@@ -22,6 +22,19 @@ export class MailTemplatesComponent extends PageComponent implements OnInit, Has
 
   readonly templateKeys = mailTemplateKeys;
 
+  readonly templateLabels: { [key: string]: string } = {
+    'test.ftl': 'Test email message',
+    'activation.ftl': 'Account activation message',
+    'account.activated.ftl': 'Account activated message',
+    'account.lockout.ftl': 'Account lockout message',
+    'reset.password.ftl': 'Reset password message',
+    'password.was.reset.ftl': 'Password was reset message',
+    '2fa.verification.code.ftl': 'Two-factor authentication code message',
+    'state.enabled.ftl': 'API usage limit enabled message',
+    'state.warning.ftl': 'API usage limit warning message',
+    'state.disabled.ftl': 'API usage limit disabled message'
+  };
+
   settingsForm: FormGroup;
   subjectControl = new FormControl('');
   bodyControl = new FormControl('');
@@ -47,6 +60,10 @@ export class MailTemplatesComponent extends PageComponent implements OnInit, Has
 
   confirmForm(): FormGroup {
     return this.settingsForm;
+  }
+
+  templateLabel(templateKey: string): string {
+    return this.templateLabels[templateKey] || templateKey;
   }
 
   setSettings(settings: MailTemplateSettings) {
