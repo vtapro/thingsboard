@@ -290,22 +290,38 @@ public class DefaultMailService implements MailService {
 
     @Override
     public void sendAccountLockoutEmail(String lockoutEmail, String email, Integer maxFailedLoginAttempts) throws ThingsboardException {
-        String subject = messages.getMessage("account.lockout.subject", null, Locale.US);
+        sendAccountLockoutEmail(TenantId.SYS_TENANT_ID, lockoutEmail, email, maxFailedLoginAttempts);
+    }
+
+    @Override
+    public void sendAccountLockoutEmail(TenantId tenantId, String lockoutEmail, String email, Integer maxFailedLoginAttempts) throws ThingsboardException {
+        String subject = getCustomTemplateSubject(tenantId, "account.lockout.ftl");
+        if (subject == null) {
+            subject = messages.getMessage("account.lockout.subject", null, Locale.US);
+        }
 
         Map<String, Object> model = new HashMap<>();
         model.put("lockoutAccount", lockoutEmail);
         model.put("maxFailedLoginAttempts", maxFailedLoginAttempts);
         model.put(TARGET_EMAIL, email);
 
-        String message = mergeTemplateIntoString("account.lockout.ftl", model);
+        String message = mergeTemplateIntoString(tenantId, "account.lockout.ftl", model);
 
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
 
     @Override
     public void sendTwoFaVerificationEmail(String email, String verificationCode, int expirationTimeSeconds) throws ThingsboardException {
-        String subject = messages.getMessage("2fa.verification.code.subject", null, Locale.US);
-        String message = mergeTemplateIntoString("2fa.verification.code.ftl", Map.of(
+        sendTwoFaVerificationEmail(TenantId.SYS_TENANT_ID, email, verificationCode, expirationTimeSeconds);
+    }
+
+    @Override
+    public void sendTwoFaVerificationEmail(TenantId tenantId, String email, String verificationCode, int expirationTimeSeconds) throws ThingsboardException {
+        String subject = getCustomTemplateSubject(tenantId, "2fa.verification.code.ftl");
+        if (subject == null) {
+            subject = messages.getMessage("2fa.verification.code.subject", null, Locale.US);
+        }
+        String message = mergeTemplateIntoString(tenantId, "2fa.verification.code.ftl", Map.of(
                 TARGET_EMAIL, email,
                 "code", verificationCode,
                 "expirationTimeSeconds", expirationTimeSeconds
@@ -316,7 +332,20 @@ public class DefaultMailService implements MailService {
 
     @Override
     public void sendApiFeatureStateEmail(ApiFeature apiFeature, ApiUsageStateValue stateValue, String email, ApiUsageRecordState recordState) throws ThingsboardException {
-        String subject = messages.getMessage("api.usage.state", null, Locale.US);
+        sendApiFeatureStateEmail(TenantId.SYS_TENANT_ID, apiFeature, stateValue, email, recordState);
+    }
+
+    @Override
+    public void sendApiFeatureStateEmail(TenantId tenantId, ApiFeature apiFeature, ApiUsageStateValue stateValue, String email, ApiUsageRecordState recordState) throws ThingsboardException {
+        String templateName = switch (stateValue) {
+            case ENABLED -> "state.enabled.ftl";
+            case WARNING -> "state.warning.ftl";
+            case DISABLED -> "state.disabled.ftl";
+        };
+        String subject = getCustomTemplateSubject(tenantId, templateName);
+        if (subject == null) {
+            subject = messages.getMessage("api.usage.state", null, Locale.US);
+        }
 
         Map<String, Object> model = new HashMap<>();
         model.put("apiFeature", apiFeature.getLabel());
@@ -325,15 +354,15 @@ public class DefaultMailService implements MailService {
         String message = switch (stateValue) {
             case ENABLED -> {
                 model.put("apiLabel", toEnabledValueLabel(apiFeature));
-                yield mergeTemplateIntoString("state.enabled.ftl", model);
+                yield mergeTemplateIntoString(tenantId, "state.enabled.ftl", model);
             }
             case WARNING -> {
                 model.put("apiValueLabel", toDisabledValueLabel(apiFeature) + " " + toWarningValueLabel(recordState));
-                yield mergeTemplateIntoString("state.warning.ftl", model);
+                yield mergeTemplateIntoString(tenantId, "state.warning.ftl", model);
             }
             case DISABLED -> {
                 model.put("apiLimitValueLabel", toDisabledValueLabel(apiFeature) + " " + toDisabledValueLabel(recordState));
-                yield mergeTemplateIntoString("state.disabled.ftl", model);
+                yield mergeTemplateIntoString(tenantId, "state.disabled.ftl", model);
             }
         };
 
@@ -429,21 +458,6 @@ public class DefaultMailService implements MailService {
         } catch (Exception e) {
             throw new ThingsboardException("Unable to send mail", ExceptionUtils.getRootCause(e), ThingsboardErrorCode.GENERAL);
         }
-    }
-
-    @Override
-    public void sendAccountLockoutEmail(TenantId tenantId, String lockoutEmail, String email, Integer maxFailedLoginAttempts) throws ThingsboardException {
-        sendAccountLockoutEmail(lockoutEmail, email, maxFailedLoginAttempts);
-    }
-
-    @Override
-    public void sendTwoFaVerificationEmail(TenantId tenantId, String email, String verificationCode, int expirationTimeSeconds) throws ThingsboardException {
-        sendTwoFaVerificationEmail(email, verificationCode, expirationTimeSeconds);
-    }
-
-    @Override
-    public void sendApiFeatureStateEmail(TenantId tenantId, ApiFeature apiFeature, ApiUsageStateValue stateValue, String email, ApiUsageRecordState recordState) throws ThingsboardException {
-        sendApiFeatureStateEmail(apiFeature, stateValue, email, recordState);
     }
 
     private String mergeTemplateIntoString(String templateLocation,

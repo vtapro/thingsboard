@@ -387,7 +387,7 @@ public class DefaultTbApiUsageStateService extends AbstractPartitionBasedService
                 if (StringUtils.isNotEmpty(email)) {
                     mailExecutor.submit(() -> {
                         try {
-                            mailService.sendApiFeatureStateEmail(apiFeature, stateValue, email, recordState);
+                            mailService.sendApiFeatureStateEmail(state.getTenantId(), apiFeature, stateValue, email, recordState);
                         } catch (ThingsboardException e) {
                             log.warn("[{}] Can't send update of the API state to tenant with provided email [{}]", state.getTenantId(), email, e);
                         }

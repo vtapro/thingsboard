@@ -253,7 +253,7 @@ public class AuthController extends BaseController {
             String loginUrl = String.format("%s/login", baseUrl);
             String email = user.getEmail();
             try {
-                mailService.sendPasswordWasResetEmail(loginUrl, email);
+                mailService.sendPasswordWasResetEmail(user.getTenantId(), loginUrl, email);
             } catch (Exception e) {
                 log.warn("Couldn't send password was reset email: {}", e.getMessage());
             }
