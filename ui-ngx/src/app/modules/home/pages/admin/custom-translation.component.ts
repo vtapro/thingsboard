@@ -7,6 +7,8 @@ import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { CustomTranslationService } from '@core/http/custom-translation.service';
 import { PageComponent } from '@shared/components/page.component';
+import { getCurrentAuthState } from '@core/auth/auth.selectors';
+import { Authority } from '@shared/models/authority.enum';
 
 @Component({
     selector: 'tb-custom-translation',
@@ -29,8 +31,10 @@ export class CustomTranslationComponent extends PageComponent implements OnInit 
   }
 
   ngOnInit() {
-    this.loadLocales();
-    this.load(this.localeControl.value);
+    if (getCurrentAuthState(this.store).authUser?.authority === Authority.TENANT_ADMIN) {
+      this.loadLocales();
+      this.load(this.localeControl.value);
+    }
   }
 
   loadLocales() {
@@ -79,4 +83,3 @@ export class CustomTranslationComponent extends PageComponent implements OnInit 
   }
 
 }
-

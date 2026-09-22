@@ -9,6 +9,8 @@ import { MailTemplateService } from '@core/http/mail-template.service';
 import { HasConfirmForm } from '@core/guards/confirm-on-exit.guard';
 import { PageComponent } from '@shared/components/page.component';
 import { MailTemplateSettings, mailTemplateKeys } from '@shared/models/mail-template.models';
+import { getCurrentAuthState } from '@core/auth/auth.selectors';
+import { Authority } from '@shared/models/authority.enum';
 
 @Component({
     selector: 'tb-mail-templates',
@@ -38,7 +40,9 @@ export class MailTemplatesComponent extends PageComponent implements OnInit, Has
     this.settingsForm = this.fb.group({
       useSystemMailTemplates: [true]
     });
-    this.mailTemplateService.getMailTemplateSettings().subscribe(settings => this.setSettings(settings));
+    if (getCurrentAuthState(this.store).authUser?.authority === Authority.TENANT_ADMIN) {
+      this.mailTemplateService.getMailTemplateSettings().subscribe(settings => this.setSettings(settings));
+    }
   }
 
   confirmForm(): FormGroup {
@@ -80,4 +84,3 @@ export class MailTemplatesComponent extends PageComponent implements OnInit, Has
   }
 
 }
-

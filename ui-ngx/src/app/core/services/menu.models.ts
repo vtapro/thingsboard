@@ -902,7 +902,6 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.queues}
         ]
       },
-      {id: MenuId.white_labeling},
       {
         id: MenuId.mobile_center,
         pages: [
