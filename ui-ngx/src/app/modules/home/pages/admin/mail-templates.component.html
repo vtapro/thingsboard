@@ -1,0 +1,56 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<div>
+  <mat-card appearance="outlined" class="settings-card">
+    <mat-card-header>
+      <mat-card-title>
+        <span class="mat-headline-5" translate>admin.mail-templates-settings</span>
+      </mat-card-title>
+    </mat-card-header>
+    @if (isLoading$ | async) {
+      <mat-progress-bar color="warn" mode="indeterminate"></mat-progress-bar>
+    }
+    @if (!(isLoading$ | async)) {
+      <div style="height: 4px;"></div>
+    }
+    <mat-card-content>
+      <form [formGroup]="settingsForm" (ngSubmit)="save()">
+        <fieldset [disabled]="isLoading$ | async">
+          <mat-checkbox class="mat-block" formControlName="useSystemMailTemplates">
+            {{ 'admin.mail-templates-use-system' | translate }}
+          </mat-checkbox>
+          <div class="tb-wl-row tb-wl-row-2">
+            <mat-form-field class="tb-wl-field" subscriptSizing="dynamic" appearance="outline">
+              <mat-label translate>admin.mail-templates-template</mat-label>
+              <mat-select [value]="selectedTemplate" (selectionChange)="selectTemplate($event.value)">
+                @for (templateKey of templateKeys; track templateKey) {
+                  <mat-option [value]="templateKey">{{ templateKey }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field class="tb-wl-field" subscriptSizing="dynamic" appearance="outline">
+              <mat-label translate>admin.mail-templates-subject</mat-label>
+              <input matInput [formControl]="subjectControl">
+            </mat-form-field>
+          </div>
+          <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
+            <mat-label translate>admin.mail-templates-body</mat-label>
+            <textarea matInput rows="12" [formControl]="bodyControl" spellcheck="false"></textarea>
+          </mat-form-field>
+          <div class="tb-wl-actions">
+            <span class="flex-1"></span>
+            <button mat-raised-button color="primary" type="submit"
+                    [disabled]="isLoading$ | async">
+              {{ 'action.save' | translate }}
+            </button>
+          </div>
+        </fieldset>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>
+

@@ -1,0 +1,26 @@
+// SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+// SPDX-License-Identifier: Apache-2.0
+.tb-wl-row {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.tb-wl-row-2 {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.tb-wl-field {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.tb-wl-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+

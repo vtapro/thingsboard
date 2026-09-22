@@ -26,6 +26,7 @@ import { TrendzSettingsComponent } from '@home/pages/admin/trendz-settings.compo
 import { ResourceLibraryTabsComponent } from '@home/pages/admin/resource/resource-library-tabs.component';
 import { WhiteLabelingComponent } from '@home/pages/admin/white-labeling.component';
 import { AdvancedCssDialogComponent } from '@home/pages/admin/advanced-css-dialog.component';
+import { MailTemplatesComponent } from '@home/pages/admin/mail-templates.component';
 
 @NgModule({
   declarations:
@@ -47,7 +48,8 @@ import { AdvancedCssDialogComponent } from '@home/pages/admin/advanced-css-dialo
       TwoFactorAuthSettingsComponent,
       TrendzSettingsComponent,
       WhiteLabelingComponent,
-      AdvancedCssDialogComponent
+      AdvancedCssDialogComponent,
+      MailTemplatesComponent
     ],
   imports: [
     CommonModule,

@@ -152,7 +152,7 @@ public class AuthController extends BaseController {
             String resetUrl = String.format("%s/api/noauth/resetPassword?resetToken=%s", baseUrl,
                     userCredentials.getResetToken());
 
-            mailService.sendResetPasswordEmailAsync(resetUrl, userCredentials.getResetTokenTtl(), email);
+            mailService.sendResetPasswordEmailAsync(user.getTenantId(), resetUrl, userCredentials.getResetTokenTtl(), email);
         } catch (Exception e) {
             log.warn("Error occurred: {}", e.getMessage());
         }
@@ -206,7 +206,7 @@ public class AuthController extends BaseController {
 
         if (sendActivationMail) {
             try {
-                mailService.sendAccountActivatedEmail(loginUrl, email);
+                mailService.sendAccountActivatedEmail(user.getTenantId(), loginUrl, email);
             } catch (Exception e) {
                 log.warn("Unable to send account activation email [{}]", e.getMessage());
             }

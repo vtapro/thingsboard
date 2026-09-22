@@ -4,6 +4,8 @@
     SPDX-License-Identifier: Apache-2.0
 
 -->
+<mat-tab-group>
+  <mat-tab label="{{ 'admin.white-labeling' | translate }}">
 <div>
   <mat-card appearance="outlined" class="settings-card">
     <mat-card-header>
@@ -153,3 +155,8 @@
     </mat-card-content>
   </mat-card>
 </div>
+  </mat-tab>
+  <mat-tab label="{{ 'admin.mail-templates-settings' | translate }}">
+    <tb-mail-templates></tb-mail-templates>
+  </mat-tab>
+</mat-tab-group>

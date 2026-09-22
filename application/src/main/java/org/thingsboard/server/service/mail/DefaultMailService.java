@@ -43,9 +43,12 @@ import org.thingsboard.server.common.stats.TbApiUsageReportClient;
 import org.thingsboard.server.dao.exception.IncorrectParameterException;
 import org.thingsboard.server.dao.settings.AdminSettingsService;
 import org.thingsboard.server.dao.settings.WhiteLabelingService;
+import org.thingsboard.server.dao.settings.MailTemplateService;
+import org.thingsboard.server.common.data.mail.MailTemplateSettings;
 import org.thingsboard.server.service.apiusage.TbApiUsageStateService;
 
 import java.io.ByteArrayInputStream;
+import java.io.StringReader;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -75,6 +78,7 @@ public class DefaultMailService implements MailService {
     private final TbMailContextComponent ctx;
     private final RateLimitService rateLimitService;
     private final WhiteLabelingService whiteLabelingService;
+    private final MailTemplateService mailTemplateService;
 
     @Value("${mail.per_tenant_rate_limits:}")
     private String perTenantRateLimitConfig;
@@ -130,52 +134,81 @@ public class DefaultMailService implements MailService {
 
     @Override
     public void sendActivationEmail(String activationLink, long ttlMs, String email) throws ThingsboardException {
-        String subject = messages.getMessage("activation.subject", null, Locale.US);
+        sendActivationEmail(TenantId.SYS_TENANT_ID, activationLink, ttlMs, email);
+    }
+
+    @Override
+    public void sendActivationEmail(TenantId tenantId, String activationLink, long ttlMs, String email) throws ThingsboardException {
+        String subject = getCustomTemplateSubject(tenantId, "activation.ftl");
+        if (subject == null) {
+            subject = messages.getMessage("activation.subject", null, Locale.US);
+        }
 
         Map<String, Object> model = new HashMap<>();
         model.put("activationLink", activationLink);
         model.put("activationLinkTtlInHours", (int) Math.ceil(ttlMs / 3600000.0));
         model.put(TARGET_EMAIL, email);
 
-        String message = mergeTemplateIntoString("activation.ftl", model);
+        String message = mergeTemplateIntoString(tenantId, "activation.ftl", model);
 
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
 
     @Override
     public void sendAccountActivatedEmail(String loginLink, String email) throws ThingsboardException {
+        sendAccountActivatedEmail(TenantId.SYS_TENANT_ID, loginLink, email);
+    }
 
-        String subject = messages.getMessage("account.activated.subject", null, Locale.US);
+    @Override
+    public void sendAccountActivatedEmail(TenantId tenantId, String loginLink, String email) throws ThingsboardException {
+
+        String subject = getCustomTemplateSubject(tenantId, "account.activated.ftl");
+        if (subject == null) {
+            subject = messages.getMessage("account.activated.subject", null, Locale.US);
+        }
 
         Map<String, Object> model = new HashMap<>();
         model.put("loginLink", loginLink);
         model.put(TARGET_EMAIL, email);
 
-        String message = mergeTemplateIntoString("account.activated.ftl", model);
+        String message = mergeTemplateIntoString(tenantId, "account.activated.ftl", model);
 
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
 
     @Override
     public void sendResetPasswordEmail(String passwordResetLink, long ttlMs, String email) throws ThingsboardException {
+        sendResetPasswordEmail(TenantId.SYS_TENANT_ID, passwordResetLink, ttlMs, email);
+    }
 
-        String subject = messages.getMessage("reset.password.subject", null, Locale.US);
+    @Override
+    public void sendResetPasswordEmail(TenantId tenantId, String passwordResetLink, long ttlMs, String email) throws ThingsboardException {
+
+        String subject = getCustomTemplateSubject(tenantId, "reset.password.ftl");
+        if (subject == null) {
+            subject = messages.getMessage("reset.password.subject", null, Locale.US);
+        }
 
         Map<String, Object> model = new HashMap<>();
         model.put("passwordResetLink", passwordResetLink);
         model.put("passwordResetLinkTtlInHours", (int) Math.ceil(ttlMs / 3600000.0));
         model.put(TARGET_EMAIL, email);
 
-        String message = mergeTemplateIntoString("reset.password.ftl", model);
+        String message = mergeTemplateIntoString(tenantId, "reset.password.ftl", model);
 
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
 
     @Override
     public void sendResetPasswordEmailAsync(String passwordResetLink, long ttlMs, String email) {
+        sendResetPasswordEmailAsync(TenantId.SYS_TENANT_ID, passwordResetLink, ttlMs, email);
+    }
+
+    @Override
+    public void sendResetPasswordEmailAsync(TenantId tenantId, String passwordResetLink, long ttlMs, String email) {
         passwordResetExecutorService.execute(() -> {
             try {
-                this.sendResetPasswordEmail(passwordResetLink, ttlMs, email);
+                this.sendResetPasswordEmail(tenantId, passwordResetLink, ttlMs, email);
             } catch (Exception e) {
                 log.error("Error occurred: {} ", e.getMessage());
             }
@@ -184,14 +217,22 @@ public class DefaultMailService implements MailService {
 
     @Override
     public void sendPasswordWasResetEmail(String loginLink, String email) throws ThingsboardException {
+        sendPasswordWasResetEmail(TenantId.SYS_TENANT_ID, loginLink, email);
+    }
 
-        String subject = messages.getMessage("password.was.reset.subject", null, Locale.US);
+    @Override
+    public void sendPasswordWasResetEmail(TenantId tenantId, String loginLink, String email) throws ThingsboardException {
+
+        String subject = getCustomTemplateSubject(tenantId, "password.was.reset.ftl");
+        if (subject == null) {
+            subject = messages.getMessage("password.was.reset.subject", null, Locale.US);
+        }
 
         Map<String, Object> model = new HashMap<>();
         model.put("loginLink", loginLink);
         model.put(TARGET_EMAIL, email);
 
-        String message = mergeTemplateIntoString("password.was.reset.ftl", model);
+        String message = mergeTemplateIntoString(tenantId, "password.was.reset.ftl", model);
 
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
@@ -390,16 +431,76 @@ public class DefaultMailService implements MailService {
         }
     }
 
+    @Override
+    public void sendAccountLockoutEmail(TenantId tenantId, String lockoutEmail, String email, Integer maxFailedLoginAttempts) throws ThingsboardException {
+        sendAccountLockoutEmail(lockoutEmail, email, maxFailedLoginAttempts);
+    }
+
+    @Override
+    public void sendTwoFaVerificationEmail(TenantId tenantId, String email, String verificationCode, int expirationTimeSeconds) throws ThingsboardException {
+        sendTwoFaVerificationEmail(email, verificationCode, expirationTimeSeconds);
+    }
+
+    @Override
+    public void sendApiFeatureStateEmail(TenantId tenantId, ApiFeature apiFeature, ApiUsageStateValue stateValue, String email, ApiUsageRecordState recordState) throws ThingsboardException {
+        sendApiFeatureStateEmail(apiFeature, stateValue, email, recordState);
+    }
+
     private String mergeTemplateIntoString(String templateLocation,
+                                           Map<String, Object> model) throws ThingsboardException {
+        return mergeTemplateIntoString(null, templateLocation, model);
+    }
+
+    private String mergeTemplateIntoString(TenantId tenantId, String templateLocation,
                                            Map<String, Object> model) throws ThingsboardException {
         try {
             Map<String, Object> templateModel = new HashMap<>(model);
             addWhiteLabelingModel(templateModel);
+            String customBody = getCustomTemplateBody(tenantId, templateLocation);
+            if (customBody != null) {
+                Template customTemplate = new Template(templateLocation, new StringReader(customBody), freemarkerConfig);
+                return FreeMarkerTemplateUtils.processTemplateIntoString(customTemplate, templateModel);
+            }
             Template template = freemarkerConfig.getTemplate(templateLocation);
             return FreeMarkerTemplateUtils.processTemplateIntoString(template, templateModel);
         } catch (Exception e) {
             log.warn("Failed to process mail template: {}", ExceptionUtils.getRootCauseMessage(e));
             throw new ThingsboardException("Failed to process mail template: " + e.getMessage(), e, ThingsboardErrorCode.GENERAL);
+        }
+    }
+
+    private String getCustomTemplateBody(TenantId tenantId, String templateLocation) {
+        if (tenantId == null) {
+            return null;
+        }
+        MailTemplateSettings.MailTemplate template = getCustomMailTemplate(tenantId, templateLocation);
+        if (template == null || template.getBody() == null || template.getBody().isBlank()) {
+            return null;
+        }
+        return template.getBody();
+    }
+
+    private String getCustomTemplateSubject(TenantId tenantId, String templateLocation) {
+        if (tenantId == null) {
+            return null;
+        }
+        MailTemplateSettings.MailTemplate template = getCustomMailTemplate(tenantId, templateLocation);
+        if (template == null || template.getSubject() == null || template.getSubject().isBlank()) {
+            return null;
+        }
+        return template.getSubject();
+    }
+
+    private MailTemplateSettings.MailTemplate getCustomMailTemplate(TenantId tenantId, String templateLocation) {
+        try {
+            MailTemplateSettings settings = mailTemplateService.getMailTemplateSettings(tenantId);
+            if (settings == null || settings.isUseSystemMailTemplates() || settings.getTemplates() == null) {
+                return null;
+            }
+            return settings.getTemplates().get(templateLocation);
+        } catch (Exception e) {
+            log.warn("Failed to load custom mail template [{}]: {}", templateLocation, ExceptionUtils.getRootCauseMessage(e));
+            return null;
         }
     }
 
