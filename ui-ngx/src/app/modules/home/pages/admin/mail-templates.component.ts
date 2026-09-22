@@ -11,6 +11,8 @@ import { PageComponent } from '@shared/components/page.component';
 import { MailTemplateSettings, mailTemplateKeys } from '@shared/models/mail-template.models';
 import { getCurrentAuthState } from '@core/auth/auth.selectors';
 import { Authority } from '@shared/models/authority.enum';
+import { EditorOptions } from 'hugerte';
+import { defaultHugeRteOptions } from '@shared/models/hugerte/hugerte.models';
 
 @Component({
     selector: 'tb-mail-templates',
@@ -40,6 +42,15 @@ export class MailTemplatesComponent extends PageComponent implements OnInit, Has
   bodyControl = new FormControl('');
 
   selectedTemplate = mailTemplateKeys[0];
+
+  hugeRteOptions: Partial<EditorOptions> = defaultHugeRteOptions({
+    height: 420,
+    menubar: true,
+    plugins: 'anchor autolink charmap code fullscreen image link lists searchreplace table visualblocks wordcount',
+    toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image table | ' +
+      'alignleft aligncenter alignright | bullist numlist | code fullscreen',
+    valid_elements: '*[*]'
+  });
 
   private templates: { [key: string]: { subject?: string; body?: string } } = {};
 

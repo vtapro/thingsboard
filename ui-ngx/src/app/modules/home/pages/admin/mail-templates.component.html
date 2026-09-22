@@ -38,10 +38,10 @@
               <input matInput [formControl]="subjectControl">
             </mat-form-field>
           </div>
-          <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
-            <mat-label translate>admin.mail-templates-body</mat-label>
-            <textarea matInput rows="12" [formControl]="bodyControl" spellcheck="false"></textarea>
-          </mat-form-field>
+          <div class="tb-mt-body">
+            <label class="tb-mt-body-label" translate>admin.mail-templates-body</label>
+            <editor [init]="hugeRteOptions" [formControl]="bodyControl"></editor>
+          </div>
           <div class="tb-wl-actions">
             <span class="flex-1"></span>
             <button mat-raised-button color="primary" type="submit"
