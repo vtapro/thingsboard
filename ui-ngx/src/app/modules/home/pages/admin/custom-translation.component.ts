@@ -23,6 +23,10 @@ export class CustomTranslationComponent extends PageComponent implements OnInit 
 
   locales: string[] = [];
 
+  localeRows: Array<{locale: string; count: number}> = [];
+
+  readonly displayedColumns = ['flag', 'locale', 'keys', 'actions'];
+
   parseError = false;
 
   constructor(protected store: Store<AppState>,
@@ -39,8 +43,18 @@ export class CustomTranslationComponent extends PageComponent implements OnInit 
 
   loadLocales() {
     this.customTranslationService.getAllCustomTranslations().subscribe(translations => {
-      this.locales = Object.keys(translations || {}).sort();
+      const all = translations || {};
+      this.locales = Object.keys(all).sort();
+      this.localeRows = this.locales.map(locale => ({locale, count: Object.keys(all[locale] || {}).length}));
     });
+  }
+
+  flagFor(locale: string): string {
+    const region = (locale || '').split('_')[1];
+    if (!region || region.length !== 2) {
+      return '🌐';
+    }
+    return String.fromCodePoint(...region.toUpperCase().split('').map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
   }
 
   selectLocale(locale: string) {

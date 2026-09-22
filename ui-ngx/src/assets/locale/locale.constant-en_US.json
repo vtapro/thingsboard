@@ -130,6 +130,7 @@
         "mail-templates-body": "Mail body",
         "custom-translation": "Custom translation",
         "custom-translation-locale": "Localization code",
+        "custom-translation-keys": "Overridden keys",
         "custom-translation-hint": "Enter custom translations as JSON for the locale above, for example { \"login.sign-in\": \"Sign in\" }. Keys not present here use the platform bundle.",
         "custom-translation-invalid-json": "Invalid JSON. Please fix the syntax and try again.",
         "custom-menu": "Custom menu",
