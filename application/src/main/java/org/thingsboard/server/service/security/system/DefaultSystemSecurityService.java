@@ -114,16 +114,20 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
                 && failedVerificationAttempts >= maxVerificationFailures) {
             userService.setUserCredentialsEnabled(TenantId.SYS_TENANT_ID, userId, false);
             SecuritySettings securitySettings = securitySettingsService.getSecuritySettings();
-            lockAccount(userId, securityUser.getEmail(), securitySettings.getUserLockoutNotificationEmail(), maxVerificationFailures);
+            lockAccount(securityUser.getTenantId(), userId, securityUser.getEmail(), securitySettings.getUserLockoutNotificationEmail(), maxVerificationFailures);
             throw new LockedException("User account was locked due to exceeded 2FA verification attempts");
         }
     }
 
     private void lockAccount(UserId userId, String username, String userLockoutNotificationEmail, Integer maxFailedLoginAttempts) {
+        lockAccount(TenantId.SYS_TENANT_ID, userId, username, userLockoutNotificationEmail, maxFailedLoginAttempts);
+    }
+
+    private void lockAccount(TenantId tenantId, UserId userId, String username, String userLockoutNotificationEmail, Integer maxFailedLoginAttempts) {
         userService.setUserCredentialsEnabled(TenantId.SYS_TENANT_ID, userId, false);
         if (StringUtils.isNotBlank(userLockoutNotificationEmail)) {
             try {
-                mailService.sendAccountLockoutEmail(username, userLockoutNotificationEmail, maxFailedLoginAttempts);
+                mailService.sendAccountLockoutEmail(tenantId, username, userLockoutNotificationEmail, maxFailedLoginAttempts);
             } catch (ThingsboardException e) {
                 log.warn("Can't send email regarding user account [{}] lockout to provided email [{}]", username, userLockoutNotificationEmail, e);
             }
