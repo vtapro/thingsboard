@@ -27,6 +27,7 @@ import { ResourceLibraryTabsComponent } from '@home/pages/admin/resource/resourc
 import { WhiteLabelingComponent } from '@home/pages/admin/white-labeling.component';
 import { AdvancedCssDialogComponent } from '@home/pages/admin/advanced-css-dialog.component';
 import { MailTemplatesComponent } from '@home/pages/admin/mail-templates.component';
+import { CustomTranslationComponent } from '@home/pages/admin/custom-translation.component';
 
 @NgModule({
   declarations:
@@ -49,7 +50,8 @@ import { MailTemplatesComponent } from '@home/pages/admin/mail-templates.compone
       TrendzSettingsComponent,
       WhiteLabelingComponent,
       AdvancedCssDialogComponent,
-      MailTemplatesComponent
+      MailTemplatesComponent,
+      CustomTranslationComponent
     ],
   imports: [
     CommonModule,

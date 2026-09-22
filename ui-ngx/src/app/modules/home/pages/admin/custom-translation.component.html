@@ -1,0 +1,57 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<div>
+  <mat-card appearance="outlined" class="settings-card">
+    <mat-card-header>
+      <mat-card-title>
+        <span class="mat-headline-5" translate>admin.custom-translation</span>
+      </mat-card-title>
+    </mat-card-header>
+    @if (isLoading$ | async) {
+      <mat-progress-bar color="warn" mode="indeterminate"></mat-progress-bar>
+    }
+    @if (!(isLoading$ | async)) {
+      <div style="height: 4px;"></div>
+    }
+    <mat-card-content>
+      <div class="tb-ct-row">
+        <mat-form-field class="tb-ct-locale" subscriptSizing="dynamic" appearance="outline">
+          <mat-label translate>admin.custom-translation-locale</mat-label>
+          <input matInput [formControl]="localeControl" placeholder="en_US">
+        </mat-form-field>
+        <button mat-stroked-button type="button" (click)="reload()">
+          {{ 'action.reload' | translate }}
+        </button>
+      </div>
+      @if (locales.length) {
+        <div class="tb-ct-row tb-ct-chips">
+          @for (locale of locales; track locale) {
+            <button mat-stroked-button type="button" (click)="selectLocale(locale)">{{ locale }}</button>
+          }
+        </div>
+      }
+      <div class="tb-white-labeling-hint" translate>admin.custom-translation-hint</div>
+      <textarea class="tb-ct-editor"
+                [formControl]="translationsControl"
+                spellcheck="false"
+                placeholder='{ "login.sign-in": "Sign in" }'></textarea>
+      @if (parseError) {
+        <div class="tb-ct-error" translate>admin.custom-translation-invalid-json</div>
+      }
+      <div class="tb-ct-actions">
+        <button mat-stroked-button color="warn" type="button" (click)="delete()">
+          {{ 'action.delete' | translate }}
+        </button>
+        <span class="flex-1"></span>
+        <button mat-raised-button color="primary" type="button" (click)="save()">
+          {{ 'action.save' | translate }}
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>
+
