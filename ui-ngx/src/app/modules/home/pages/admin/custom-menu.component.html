@@ -1,0 +1,97 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<div>
+  <mat-card appearance="outlined" class="settings-card">
+    <mat-card-header>
+      <mat-card-title>
+        <span class="mat-headline-5" translate>admin.custom-menu</span>
+      </mat-card-title>
+    </mat-card-header>
+    @if (isLoading$ | async) {
+      <mat-progress-bar color="warn" mode="indeterminate"></mat-progress-bar>
+    }
+    @if (!(isLoading$ | async)) {
+      <div style="height: 4px;"></div>
+    }
+    <mat-card-content>
+      <div class="tb-cm-add">
+        <mat-form-field class="tb-cm-field" subscriptSizing="dynamic" appearance="outline">
+          <mat-label translate>admin.custom-menu-name</mat-label>
+          <input matInput [formControl]="nameControl">
+        </mat-form-field>
+        <mat-form-field class="tb-cm-field" subscriptSizing="dynamic" appearance="outline">
+          <mat-label translate>admin.custom-menu-type</mat-label>
+          <mat-select [formControl]="typeControl">
+            <mat-option value="dashboard">Dashboard</mat-option>
+            <mat-option value="url">URL</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field class="tb-cm-field" subscriptSizing="dynamic" appearance="outline">
+          <mat-label translate>admin.custom-menu-target</mat-label>
+          <input matInput [formControl]="targetControl" placeholder="dashboard id hoặc https://...">
+        </mat-form-field>
+        <mat-form-field class="tb-cm-field" subscriptSizing="dynamic" appearance="outline">
+          <mat-label translate>admin.custom-menu-icon</mat-label>
+          <input matInput [formControl]="iconControl" placeholder="mdi:view-dashboard-outline">
+        </mat-form-field>
+        <mat-form-field class="tb-cm-field" subscriptSizing="dynamic" appearance="outline">
+          <mat-label translate>admin.custom-menu-assignee</mat-label>
+          <mat-select [formControl]="assigneeControl">
+            @for (assignee of assigneeTypes; track assignee.value) {
+              <mat-option [value]="assignee.value">{{ assignee.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <button mat-stroked-button color="primary" type="button" (click)="addItem()">
+          {{ 'admin.custom-menu-add' | translate }}
+        </button>
+      </div>
+      <table mat-table [dataSource]="items" class="mat-elevation-z0 tb-cm-table">
+        <ng-container matColumnDef="order">
+          <th mat-header-cell *matHeaderCellDef>#</th>
+          <td mat-cell *matCellDef="let item">{{ item.order }}</td>
+        </ng-container>
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>{{ 'admin.custom-menu-name' | translate }}</th>
+          <td mat-cell *matCellDef="let item">{{ item.name }}</td>
+        </ng-container>
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef>{{ 'admin.custom-menu-type' | translate }}</th>
+          <td mat-cell *matCellDef="let item">{{ item.type }}</td>
+        </ng-container>
+        <ng-container matColumnDef="target">
+          <th mat-header-cell *matHeaderCellDef>{{ 'admin.custom-menu-target' | translate }}</th>
+          <td mat-cell *matCellDef="let item">{{ item.target }}</td>
+        </ng-container>
+        <ng-container matColumnDef="assigneeType">
+          <th mat-header-cell *matHeaderCellDef>{{ 'admin.custom-menu-assignee' | translate }}</th>
+          <td mat-cell *matCellDef="let item">{{ item.assigneeType || 'Not assigned' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let item; let i = index">
+            <button mat-icon-button type="button" (click)="moveUp(i)" [disabled]="i === 0">
+              <mat-icon>arrow_upward</mat-icon>
+            </button>
+            <button mat-icon-button type="button" (click)="removeItem(item)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+      <div class="tb-cm-actions">
+        <span class="flex-1"></span>
+        <button mat-raised-button color="primary" type="button" (click)="save()">
+          {{ 'action.save' | translate }}
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>
+

@@ -1061,7 +1061,29 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
 
 export const buildUserMenu = (authState: AuthState): Array<MenuSection> => {
   const references = defaultUserMenuMap.get(authState.authUser.authority);
-  return (references || []).map(ref => referenceToMenuSection(authState, ref)).filter(section => !!section);
+  const sections = (references || []).map(ref => referenceToMenuSection(authState, ref)).filter(section => !!section);
+  return sections.concat(buildCustomMenuSections(authState));
+};
+
+let customMenuItems: Array<{ id: string; name: string; icon?: string; type: string; target: string; assigneeType?: string; order?: number }> = [];
+
+export const setCustomMenuItems = (items: Array<{ id: string; name: string; icon?: string; type: string; target: string; assigneeType?: string; order?: number }>): void => {
+  customMenuItems = items || [];
+};
+
+const buildCustomMenuSections = (authState: AuthState): Array<MenuSection> => {
+  const authority = authState?.authUser?.authority;
+  return (customMenuItems || [])
+    .filter(item => !item.assigneeType || item.assigneeType === authority)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .map(item => ({
+      id: item.id,
+      name: item.name,
+      type: 'link' as MenuSectionType,
+      path: item.type === 'url' ? item.target : `/dashboards/${item.target}`,
+      icon: item.icon || 'mdi:link-variant',
+      customTranslate: true
+    }));
 };
 
 export const buildUserHome = (currentMenuSections: MenuSection[]): Array<HomeSection> => {

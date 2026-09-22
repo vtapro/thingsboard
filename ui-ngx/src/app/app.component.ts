@@ -22,6 +22,7 @@ import { initCustomJQueryEvents } from '@shared/models/jquery-event.models';
 import { WhiteLabelingService } from '@core/http/white-labeling.service';
 import { WhiteLabelingSettings } from '@shared/models/white-labeling.models';
 import { CustomTranslationService } from '@core/http/custom-translation.service';
+import { CustomMenuService } from '@core/http/custom-menu.service';
 
 @Component({
     selector: 'tb-root',
@@ -39,6 +40,7 @@ export class AppComponent {
               private authService: AuthService,
               private whiteLabelingService: WhiteLabelingService,
               private customTranslationService: CustomTranslationService,
+              private customMenuService: CustomMenuService,
               @Inject(DOCUMENT) private document: Document) {
 
     console.log(`ThingsBoard Version: ${env.tbVersion}`);
@@ -115,6 +117,7 @@ export class AppComponent {
     ).subscribe((data) => {
       if (data.isAuthenticated) {
         this.whiteLabelingService.loadAuthenticatedWhiteLabelingSettings();
+        this.customMenuService.loadCustomMenu();
       }
       this.authService.gotoDefaultPlace(data.isAuthenticated);
     });

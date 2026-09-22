@@ -28,6 +28,7 @@ import { WhiteLabelingComponent } from '@home/pages/admin/white-labeling.compone
 import { AdvancedCssDialogComponent } from '@home/pages/admin/advanced-css-dialog.component';
 import { MailTemplatesComponent } from '@home/pages/admin/mail-templates.component';
 import { CustomTranslationComponent } from '@home/pages/admin/custom-translation.component';
+import { CustomMenuComponent } from '@home/pages/admin/custom-menu.component';
 
 @NgModule({
   declarations:
@@ -51,7 +52,8 @@ import { CustomTranslationComponent } from '@home/pages/admin/custom-translation
       WhiteLabelingComponent,
       AdvancedCssDialogComponent,
       MailTemplatesComponent,
-      CustomTranslationComponent
+      CustomTranslationComponent,
+      CustomMenuComponent
     ],
   imports: [
     CommonModule,
