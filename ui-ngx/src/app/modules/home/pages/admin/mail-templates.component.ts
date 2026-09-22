@@ -46,7 +46,8 @@ export class MailTemplatesComponent extends PageComponent implements OnInit, Has
   hugeRteOptions: Partial<EditorOptions> = defaultHugeRteOptions({
     height: 420,
     menubar: true,
-    plugins: 'anchor autolink charmap code fullscreen image link lists searchreplace table visualblocks wordcount',
+    plugins: ['anchor', 'autolink', 'charmap', 'code', 'fullscreen', 'image', 'link', 'lists',
+      'searchreplace', 'table', 'visualblocks', 'wordcount'],
     toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image table | ' +
       'alignleft aligncenter alignright | bullist numlist | code fullscreen',
     valid_elements: '*[*]'
