@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import 'hammerjs';
 
-import { Component } from '@angular/core';
+import { Component, DOCUMENT, Inject } from '@angular/core';
 
 import { environment as env } from '@env/environment';
 
@@ -19,6 +19,8 @@ import { svgIcons, svgIconsUrl } from '@shared/models/icon.models';
 import { ActionSettingsChangeLanguage } from '@core/settings/settings.actions';
 import { SETTINGS_KEY } from '@core/settings/settings.effects';
 import { initCustomJQueryEvents } from '@shared/models/jquery-event.models';
+import { WhiteLabelingService } from '@core/http/white-labeling.service';
+import { WhiteLabelingSettings } from '@shared/models/white-labeling.models';
 
 @Component({
     selector: 'tb-root',
@@ -33,9 +35,13 @@ export class AppComponent {
               private translate: TranslateService,
               private matIconRegistry: MatIconRegistry,
               private domSanitizer: DomSanitizer,
-              private authService: AuthService) {
+              private authService: AuthService,
+              private whiteLabelingService: WhiteLabelingService,
+              @Inject(DOCUMENT) private document: Document) {
 
     console.log(`ThingsBoard Version: ${env.tbVersion}`);
+
+    this.setupWhiteLabeling();
 
     this.matIconRegistry.addSvgIconResolver((name, namespace) => {
       if (namespace === 'mdi') {
@@ -66,6 +72,21 @@ export class AppComponent {
     initCustomJQueryEvents();
   }
 
+  setupWhiteLabeling() {
+    this.whiteLabelingService.loadWhiteLabelingSettings().subscribe();
+    this.whiteLabelingService.settings$.subscribe(settings => this.applyFavicon(settings));
+  }
+
+  private applyFavicon(settings: WhiteLabelingSettings) {
+    if (!settings.enabled || !settings.faviconUrl) {
+      return;
+    }
+    const favicon: HTMLLinkElement = this.document.querySelector('link[rel*="icon"]');
+    if (favicon) {
+      favicon.href = settings.faviconUrl;
+    }
+  }
+
   setupTranslate() {
     if (!env.production) {
       console.log(`Supported Langs: ${env.supportedLangs}`);
@@ -90,6 +111,9 @@ export class AppComponent {
       }),
       skip(1),
     ).subscribe((data) => {
+      if (data.isAuthenticated) {
+        this.whiteLabelingService.loadAuthenticatedWhiteLabelingSettings();
+      }
       this.authService.gotoDefaultPlace(data.isAuthenticated);
     });
     this.authService.reloadUser();

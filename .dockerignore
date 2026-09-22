@@ -1,0 +1,6 @@
+# Build artifacts and local logs are not required inside the build context
+**/target
+**/node_modules
+**/.gradle
+**/*.log
+**/*.log.*

@@ -9,6 +9,7 @@ import { Authority } from '@shared/models/authority.enum';
 import { AppState } from '@core/core.state';
 import { LocalStorageService } from '@core/local-storage/local-storage.service';
 import { Subject } from 'rxjs';
+import { WhiteLabelingService } from '@core/http/white-labeling.service';
 
 const SETTINGS_KEY = 'HIDE_GITHUB_STAR_BUTTON';
 
@@ -32,11 +33,18 @@ export class GithubBadgeComponent implements OnInit, OnDestroy {
   constructor(private gitHubService: GitHubService,
               private localStorageService: LocalStorageService,
               private store: Store<AppState>,
-              private cd: ChangeDetectorRef) {
+              private cd: ChangeDetectorRef,
+              private whiteLabelingService: WhiteLabelingService) {
   }
 
   ngOnInit() {
     this.hide = this.localStorageService.getItem(SETTINGS_KEY) ?? false;
+
+    this.whiteLabelingService.settings$.subscribe(settings => {
+      if (settings.enabled && settings.hideVendorPromotion && !this.hide) {
+        this.hideBadge();
+      }
+    });
 
     if (!this.hide) {
       this.store.select(selectIsAuthenticated).pipe(
@@ -68,6 +76,10 @@ export class GithubBadgeComponent implements OnInit, OnDestroy {
   hideGithubStar($event: Event) {
     $event?.stopPropagation();
     this.localStorageService.setItem(SETTINGS_KEY, true);
+    this.hideBadge();
+  }
+
+  private hideBadge() {
     this.hide = true;
     this.githubStar = 0;
 

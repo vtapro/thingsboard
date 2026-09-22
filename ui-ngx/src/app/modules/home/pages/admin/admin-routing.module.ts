@@ -34,6 +34,7 @@ import { catchError } from 'rxjs/operators';
 import { JsLibraryTableConfigResolver } from '@home/pages/admin/resource/js-library-table-config.resolver';
 import { TrendzSettingsComponent } from '@home/pages/admin/trendz-settings.component';
 import { aiModelRoutes } from '@home/pages/ai-model/ai-model-routing.module';
+import { WhiteLabelingComponent } from '@home/pages/admin/white-labeling.component';
 
 export const scadaSymbolResolver: ResolveFn<ScadaSymbolData> =
   (route: ActivatedRouteSnapshot,
@@ -244,6 +245,10 @@ const routes: Routes = [
         }
       },
       {
+        path: 'white-labeling',
+        redirectTo: '/white-labeling'
+      },
+      {
         path: 'outgoing-mail',
         component: MailServerComponent,
         canDeactivate: [ConfirmOnExitGuard],
@@ -379,6 +384,18 @@ const routes: Routes = [
         redirectTo: '/settings/notifications'
       }
     ]
+  },
+  {
+    path: 'white-labeling',
+    component: WhiteLabelingComponent,
+    canDeactivate: [ConfirmOnExitGuard],
+    data: {
+      auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN],
+      title: 'admin.white-labeling',
+      breadcrumb: {
+        menuId: MenuId.white_labeling
+      }
+    }
   },
   {
     path: 'security-settings',

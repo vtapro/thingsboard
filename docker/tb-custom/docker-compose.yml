@@ -1,0 +1,43 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+services:
+  postgres:
+    restart: always
+    image: "postgres:16"
+    environment:
+      POSTGRES_DB: "thingsboard"
+      POSTGRES_PASSWORD: "postgres"
+    volumes:
+      - tb-custom-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d thingsboard"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  tb-node:
+    restart: always
+    build:
+      context: "../.."
+      dockerfile: "docker/tb-custom/Dockerfile"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/thingsboard"
+      SPRING_DATASOURCE_USERNAME: "postgres"
+      SPRING_DATASOURCE_PASSWORD: "postgres"
+      TB_QUEUE_TYPE: "in-memory"
+      INSTALL_DATA_DIR: "/app/data"
+      RUN_INSTALL: "true"
+      JAVA_OPTS: "-Xmx2048M -Xms512M"
+    ports:
+      - "8080:8080"
+      - "11883:1883"
+      - "7070:7070"
+      - "5683:5683/udp"
+
+volumes:
+  tb-custom-postgres-data:

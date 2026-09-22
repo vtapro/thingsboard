@@ -7,6 +7,8 @@ import { Store } from '@ngrx/store';
 import { UrlTree } from '@angular/router';
 import { getCurrentAuthState } from '@core/auth/auth.selectors';
 import { UrlHolder } from '@shared/pipe/image.pipe';
+import { WhiteLabelingService } from '@core/http/white-labeling.service';
+import { WhiteLabelingSettings } from '@shared/models/white-labeling.models';
 
 @Component({
     selector: 'tb-logo',
@@ -16,8 +18,13 @@ import { UrlHolder } from '@shared/pipe/image.pipe';
 })
 export class LogoComponent implements OnInit {
 
+  private static readonly DEFAULT_LOGO = 'assets/logo_title_white.svg';
+
   @Input()
-  src: string | UrlHolder = 'assets/logo_title_white.svg';
+  src: string | UrlHolder;
+
+  @Input()
+  darkBackground = false;
 
   @Input()
   link: string | UrlTree;
@@ -25,13 +32,26 @@ export class LogoComponent implements OnInit {
   @Input()
   target: string = null;
 
+  private customLogoSrc: string;
+
+  logoHeightPx: number;
+
   isExternal = false;
 
   constructor(private authService: AuthService,
-              private store: Store<AppState>) {
+              private store: Store<AppState>,
+              private whiteLabelingService: WhiteLabelingService) {
+  }
+
+  get logoSrc(): string | UrlHolder {
+    return this.src || this.customLogoSrc || LogoComponent.DEFAULT_LOGO;
   }
 
   ngOnInit() {
+    this.whiteLabelingService.settings$.subscribe(settings => {
+      this.customLogoSrc = this.resolveCustomLogoSrc(settings);
+      this.logoHeightPx = settings.enabled ? settings.logoHeight : null;
+    });
     if (!this.link) {
       const authState = getCurrentAuthState(this.store);
       this.link = this.authService.defaultUrl(true, authState);
@@ -39,5 +59,14 @@ export class LogoComponent implements OnInit {
     if (typeof this.link === 'string' && this.link.startsWith('http')) {
       this.isExternal = true;
     }
+  }
+
+  private resolveCustomLogoSrc(settings: WhiteLabelingSettings): string {
+    if (!settings.enabled) {
+      return null;
+    }
+    return this.darkBackground
+      ? settings.logoImageUrlDark || settings.logoImageUrl
+      : settings.logoImageUrl || settings.logoImageUrlDark;
   }
 }

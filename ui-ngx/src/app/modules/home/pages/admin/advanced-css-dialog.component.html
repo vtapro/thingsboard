@@ -1,0 +1,16 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<h2 mat-dialog-title>{{ 'admin.white-labeling-advanced-css' | translate }}</h2>
+<mat-dialog-content class="tb-advanced-css-dialog-content">
+  <tb-css class="tb-advanced-css-editor"
+          [formControl]="advancedCssControl"
+          label="{{ 'admin.white-labeling-advanced-css' | translate }}"></tb-css>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="cancel()">{{ 'action.cancel' | translate }}</button>
+  <button mat-raised-button color="primary" type="button" (click)="save()">{{ 'action.save' | translate }}</button>
+</mat-dialog-actions>

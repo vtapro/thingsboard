@@ -944,6 +944,7 @@
                                     <exclude>**/data/certs/**</exclude>
                                     <exclude>**/*.otf</exclude>
                                     <exclude>**/*.txt</exclude>
+                                    <exclude>**/Dockerfile</exclude>
                                 </excludes>
                             </licenseSet>
                         </licenseSets>

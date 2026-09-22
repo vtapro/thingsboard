@@ -1,0 +1,155 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<div>
+  <mat-card appearance="outlined" class="settings-card">
+    <mat-card-header>
+      <mat-card-title>
+        <span class="mat-headline-5" translate>admin.white-labeling</span>
+      </mat-card-title>
+    </mat-card-header>
+    @if (isLoading$ | async) {
+      <mat-progress-bar color="warn" mode="indeterminate">
+      </mat-progress-bar>
+    }
+    @if (!(isLoading$ | async)) {
+      <div style="height: 4px;"></div>
+    }
+    <mat-card-content>
+      <form [formGroup]="whiteLabelingForm" (ngSubmit)="save()">
+        <fieldset [disabled]="isLoading$ | async">
+          <mat-checkbox class="mat-block" formControlName="enabled">
+            {{ 'admin.white-labeling-enable' | translate }}
+          </mat-checkbox>
+          <div class="tb-white-labeling-hint" translate>admin.white-labeling-hint</div>
+          <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
+            <mat-label translate>admin.white-labeling-app-title</mat-label>
+            <input matInput formControlName="appTitle">
+          </mat-form-field>
+          <div class="tb-wl-row">
+            <tb-gallery-image-input label="{{ 'admin.white-labeling-favicon' | translate }}"
+                                    formControlName="faviconUrl">
+            </tb-gallery-image-input>
+          </div>
+          <div class="tb-wl-row">
+            <tb-gallery-image-input label="{{ 'admin.white-labeling-logo' | translate }}"
+                                    formControlName="logoImageUrl">
+            </tb-gallery-image-input>
+          </div>
+          <div class="tb-wl-row">
+            <tb-gallery-image-input label="{{ 'admin.white-labeling-logo-dark' | translate }}"
+                                    formControlName="logoImageUrlDark">
+            </tb-gallery-image-input>
+          </div>
+          <div class="tb-wl-row tb-wl-row-2">
+            <mat-form-field class="tb-wl-field" subscriptSizing="dynamic" appearance="outline">
+              <mat-label translate>admin.white-labeling-primary-palette</mat-label>
+              <mat-select [value]="primaryPalette" (selectionChange)="onPrimaryPalette($event.value)">
+                <mat-option [value]="customPalette">{{ 'admin.white-labeling-custom' | translate }}</mat-option>
+                @for (palette of palettes; track palette.name) {
+                  <mat-option [value]="palette.name">
+                    <span class="tb-palette-swatch" [style.background]="palette.color"></span>
+                    {{ palette.name }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <tb-color-input class="tb-wl-field"
+                            label="{{ 'admin.white-labeling-primary-color' | translate }}"
+                            formControlName="primaryColor"></tb-color-input>
+          </div>
+          <div class="tb-wl-row tb-wl-row-2">
+            <mat-form-field class="tb-wl-field" subscriptSizing="dynamic" appearance="outline">
+              <mat-label translate>admin.white-labeling-accent-palette</mat-label>
+              <mat-select [value]="accentPalette" (selectionChange)="onAccentPalette($event.value)">
+                <mat-option [value]="customPalette">{{ 'admin.white-labeling-custom' | translate }}</mat-option>
+                @for (palette of palettes; track palette.name) {
+                  <mat-option [value]="palette.name">
+                    <span class="tb-palette-swatch" [style.background]="palette.color"></span>
+                    {{ palette.name }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <tb-color-input class="tb-wl-field"
+                            label="{{ 'admin.white-labeling-accent-color' | translate }}"
+                            formControlName="accentColor"></tb-color-input>
+          </div>
+          <div class="tb-wl-row tb-wl-row-2">
+            <mat-form-field class="tb-wl-field" subscriptSizing="dynamic" appearance="outline">
+              <mat-label translate>admin.white-labeling-background-palette</mat-label>
+              <mat-select [value]="backgroundPalette" (selectionChange)="onBackgroundPalette($event.value)">
+                <mat-option [value]="customPalette">{{ 'admin.white-labeling-custom' | translate }}</mat-option>
+                @for (palette of palettes; track palette.name) {
+                  <mat-option [value]="palette.name">
+                    <span class="tb-palette-swatch" [style.background]="palette.color"></span>
+                    {{ palette.name }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <tb-color-input class="tb-wl-field"
+                            label="{{ 'admin.white-labeling-background-color' | translate }}"
+                            formControlName="backgroundColor"></tb-color-input>
+          </div>
+          <div class="tb-wl-row tb-wl-row-2">
+            <mat-form-field class="tb-wl-field" subscriptSizing="dynamic" appearance="outline">
+              <mat-label translate>admin.white-labeling-logo-height</mat-label>
+              <input matInput type="number" formControlName="logoHeight">
+            </mat-form-field>
+          </div>
+          <div class="tb-wl-row">
+            <button mat-raised-button color="primary" type="button" (click)="openAdvancedCss()">
+              {{ 'admin.white-labeling-advanced-css' | translate }}
+            </button>
+          </div>
+          <div class="tb-wl-row">
+            <mat-checkbox class="tb-wl-checkbox" formControlName="hideConnectivityDialog">
+              {{ 'admin.white-labeling-hide-connectivity-dialog' | translate }}
+            </mat-checkbox>
+            <mat-checkbox class="tb-wl-checkbox" formControlName="overrideTrendzName">
+              {{ 'admin.white-labeling-override-trendz' | translate }}
+            </mat-checkbox>
+            @if (whiteLabelingForm.get('overrideTrendzName').value) {
+              <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
+                <mat-label translate>admin.white-labeling-trendz-name</mat-label>
+                <input matInput formControlName="trendzName">
+              </mat-form-field>
+            }
+            <mat-checkbox class="tb-wl-checkbox" formControlName="hideChatBot">
+              {{ 'admin.white-labeling-hide-chat-bot' | translate }}
+            </mat-checkbox>
+            <mat-checkbox class="tb-wl-checkbox" formControlName="showPlatformNameVersion">
+              {{ 'admin.white-labeling-show-platform-name-version' | translate }}
+            </mat-checkbox>
+          </div>
+          <div class="tb-wl-row tb-wl-row-2">
+            <mat-checkbox class="tb-wl-field" formControlName="hideHelpLinks">
+              {{ 'admin.white-labeling-hide-help-links' | translate }}
+            </mat-checkbox>
+            <mat-checkbox class="tb-wl-field" formControlName="hideVendorPromotion">
+              {{ 'admin.white-labeling-hide-vendor-promotion' | translate }}
+            </mat-checkbox>
+          </div>
+          <div class="tb-wl-actions">
+            <button mat-stroked-button color="warn" type="button" (click)="resetToDefault()">
+              {{ 'admin.white-labeling-reset' | translate }}
+            </button>
+            <span class="flex-1"></span>
+            <button mat-stroked-button type="button" (click)="preview()">
+              {{ 'admin.white-labeling-preview' | translate }}
+            </button>
+            <button mat-raised-button color="primary"
+                    [disabled]="(isLoading$ | async) || whiteLabelingForm.invalid || !whiteLabelingForm.dirty"
+                    type="submit">
+              {{ 'action.save' | translate }}
+            </button>
+          </div>
+        </fieldset>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>

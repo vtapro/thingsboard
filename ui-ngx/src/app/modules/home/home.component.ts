@@ -29,6 +29,7 @@ import { ActiveComponentService } from '@core/services/active-component.service'
 import { FormBuilder } from '@angular/forms';
 import { ActionPreferencesPutUserSettings } from '@core/auth/auth.actions';
 import { HomeService } from '@core/services/home.service';
+import { WhiteLabelingService } from '@core/http/white-labeling.service';
 
 @Component({
     selector: 'tb-home',
@@ -75,11 +76,19 @@ export class HomeComponent extends PageComponent implements AfterViewInit, OnIni
               private activeComponentService: ActiveComponentService,
               private fb: FormBuilder,
               public breakpointObserver: BreakpointObserver,
-              public homeService: HomeService) {
+              public homeService: HomeService,
+              private whiteLabelingService: WhiteLabelingService) {
     super(store);
   }
 
   ngOnInit() {
+
+    this.whiteLabelingService.settings$.subscribe(settings => {
+      if (settings.enabled && settings.logoImageUrl) {
+        this.logo = settings.logoImageUrl;
+        this.collapsedLogo = settings.logoImageUrl;
+      }
+    });
 
     const isGtSm = this.breakpointObserver.isMatched(MediaBreakpoints['gt-sm']);
     this.sidenavMode = isGtSm ? 'side' : 'over';

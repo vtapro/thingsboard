@@ -4,10 +4,12 @@
     SPDX-License-Identifier: Apache-2.0
 
 -->
-<button mat-icon-button
-        type="button"
-        (click)="gotoHelpPage()"
-        matTooltip="{{'help.goto-help-page' | translate}}"
-        matTooltipPosition="above">
-  <mat-icon class="material-icons">help</mat-icon>
-</button>
+@if (!hidden) {
+  <button mat-icon-button
+          type="button"
+          (click)="gotoHelpPage()"
+          matTooltip="{{'help.goto-help-page' | translate}}"
+          matTooltipPosition="above">
+    <mat-icon class="material-icons">help</mat-icon>
+  </button>
+}

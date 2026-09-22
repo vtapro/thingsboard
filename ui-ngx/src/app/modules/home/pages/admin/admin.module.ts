@@ -24,6 +24,8 @@ import { JsResourceComponent } from '@home/pages/admin/resource/js-resource.comp
 import { NgxFlowModule } from '@flowjs/ngx-flow';
 import { TrendzSettingsComponent } from '@home/pages/admin/trendz-settings.component';
 import { ResourceLibraryTabsComponent } from '@home/pages/admin/resource/resource-library-tabs.component';
+import { WhiteLabelingComponent } from '@home/pages/admin/white-labeling.component';
+import { AdvancedCssDialogComponent } from '@home/pages/admin/advanced-css-dialog.component';
 
 @NgModule({
   declarations:
@@ -43,7 +45,9 @@ import { ResourceLibraryTabsComponent } from '@home/pages/admin/resource/resourc
       RepositoryAdminSettingsComponent,
       AutoCommitAdminSettingsComponent,
       TwoFactorAuthSettingsComponent,
-      TrendzSettingsComponent
+      TrendzSettingsComponent,
+      WhiteLabelingComponent,
+      AdvancedCssDialogComponent
     ],
   imports: [
     CommonModule,

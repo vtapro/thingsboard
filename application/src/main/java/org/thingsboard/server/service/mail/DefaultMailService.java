@@ -38,9 +38,11 @@ import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.limit.LimitedApi;
+import org.thingsboard.server.common.data.whiteLabeling.WhiteLabelingSettings;
 import org.thingsboard.server.common.stats.TbApiUsageReportClient;
 import org.thingsboard.server.dao.exception.IncorrectParameterException;
 import org.thingsboard.server.dao.settings.AdminSettingsService;
+import org.thingsboard.server.dao.settings.WhiteLabelingService;
 import org.thingsboard.server.service.apiusage.TbApiUsageStateService;
 
 import java.io.ByteArrayInputStream;
@@ -72,6 +74,7 @@ public class DefaultMailService implements MailService {
     private final PasswordResetExecutorService passwordResetExecutorService;
     private final TbMailContextComponent ctx;
     private final RateLimitService rateLimitService;
+    private final WhiteLabelingService whiteLabelingService;
 
     @Value("${mail.per_tenant_rate_limits:}")
     private String perTenantRateLimitConfig;
@@ -390,11 +393,31 @@ public class DefaultMailService implements MailService {
     private String mergeTemplateIntoString(String templateLocation,
                                            Map<String, Object> model) throws ThingsboardException {
         try {
+            Map<String, Object> templateModel = new HashMap<>(model);
+            addWhiteLabelingModel(templateModel);
             Template template = freemarkerConfig.getTemplate(templateLocation);
-            return FreeMarkerTemplateUtils.processTemplateIntoString(template, model);
+            return FreeMarkerTemplateUtils.processTemplateIntoString(template, templateModel);
         } catch (Exception e) {
             log.warn("Failed to process mail template: {}", ExceptionUtils.getRootCauseMessage(e));
             throw new ThingsboardException("Failed to process mail template: " + e.getMessage(), e, ThingsboardErrorCode.GENERAL);
+        }
+    }
+
+    private void addWhiteLabelingModel(Map<String, Object> model) {
+        try {
+            WhiteLabelingSettings whiteLabelingSettings = whiteLabelingService.getWhiteLabelingSettings();
+            if (whiteLabelingSettings != null && whiteLabelingSettings.isEnabled()) {
+                if (whiteLabelingSettings.getAppTitle() != null && !whiteLabelingSettings.getAppTitle().isBlank()) {
+                    model.put("appTitle", whiteLabelingSettings.getAppTitle());
+                }
+                String headerImageUrl = whiteLabelingSettings.getLogoImageUrl() != null && !whiteLabelingSettings.getLogoImageUrl().isBlank()
+                        ? whiteLabelingSettings.getLogoImageUrl() : whiteLabelingSettings.getLogoImageUrlDark();
+                if (headerImageUrl != null && !headerImageUrl.isBlank()) {
+                    model.put("emailHeaderImageUrl", headerImageUrl);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to apply white labeling settings to mail template: {}", ExceptionUtils.getRootCauseMessage(e));
         }
     }
 

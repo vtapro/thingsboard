@@ -15,6 +15,8 @@
 }
 
 <ng-template #logo>
-  <img [src]="src" aria-label="logo" alt="Logo"/>
+  <img [src]="logoSrc" aria-label="logo" alt="Logo"
+       [style.height.px]="logoHeightPx"
+       [style.width]="logoHeightPx ? 'auto' : null"/>
 </ng-template>
 

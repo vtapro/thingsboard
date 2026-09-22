@@ -58,6 +58,7 @@ export enum MenuId {
   platform_section = 'platform_section',
   settings = 'settings',
   general = 'general',
+  white_labeling = 'white_labeling',
   mail_server = 'mail_server',
   home_settings = 'home_settings',
   notification_settings = 'notification_settings',
@@ -381,6 +382,18 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
       type: 'link',
       path: '/settings/general',
       icon: 'mdi:cog-outline'
+    }
+  ],
+  [
+    MenuId.white_labeling,
+    {
+      id: MenuId.white_labeling,
+      name: 'White labeling',
+      fullName: 'White labeling',
+      type: 'link',
+      path: '/white-labeling',
+      icon: 'palette',
+      customTranslate: true
     }
   ],
   [
@@ -889,6 +902,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.queues}
         ]
       },
+      {id: MenuId.white_labeling},
       {
         id: MenuId.mobile_center,
         pages: [
@@ -976,6 +990,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.audit_log}
         ]
       },
+      {id: MenuId.white_labeling},
       {
         id: MenuId.platform_section,
         pages: [
