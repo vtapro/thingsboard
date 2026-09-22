@@ -21,6 +21,7 @@ import { SETTINGS_KEY } from '@core/settings/settings.effects';
 import { initCustomJQueryEvents } from '@shared/models/jquery-event.models';
 import { WhiteLabelingService } from '@core/http/white-labeling.service';
 import { WhiteLabelingSettings } from '@shared/models/white-labeling.models';
+import { CustomTranslationService } from '@core/http/custom-translation.service';
 
 @Component({
     selector: 'tb-root',
@@ -37,6 +38,7 @@ export class AppComponent {
               private domSanitizer: DomSanitizer,
               private authService: AuthService,
               private whiteLabelingService: WhiteLabelingService,
+              private customTranslationService: CustomTranslationService,
               @Inject(DOCUMENT) private document: Document) {
 
     console.log(`ThingsBoard Version: ${env.tbVersion}`);
