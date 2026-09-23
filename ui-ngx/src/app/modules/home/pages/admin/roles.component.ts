@@ -42,6 +42,11 @@ interface RbacUserGroup {
   roleIds: string[];
 }
 
+interface TenantCustomerInfo {
+  id: { id: string };
+  title: string;
+}
+
 @Component({
     selector: 'tb-roles',
     templateUrl: './roles.component.html',
@@ -58,6 +63,11 @@ export class RolesComponent extends PageComponent implements OnInit {
   users: TenantUserInfo[] = [];
   groups: RbacEntityGroup[] = [];
   userGroups: RbacUserGroup[] = [];
+  customers: TenantCustomerInfo[] = [];
+  hierarchyRows: Array<{childId: string; parentId: string}> = [];
+  readonly hierarchyColumns = ['child', 'parent', 'actions'];
+  childCustomerControl = new FormControl('');
+  parentCustomerControl = new FormControl('');
   readonly userGroupColumns = ['name', 'userIds', 'roleIds', 'actions'];
   userGroupNameControl = new FormControl('');
   readonly entityTypes = ['DEVICE', 'ASSET', 'ENTITY_VIEW'];
@@ -89,6 +99,7 @@ export class RolesComponent extends PageComponent implements OnInit {
       this.loadUsers();
       this.loadGroups();
       this.loadUserGroups();
+      this.loadHierarchy();
     }
   }
 
@@ -166,6 +177,45 @@ export class RolesComponent extends PageComponent implements OnInit {
   saveUserGroups() {
     this.http.post<{groups: RbacUserGroup[]}>('/api/tenant/userGroup', {groups: this.userGroups},
       defaultHttpOptionsFromConfig(undefined)).subscribe(settings => this.userGroups = settings?.groups || []);
+  }
+
+  loadHierarchy() {
+    this.http.get<{data: TenantCustomerInfo[]}>('/api/customers?pageSize=100&page=0',
+      defaultHttpOptionsFromConfig(undefined)).subscribe(page => this.customers = page?.data || []);
+    this.http.get<{parents: {[childId: string]: string}}>('/api/tenant/customerHierarchy',
+      defaultHttpOptionsFromConfig(undefined)).subscribe(hierarchy => {
+      const parents = hierarchy?.parents || {};
+      this.hierarchyRows = Object.keys(parents).map(childId => ({childId, parentId: parents[childId]}));
+    });
+  }
+
+  customerLabel(customerId: string): string {
+    const customer = this.customers.find(c => c.id.id === customerId);
+    return customer ? customer.title : customerId;
+  }
+
+  addHierarchyRow() {
+    const childId = this.childCustomerControl.value;
+    const parentId = this.parentCustomerControl.value;
+    if (!childId || !parentId || childId === parentId) {
+      return;
+    }
+    this.hierarchyRows = [...this.hierarchyRows.filter(row => row.childId !== childId), {childId, parentId}];
+    this.persistHierarchy();
+  }
+
+  removeHierarchyRow(row: {childId: string; parentId: string}) {
+    this.hierarchyRows = this.hierarchyRows.filter(r => r.childId !== row.childId);
+    this.persistHierarchy();
+  }
+
+  private persistHierarchy() {
+    const parents: {[childId: string]: string} = {};
+    for (const row of this.hierarchyRows) {
+      parents[row.childId] = row.parentId;
+    }
+    this.http.post('/api/tenant/customerHierarchy', {parents},
+      defaultHttpOptionsFromConfig(undefined)).subscribe(() => this.loadHierarchy());
   }
 
   setRoleUsers(role: RbacRole, userIds: string[]) {

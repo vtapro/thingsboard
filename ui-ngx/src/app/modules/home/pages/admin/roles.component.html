@@ -217,6 +217,49 @@
           {{ 'action.save' | translate }}
         </button>
       </div>
+      <mat-divider class="mat-block"></mat-divider>
+      <div class="mat-headline-6 tb-roles-groups-title">Customer hierarchy</div>
+      <div class="tb-roles-add">
+        <mat-form-field class="tb-roles-field" subscriptSizing="dynamic" appearance="outline">
+          <mat-label>Child customer</mat-label>
+          <mat-select [formControl]="childCustomerControl">
+            @for (customer of customers; track customer.id.id) {
+              <mat-option [value]="customer.id.id">{{ customer.title }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field class="tb-roles-field" subscriptSizing="dynamic" appearance="outline">
+          <mat-label>Parent customer</mat-label>
+          <mat-select [formControl]="parentCustomerControl">
+            @for (customer of customers; track customer.id.id) {
+              <mat-option [value]="customer.id.id">{{ customer.title }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <button mat-stroked-button color="primary" type="button" (click)="addHierarchyRow()">
+          Add relation
+        </button>
+      </div>
+      <table mat-table [dataSource]="hierarchyRows" class="mat-elevation-z0 tb-roles-table">
+        <ng-container matColumnDef="child">
+          <th mat-header-cell *matHeaderCellDef>Child customer</th>
+          <td mat-cell *matCellDef="let row">{{ customerLabel(row.childId) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="parent">
+          <th mat-header-cell *matHeaderCellDef>Parent customer</th>
+          <td mat-cell *matCellDef="let row">{{ customerLabel(row.parentId) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let row">
+            <button mat-icon-button type="button" (click)="removeHierarchyRow(row)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="hierarchyColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: hierarchyColumns;"></tr>
+      </table>
     </mat-card-content>
   </mat-card>
 </div>
