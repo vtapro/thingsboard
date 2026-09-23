@@ -24,7 +24,7 @@ export const deviceRoutes: Routes = [
     children: [
       {
         path: '',
-        component: EntityGroupsPageComponent,
+        component: EntitiesTableComponent,
         data: {
           auth: [Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
           title: 'device.devices',
