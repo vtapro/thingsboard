@@ -26,4 +26,15 @@ export class EntityGroupsPageComponent implements OnInit {
     }
   }
 
+  allIcon(): string {
+    switch (this.entityType) {
+      case 'ASSET':
+        return 'category';
+      case 'ENTITY_VIEW':
+        return 'visibility';
+      default:
+        return 'devices_other';
+    }
+  }
+
 }

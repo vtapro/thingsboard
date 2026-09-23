@@ -16,8 +16,10 @@ import org.thingsboard.server.common.data.rbac.RbacRole;
 import org.thingsboard.server.dao.settings.RoleService;
 import org.thingsboard.server.dao.settings.EntityGroupService;
 import org.thingsboard.server.dao.settings.UserGroupService;
+import org.thingsboard.server.dao.settings.CustomerHierarchyService;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroup;
 import org.thingsboard.server.common.data.rbac.RbacUserGroup;
+import org.thingsboard.server.common.data.HasCustomerId;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
 import java.util.List;
@@ -49,6 +51,7 @@ public class TbRbacAccessControlService implements AccessControlService {
     private final RoleService roleService;
     private final EntityGroupService entityGroupService;
     private final UserGroupService userGroupService;
+    private final CustomerHierarchyService customerHierarchyService;
 
     @Override
     public boolean hasPermission(SecurityUser user, Resource resource, Operation operation) throws ThingsboardException {
@@ -78,9 +81,10 @@ public class TbRbacAccessControlService implements AccessControlService {
         }
         List<String> scopedGroups = getScopedGroups(role, resource, operation);
         if (scopedGroups == null || scopedGroups.isEmpty()) {
-            return false;
+            return hasCustomerHierarchyAccess(user, entity, role, resource, operation);
         }
-        return entityBelongsToGroups(user.getTenantId(), entityId, scopedGroups);
+        return entityBelongsToGroups(user.getTenantId(), entityId, scopedGroups)
+                || hasCustomerHierarchyAccess(user, entity, role, resource, operation);
     }
 
     @Override
@@ -184,6 +188,32 @@ public class TbRbacAccessControlService implements AccessControlService {
             log.warn("Failed to resolve entity groups for entity [{}]: {}", entityId, e.getMessage());
         }
         return false;
+    }
+
+    /**
+     * A customer user with a role granting the operation may access entities that belong to its sub-customers
+     * (customer hierarchy configured by the tenant administrator).
+     */
+    private boolean hasCustomerHierarchyAccess(SecurityUser user, HasTenantId entity,
+                                               RbacRole role, Resource resource, Operation operation) {
+        if (user.getCustomerId() == null || !(entity instanceof HasCustomerId)) {
+            return false;
+        }
+        if (!hasGlobalOperation(role, resource, operation)) {
+            return false;
+        }
+        try {
+            var entityCustomerId = ((HasCustomerId) entity).getCustomerId();
+            if (entityCustomerId == null || entityCustomerId.getId() == null) {
+                return false;
+            }
+            Set<String> subtree = customerHierarchyService.getCustomerSubtree(user.getTenantId(),
+                    user.getCustomerId().getId().toString());
+            return subtree.contains(entityCustomerId.getId().toString());
+        } catch (Exception e) {
+            log.warn("Failed to resolve customer hierarchy for user [{}]: {}", user.getId(), e.getMessage());
+            return false;
+        }
     }
 
     private void permissionDenied() throws ThingsboardException {

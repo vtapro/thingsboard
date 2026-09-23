@@ -6,6 +6,7 @@ import { FormControl } from '@angular/forms';
 import { Store } from '@ngrx/store';
 import { MatDialog } from '@angular/material/dialog';
 import { AddEntitiesDialogComponent } from '@home/components/entity/add-entities-dialog.component';
+import { EntityGroupDialogComponent } from '@home/components/entity/entity-group-dialog.component';
 
 import { AppState } from '@core/core.state';
 import { getCurrentAuthState } from '@core/auth/auth.selectors';
@@ -38,11 +39,6 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
 
   groups: EntityGroup[] = [];
   selection = new SelectionModel<EntityGroup>(true, []);
-  showAddForm = false;
-
-  nameControl = new FormControl('');
-  descriptionControl = new FormControl('');
-  publicControl = new FormControl(false);
 
   private allGroups: EntityGroup[] = [];
 
@@ -81,10 +77,6 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
     }
   }
 
-  toggleAddForm() {
-    this.showAddForm = !this.showAddForm;
-  }
-
   isAllSelected(): boolean {
     return this.groups.length > 0 && this.selection.selected.length === this.groups.length;
   }
@@ -97,27 +89,43 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
     }
   }
 
-  addGroup() {
-    const name = (this.nameControl.value || '').trim();
-    if (!name) {
-      return;
-    }
-    this.groups = [...this.groups, {
-      id: Math.random().toString(36).substring(2, 10),
-      name,
-      entityType: this.entityType,
-      entityIds: [],
-      description: (this.descriptionControl.value || '').trim() || undefined,
-      publicGroup: !!this.publicControl.value,
-      createdTime: Date.now()
-    }];
-    this.nameControl.setValue('');
-    this.descriptionControl.setValue('');
-    this.publicControl.setValue(false);
+  openGroupDialog(group?: EntityGroup) {
+    this.dialog.open(EntityGroupDialogComponent, {
+      data: group ? {
+        name: group.name,
+        description: group.description,
+        publicGroup: group.publicGroup
+      } : {},
+      width: '480px'
+    }).afterClosed().subscribe((value: {name: string; description: string; publicGroup: boolean}) => {
+      if (!value) {
+        return;
+      }
+      if (group) {
+        this.groups = this.groups.map(g => g.id === group.id ? {...g, ...value} : g);
+      } else {
+        this.groups = [...this.groups, {
+          id: Math.random().toString(36).substring(2, 10),
+          name: value.name,
+          entityType: this.entityType,
+          entityIds: [],
+          description: value.description || undefined,
+          publicGroup: !!value.publicGroup,
+          createdTime: Date.now()
+        }];
+      }
+      this.persist();
+    });
   }
 
   removeGroup(group: EntityGroup) {
     this.groups = this.groups.filter(g => g.id !== group.id);
+    this.persist();
+  }
+
+  togglePublic(group: EntityGroup) {
+    this.groups = this.groups.map(g => g.id === group.id ? {...g, publicGroup: !g.publicGroup} : g);
+    this.persist();
   }
 
   addMembers(group: EntityGroup) {
@@ -127,11 +135,16 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
     }).afterClosed().subscribe((entityIds: string[]) => {
       if (entityIds) {
         this.groups = this.groups.map(g => g.id === group.id ? {...g, entityIds} : g);
+        this.persist();
       }
     });
   }
 
   save() {
+    this.persist();
+  }
+
+  private persist() {
     const merged = [...this.allGroups.filter(group => group.entityType !== this.entityType), ...this.groups];
     this.http.post<{groups: EntityGroup[]}>('/api/tenant/entityGroup', {groups: merged},
       defaultHttpOptionsFromConfig(undefined)).subscribe(settings => {

@@ -193,6 +193,7 @@ import { GithubBadgeModule } from '@home/components/github-badge/github-badge.mo
 import { EntityGroupsComponent } from '@home/components/entity/entity-groups.component';
 import { EntityGroupsPageComponent } from '@home/components/entity/entity-groups-page.component';
 import { AddEntitiesDialogComponent } from '@home/components/entity/add-entities-dialog.component';
+import { EntityGroupDialogComponent } from '@home/components/entity/entity-group-dialog.component';
 
 @NgModule({
   declarations:
@@ -202,6 +203,7 @@ import { AddEntitiesDialogComponent } from '@home/components/entity/add-entities
       EntityGroupsComponent,
       EntityGroupsPageComponent,
       AddEntitiesDialogComponent,
+      EntityGroupDialogComponent,
       AddEntityDialogComponent,
       DetailsPanelComponent,
       EntityDetailsPanelComponent,
