@@ -169,6 +169,9 @@
             "tenant-admin-only": "Only tenant administrators can manage entity groups."
         },
         "roles-add-group": "Add group",
+        "roles-user-groups": "User groups",
+        "roles-add-user-group": "Add user group",
+        "roles-role": "Role",
         "white-labeling-image-hint": "Absolute URL or path, for example /api/images/public/logo.png",
         "white-labeling-primary-color": "Primary color",
         "white-labeling-accent-color": "Accent color",
