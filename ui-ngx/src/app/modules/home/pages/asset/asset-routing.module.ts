@@ -24,8 +24,9 @@ export const assetRoutes: Routes = [
     children: [
       {
         path: '',
-        component: EntitiesTableComponent,
+        component: EntityGroupsPageComponent,
         data: {
+          entityType: 'ASSET',
           auth: [Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
           title: 'asset.assets',
           assetsType: 'tenant'

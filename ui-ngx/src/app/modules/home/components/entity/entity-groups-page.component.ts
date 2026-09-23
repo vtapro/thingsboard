@@ -24,6 +24,21 @@ export class EntityGroupsPageComponent implements OnInit {
     if (!this.entitiesTableConfig) {
       this.entitiesTableConfig = this.route.snapshot.data.entitiesTableConfig;
     }
+    if (!this.entitiesTableConfig) {
+      this.entitiesTableConfig = this.findEntitiesTableConfig(this.route.root);
+    }
+  }
+
+  private findEntitiesTableConfig(route: ActivatedRoute): any {
+    let current: ActivatedRoute = route;
+    while (current) {
+      const config = current.snapshot?.data?.entitiesTableConfig;
+      if (config) {
+        return config;
+      }
+      current = current.firstChild;
+    }
+    return undefined;
   }
 
   allIcon(): string {
