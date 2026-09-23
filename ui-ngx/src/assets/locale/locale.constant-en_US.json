@@ -158,6 +158,16 @@
         "roles-members": "Members",
         "roles-description": "Description",
         "roles-public": "Public",
+        "entity-group": {
+            "name": "Name",
+            "description": "Description",
+            "public": "Public",
+            "members": "Members",
+            "created-time": "Created time",
+            "add": "Add entity group",
+            "no-groups": "No entity groups found",
+            "tenant-admin-only": "Only tenant administrators can manage entity groups."
+        },
         "roles-add-group": "Add group",
         "white-labeling-image-hint": "Absolute URL or path, for example /api/images/public/logo.png",
         "white-labeling-primary-color": "Primary color",
