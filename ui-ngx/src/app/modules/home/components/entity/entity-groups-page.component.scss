@@ -1,0 +1,17 @@
+// SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+// SPDX-License-Identifier: Apache-2.0
+:host ::ng-deep {
+  .mat-mdc-tab-labels {
+    justify-content: stretch;
+  }
+
+  .mat-mdc-tab {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .mat-mdc-tab .mdc-tab__content {
+    justify-content: center;
+  }
+}
+

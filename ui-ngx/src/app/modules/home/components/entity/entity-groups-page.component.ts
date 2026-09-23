@@ -1,16 +1,19 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
-import { Component, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 
 @Component({
     selector: 'tb-entity-groups-page',
     templateUrl: './entity-groups-page.component.html',
+    styleUrls: ['./entity-groups-page.component.scss'],
     standalone: false
 })
 export class EntityGroupsPageComponent implements OnInit {
 
   entityType: string;
+
+  @Input()
   entitiesTableConfig: any;
 
   constructor(private route: ActivatedRoute) {
@@ -18,8 +21,9 @@ export class EntityGroupsPageComponent implements OnInit {
 
   ngOnInit() {
     this.entityType = this.route.snapshot.data.entityType;
-    this.entitiesTableConfig = this.route.snapshot.data.entitiesTableConfig;
+    if (!this.entitiesTableConfig) {
+      this.entitiesTableConfig = this.route.snapshot.data.entitiesTableConfig;
+    }
   }
 
 }
-
