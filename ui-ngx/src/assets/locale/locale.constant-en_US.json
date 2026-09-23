@@ -156,6 +156,8 @@
         "roles-entity-type": "Entity type",
         "roles-entity-ids": "Entity ids (comma separated)",
         "roles-members": "Members",
+        "roles-description": "Description",
+        "roles-public": "Public",
         "roles-add-group": "Add group",
         "white-labeling-image-hint": "Absolute URL or path, for example /api/images/public/logo.png",
         "white-labeling-primary-color": "Primary color",

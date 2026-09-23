@@ -26,8 +26,13 @@ public class RbacEntityGroup implements Serializable {
     @Schema(description = "Entity type of the group members: DEVICE, ASSET or ENTITY_VIEW")
     private String entityType;
 
+    @Schema(description = "Optional description of the group")
+    private String description;
+
+    @Schema(description = "When the group is public it is available to all customers of the tenant")
+    private boolean publicGroup;
+
     @Schema(description = "Ids of the entities that belong to the group")
     private List<String> entityIds = new ArrayList<>();
 
 }
-

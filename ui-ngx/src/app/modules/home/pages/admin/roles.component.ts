@@ -30,6 +30,8 @@ interface RbacEntityGroup {
   name: string;
   entityType: string;
   entityIds: string[];
+  description?: string;
+  publicGroup?: boolean;
 }
 
 @Component({
@@ -48,11 +50,13 @@ export class RolesComponent extends PageComponent implements OnInit {
   users: TenantUserInfo[] = [];
   groups: RbacEntityGroup[] = [];
   readonly entityTypes = ['DEVICE', 'ASSET', 'ENTITY_VIEW'];
-  readonly groupColumns = ['name', 'entityType', 'members', 'actions'];
+  readonly groupColumns = ['name', 'entityType', 'description', 'publicGroup', 'members', 'actions'];
 
   groupNameControl = new FormControl('');
   groupTypeControl = new FormControl('DEVICE');
   groupIdsControl = new FormControl('');
+  groupDescriptionControl = new FormControl('');
+  groupPublicControl = new FormControl(false);
 
   nameControl = new FormControl('');
   resourceControl = new FormControl('DEVICE');
@@ -96,10 +100,14 @@ export class RolesComponent extends PageComponent implements OnInit {
       id: Math.random().toString(36).substring(2, 10),
       name,
       entityType: this.groupTypeControl.value,
-      entityIds
+      entityIds,
+      description: (this.groupDescriptionControl.value || '').trim() || undefined,
+      publicGroup: !!this.groupPublicControl.value
     }];
     this.groupNameControl.setValue('');
     this.groupIdsControl.setValue('');
+    this.groupDescriptionControl.setValue('');
+    this.groupPublicControl.setValue(false);
   }
 
   removeGroup(group: RbacEntityGroup) {
