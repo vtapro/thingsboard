@@ -1,0 +1,18 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<mat-tab-group>
+  <mat-tab label="Devices">
+    <tb-entity-groups [entityType]="'DEVICE'"></tb-entity-groups>
+  </mat-tab>
+  <mat-tab label="Assets">
+    <tb-entity-groups [entityType]="'ASSET'"></tb-entity-groups>
+  </mat-tab>
+  <mat-tab label="Entity views">
+    <tb-entity-groups [entityType]="'ENTITY_VIEW'"></tb-entity-groups>
+  </mat-tab>
+</mat-tab-group>
+

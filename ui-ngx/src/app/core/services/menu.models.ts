@@ -82,6 +82,7 @@ export enum MenuId {
   devices = 'devices',
   assets = 'assets',
   entity_views = 'entity_views',
+  groups = 'groups',
   gateways = 'gateways',
   profiles = 'profiles',
   device_profiles = 'device_profiles',
@@ -614,6 +615,18 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
     }
   ],
   [
+    MenuId.groups,
+    {
+      id: MenuId.groups,
+      name: 'Groups',
+      fullName: 'Groups',
+      type: 'link',
+      path: '/entities/groups',
+      icon: 'group_work',
+      customTranslate: true
+    }
+  ],
+  [
     MenuId.assets,
     {
       id: MenuId.assets,
@@ -962,6 +975,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.device_profiles},
           {id: MenuId.asset_profiles},
           {id: MenuId.entity_views},
+          {id: MenuId.groups},
           {id: MenuId.otaUpdates}
         ]
       },

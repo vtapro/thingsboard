@@ -194,6 +194,7 @@ import { EntityGroupsComponent } from '@home/components/entity/entity-groups.com
 import { EntityGroupsPageComponent } from '@home/components/entity/entity-groups-page.component';
 import { AddEntitiesDialogComponent } from '@home/components/entity/add-entities-dialog.component';
 import { EntityGroupDialogComponent } from '@home/components/entity/entity-group-dialog.component';
+import { GroupsPageComponent } from '@home/components/entity/groups-page.component';
 
 @NgModule({
   declarations:
@@ -204,6 +205,7 @@ import { EntityGroupDialogComponent } from '@home/components/entity/entity-group
       EntityGroupsPageComponent,
       AddEntitiesDialogComponent,
       EntityGroupDialogComponent,
+      GroupsPageComponent,
       AddEntityDialogComponent,
       DetailsPanelComponent,
       EntityDetailsPanelComponent,
