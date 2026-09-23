@@ -3,6 +3,7 @@
 package org.thingsboard.server.controller;
 
 import io.swagger.v3.oas.annotations.Parameter;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +14,8 @@ import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.whiteLabeling.WhiteLabelingSettings;
 import org.thingsboard.server.config.annotations.ApiOperation;
 import org.thingsboard.server.dao.settings.WhiteLabelingService;
+import org.thingsboard.server.dao.domain.DomainService;
+import org.thingsboard.server.common.data.domain.Domain;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.security.permission.Operation;
 import org.thingsboard.server.service.security.permission.Resource;
@@ -25,12 +28,20 @@ import static org.thingsboard.server.controller.ControllerConstants.SYSTEM_AUTHO
 public class WhiteLabelingController extends BaseController {
 
     private final WhiteLabelingService whiteLabelingService;
+    private final DomainService domainService;
 
     @ApiOperation(value = "Get the White Labeling Settings (getWhiteLabelingSettings)",
             notes = "Returns the branding settings that are safe to expose to unauthenticated users, " +
                     "so that the login page and the application shell may be branded accordingly.")
     @GetMapping(value = "/api/noauth/whiteLabeling")
-    public WhiteLabelingSettings getWhiteLabelingSettings() {
+    public WhiteLabelingSettings getWhiteLabelingSettings(HttpServletRequest request) {
+        String host = request.getServerName();
+        if (host != null && !host.isBlank()) {
+            Domain domain = domainService.findDomainByName(host);
+            if (domain != null && domain.getTenantId() != null) {
+                return whiteLabelingService.getWhiteLabelingSettings(domain.getTenantId());
+            }
+        }
         return whiteLabelingService.getWhiteLabelingSettings();
     }
 

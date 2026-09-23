@@ -15,6 +15,8 @@ import java.util.List;
 
 public interface DomainService extends EntityDaoService {
 
+    Domain findDomainByName(String domain);
+
     Domain saveDomain(TenantId tenantId, Domain domain);
 
     void deleteDomainById(TenantId tenantId, DomainId domainId);

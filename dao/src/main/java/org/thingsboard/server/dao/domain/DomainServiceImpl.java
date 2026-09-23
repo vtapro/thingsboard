@@ -45,6 +45,11 @@ public class DomainServiceImpl extends AbstractEntityService implements DomainSe
     private DomainDataValidator domainDataValidator;
 
     @Override
+    public Domain findDomainByName(String domain) {
+        return domainDao.findByDomain(domain);
+    }
+
+    @Override
     public Domain saveDomain(TenantId tenantId, Domain domain) {
         log.trace("Executing saveDomain [{}]", domain);
         try {

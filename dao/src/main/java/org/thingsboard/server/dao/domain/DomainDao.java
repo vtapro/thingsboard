@@ -14,6 +14,8 @@ import java.util.List;
 
 public interface DomainDao extends Dao<Domain> {
 
+    Domain findByDomain(String domain);
+
     PageData<Domain> findByTenantId(TenantId tenantId, PageLink pageLink);
 
     int countDomainByTenantIdAndOauth2Enabled(TenantId tenantId, boolean oauth2Enabled);
