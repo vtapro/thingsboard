@@ -1078,6 +1078,36 @@ export const buildUserMenu = (authState: AuthState): Array<MenuSection> => {
   return sections.concat(buildCustomMenuSections(authState));
 };
 
+let rbacPermissions: { [resource: string]: string[] } | null = null;
+
+export const setRbacPermissions = (permissions: { [resource: string]: string[] } | null): void => {
+  rbacPermissions = permissions;
+};
+
+const menuSectionResource: { [id: string]: string } = {
+  devices: 'DEVICE',
+  device_profiles: 'DEVICE',
+  assets: 'ASSET',
+  asset_profiles: 'ASSET',
+  entity_views: 'ENTITY_VIEW',
+  dashboards: 'DASHBOARD',
+  alarms: 'ALARM',
+  customers: 'CUSTOMER',
+  rule_chains: 'RULE_CHAIN'
+};
+
+const hasMenuPermission = (id: string): boolean => {
+  if (!rbacPermissions) {
+    return true;
+  }
+  const resource = menuSectionResource[id];
+  if (!resource) {
+    return true;
+  }
+  const operations = rbacPermissions[resource];
+  return !!operations && operations.includes('READ');
+};
+
 let customMenuItems: Array<{ id: string; name: string; icon?: string; type: string; target: string; assigneeType?: string; order?: number }> = [];
 
 export const setCustomMenuItems = (items: Array<{ id: string; name: string; icon?: string; type: string; target: string; assigneeType?: string; order?: number }>): void => {
@@ -1105,6 +1135,9 @@ export const buildUserHome = (currentMenuSections: MenuSection[]): Array<HomeSec
 };
 
 const referenceToMenuSection = (authState: AuthState, reference: MenuReference): MenuSection | undefined => {
+  if (!hasMenuPermission(reference.id as string)) {
+    return undefined;
+  }
   if (filterMenuReference(authState, reference)) {
     const section = menuSectionMap.get(reference.id);
     if (section) {

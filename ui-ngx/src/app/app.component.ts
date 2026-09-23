@@ -23,6 +23,7 @@ import { WhiteLabelingService } from '@core/http/white-labeling.service';
 import { WhiteLabelingSettings } from '@shared/models/white-labeling.models';
 import { CustomTranslationService } from '@core/http/custom-translation.service';
 import { CustomMenuService } from '@core/http/custom-menu.service';
+import { RbacService } from '@core/http/rbac.service';
 
 @Component({
     selector: 'tb-root',
@@ -41,6 +42,7 @@ export class AppComponent {
               private whiteLabelingService: WhiteLabelingService,
               private customTranslationService: CustomTranslationService,
               private customMenuService: CustomMenuService,
+              private rbacService: RbacService,
               @Inject(DOCUMENT) private document: Document) {
 
     console.log(`ThingsBoard Version: ${env.tbVersion}`);
@@ -118,6 +120,7 @@ export class AppComponent {
       if (data.isAuthenticated) {
         this.whiteLabelingService.loadAuthenticatedWhiteLabelingSettings();
         this.customMenuService.loadCustomMenu();
+        this.rbacService.loadUserRoles();
       }
       this.authService.gotoDefaultPlace(data.isAuthenticated);
     });
