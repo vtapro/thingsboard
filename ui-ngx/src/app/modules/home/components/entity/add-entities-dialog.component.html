@@ -1,0 +1,28 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<h2 mat-dialog-title>Add entities</h2>
+<mat-dialog-content class="tb-add-entities-content">
+  @if (loading) {
+    <mat-progress-bar color="warn" mode="indeterminate"></mat-progress-bar>
+  }
+  @if (!loading) {
+    @if (!entities.length) {
+      <div class="tb-add-entities-empty">No entities found</div>
+    }
+    <mat-selection-list [(ngModel)]="selection.selected">
+      @for (entity of entities; track entity.id) {
+        <mat-list-option [value]="entity.id" [selected]="selection.isSelected(entity.id)">
+          {{ entity.name }}
+        </mat-list-option>
+      }
+    </mat-selection-list>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="cancel()">{{ 'action.cancel' | translate }}</button>
+  <button mat-raised-button color="primary" type="button" (click)="save()">{{ 'action.save' | translate }}</button>
+</mat-dialog-actions>

@@ -192,6 +192,7 @@ import { NotificationBellModule } from '@home/components/notification/notificati
 import { GithubBadgeModule } from '@home/components/github-badge/github-badge.module';
 import { EntityGroupsComponent } from '@home/components/entity/entity-groups.component';
 import { EntityGroupsPageComponent } from '@home/components/entity/entity-groups-page.component';
+import { AddEntitiesDialogComponent } from '@home/components/entity/add-entities-dialog.component';
 
 @NgModule({
   declarations:
@@ -200,6 +201,7 @@ import { EntityGroupsPageComponent } from '@home/components/entity/entity-groups
       EntitiesTableComponent,
       EntityGroupsComponent,
       EntityGroupsPageComponent,
+      AddEntitiesDialogComponent,
       AddEntityDialogComponent,
       DetailsPanelComponent,
       EntityDetailsPanelComponent,

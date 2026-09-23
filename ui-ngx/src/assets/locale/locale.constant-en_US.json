@@ -173,6 +173,10 @@
         "roles-add-user-group": "Add user group",
         "roles-role": "Role",
         "roles-scope-groups": "Scope to groups (optional)",
+        "entity-group-members": {
+            "add-members": "Add entities",
+            "no-entities": "No entities found"
+        },
         "entity": {
             "all": "All",
             "groups": "Groups"

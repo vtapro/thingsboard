@@ -4,6 +4,22 @@
   padding: 16px;
 }
 
+.tb-entity-groups-card {
+  padding: 16px;
+}
+
+.tb-entity-groups-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tb-entity-groups-title {
+  font-size: 20px;
+  font-weight: 500;
+}
+
 .tb-entity-groups-toolbar {
   display: flex;
   gap: 12px;
@@ -42,4 +58,3 @@
   padding: 16px 0;
   color: rgba(0, 0, 0, 0.54);
 }
-
