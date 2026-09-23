@@ -1,0 +1,17 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<mat-tab-group>
+  <mat-tab label="{{ 'entity.all' | translate }}">
+    @if (entitiesTableConfig) {
+      <tb-entities-table [entitiesTableConfig]="entitiesTableConfig"></tb-entities-table>
+    }
+  </mat-tab>
+  <mat-tab label="{{ 'entity.groups' | translate }}">
+    <tb-entity-groups [entityType]="entityType"></tb-entity-groups>
+  </mat-tab>
+</mat-tab-group>
+

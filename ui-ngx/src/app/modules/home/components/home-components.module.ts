@@ -190,12 +190,16 @@ import { AuditLogFilterComponent } from "@home/components/audit-log/audit-log-fi
 import { EventsDialogComponent } from '@home/dialogs/events-dialog.component';
 import { NotificationBellModule } from '@home/components/notification/notification-bell.module';
 import { GithubBadgeModule } from '@home/components/github-badge/github-badge.module';
+import { EntityGroupsComponent } from '@home/components/entity/entity-groups.component';
+import { EntityGroupsPageComponent } from '@home/components/entity/entity-groups-page.component';
 
 @NgModule({
   declarations:
     [
       RouterTabsComponent,
       EntitiesTableComponent,
+      EntityGroupsComponent,
+      EntityGroupsPageComponent,
       AddEntityDialogComponent,
       DetailsPanelComponent,
       EntityDetailsPanelComponent,

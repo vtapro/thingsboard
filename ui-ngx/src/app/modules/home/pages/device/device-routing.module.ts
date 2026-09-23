@@ -4,6 +4,7 @@ import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 
 import { EntitiesTableComponent } from '../../components/entity/entities-table.component';
+import { EntityGroupsPageComponent } from '../../components/entity/entity-groups-page.component';
 import { Authority } from '@shared/models/authority.enum';
 import { DevicesTableConfigResolver } from '@modules/home/pages/device/devices-table-config.resolver';
 import { EntityDetailsPageComponent } from '@home/components/entity/entity-details-page.component';
@@ -23,10 +24,11 @@ export const deviceRoutes: Routes = [
     children: [
       {
         path: '',
-        component: EntitiesTableComponent,
+        component: EntityGroupsPageComponent,
         data: {
           auth: [Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
           title: 'device.devices',
+          entityType: 'DEVICE',
           devicesType: 'tenant'
         },
         resolve: {
