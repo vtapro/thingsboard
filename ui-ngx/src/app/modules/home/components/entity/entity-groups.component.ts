@@ -40,6 +40,10 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
   groups: EntityGroup[] = [];
   selection = new SelectionModel<EntityGroup>(true, []);
 
+  readonly pageSizeOptions = [10, 25, 50];
+  pageSize = 10;
+  page = 0;
+
   private allGroups: EntityGroup[] = [];
 
   constructor(protected store: Store<AppState>,
@@ -63,7 +67,42 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
       defaultHttpOptionsFromConfig(undefined)).subscribe(settings => {
       this.allGroups = settings?.groups || [];
       this.groups = this.allGroups.filter(group => group.entityType === this.entityType);
+      this.page = 0;
     });
+  }
+
+  get displayedGroups(): EntityGroup[] {
+    const from = this.page * this.pageSize;
+    return this.groups.slice(from, from + this.pageSize);
+  }
+
+  get totalPages(): number {
+    return Math.max(1, Math.ceil(this.groups.length / this.pageSize));
+  }
+
+  get rangeFrom(): number {
+    return this.groups.length ? this.page * this.pageSize + 1 : 0;
+  }
+
+  get rangeTo(): number {
+    return Math.min(this.groups.length, (this.page + 1) * this.pageSize);
+  }
+
+  isFirstPage(): boolean {
+    return this.page === 0;
+  }
+
+  isLastPage(): boolean {
+    return this.page >= this.totalPages - 1;
+  }
+
+  goToPage(page: number) {
+    this.page = Math.max(0, Math.min(page, this.totalPages - 1));
+  }
+
+  setPageSize(size: number) {
+    this.pageSize = size;
+    this.page = 0;
   }
 
   groupTitle(): string {

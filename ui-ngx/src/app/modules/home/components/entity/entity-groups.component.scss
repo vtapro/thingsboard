@@ -20,6 +20,29 @@
   font-weight: 500;
 }
 
+.tb-entity-groups-pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.tb-entity-groups-page-size {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.tb-entity-groups-page-select {
+  width: 80px;
+}
+
+.tb-entity-groups-range {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
 .tb-entity-groups-toolbar {
   display: flex;
   gap: 12px;
