@@ -31,6 +31,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: "postgres"
       TB_QUEUE_TYPE: "in-memory"
       INSTALL_DATA_DIR: "/app/data"
+      SECURITY_RBAC_ENABLED: "true"
       RUN_INSTALL: "true"
       JAVA_OPTS: "-Xmx2048M -Xms512M"
     ports:

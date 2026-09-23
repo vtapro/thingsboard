@@ -28,8 +28,11 @@ public class RbacRole implements Serializable {
     @Schema(description = "Permissions by resource, for example { \"DEVICE\": [\"READ\", \"WRITE\"] }")
     private Map<String, List<String>> permissions = new HashMap<>();
 
+    @Schema(description = "Group scoped permissions: { \"DEVICE\": { \"READ\": [\"group-id\"] } }. " +
+            "Used to restrict an operation to the entities of the listed groups.")
+    private Map<String, Map<String, List<String>>> scopedPermissions = new HashMap<>();
+
     @Schema(description = "Ids of users assigned to this role")
     private List<String> userIds = new ArrayList<>();
 
 }
-

@@ -11,8 +11,11 @@ import org.thingsboard.server.common.data.HasTenantId;
 import org.thingsboard.server.common.data.exception.ThingsboardErrorCode;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.id.EntityId;
+import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.rbac.RbacRole;
 import org.thingsboard.server.dao.settings.RoleService;
+import org.thingsboard.server.dao.settings.EntityGroupService;
+import org.thingsboard.server.common.data.rbac.RbacEntityGroup;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
 import java.util.List;
@@ -40,15 +43,15 @@ public class TbRbacAccessControlService implements AccessControlService {
 
     private final DefaultAccessControlService defaultAccessControlService;
     private final RoleService roleService;
+    private final EntityGroupService entityGroupService;
 
     @Override
     public boolean hasPermission(SecurityUser user, Resource resource, Operation operation) throws ThingsboardException {
-        Map<String, List<String>> permissions = getRbacPermissions(user);
-        if (permissions == null) {
+        RbacRole role = getRbacRole(user);
+        if (role == null) {
             return defaultAccessControlService.hasPermission(user, resource, operation);
         }
-        List<String> operations = permissions.get(resource.name());
-        return operations != null && operations.contains(operation.name());
+        return hasGlobalOperation(role, resource, operation);
     }
 
     @Override
@@ -61,12 +64,18 @@ public class TbRbacAccessControlService implements AccessControlService {
     @Override
     public <I extends EntityId, T extends HasTenantId> boolean hasPermission(SecurityUser user, Resource resource, Operation operation,
                                                                              I entityId, T entity) throws ThingsboardException {
-        Map<String, List<String>> permissions = getRbacPermissions(user);
-        if (permissions == null) {
+        RbacRole role = getRbacRole(user);
+        if (role == null) {
             return defaultAccessControlService.hasPermission(user, resource, operation, entityId, entity);
         }
-        List<String> operations = permissions.get(resource.name());
-        return operations != null && operations.contains(operation.name());
+        if (hasGlobalOperation(role, resource, operation)) {
+            return true;
+        }
+        List<String> scopedGroups = getScopedGroups(role, resource, operation);
+        if (scopedGroups == null || scopedGroups.isEmpty()) {
+            return false;
+        }
+        return entityBelongsToGroups(user.getTenantId(), entityId, scopedGroups);
     }
 
     @Override
@@ -77,7 +86,7 @@ public class TbRbacAccessControlService implements AccessControlService {
         }
     }
 
-    private Map<String, List<String>> getRbacPermissions(SecurityUser user) {
+    private RbacRole getRbacRole(SecurityUser user) {
         if (user == null || user.getId() == null || user.getTenantId() == null || SYS_ADMIN.equals(user.getAuthority())) {
             return null;
         }
@@ -85,7 +94,7 @@ public class TbRbacAccessControlService implements AccessControlService {
             String userId = user.getId().getId().toString();
             for (RbacRole role : roleService.getRoleSettings(user.getTenantId()).getRoles()) {
                 if (role.getUserIds() != null && role.getUserIds().contains(userId)) {
-                    return role.getPermissions();
+                    return role;
                 }
             }
         } catch (Exception e) {
@@ -93,6 +102,38 @@ public class TbRbacAccessControlService implements AccessControlService {
                     user.getId(), e.getMessage());
         }
         return null;
+    }
+
+    private boolean hasGlobalOperation(RbacRole role, Resource resource, Operation operation) {
+        Map<String, List<String>> permissions = role.getPermissions();
+        if (permissions == null) {
+            return false;
+        }
+        List<String> operations = permissions.get(resource.name());
+        return operations != null && operations.contains(operation.name());
+    }
+
+    private List<String> getScopedGroups(RbacRole role, Resource resource, Operation operation) {
+        Map<String, Map<String, List<String>>> scoped = role.getScopedPermissions();
+        if (scoped == null) {
+            return null;
+        }
+        Map<String, List<String>> byOperation = scoped.get(resource.name());
+        return byOperation != null ? byOperation.get(operation.name()) : null;
+    }
+
+    private boolean entityBelongsToGroups(TenantId tenantId, EntityId entityId, List<String> groupIds) {
+        try {
+            String id = entityId.getId().toString();
+            for (RbacEntityGroup group : entityGroupService.getEntityGroupSettings(tenantId).getGroups()) {
+                if (groupIds.contains(group.getId()) && group.getEntityIds() != null && group.getEntityIds().contains(id)) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to resolve entity groups for entity [{}]: {}", entityId, e.getMessage());
+        }
+        return false;
     }
 
     private void permissionDenied() throws ThingsboardException {
