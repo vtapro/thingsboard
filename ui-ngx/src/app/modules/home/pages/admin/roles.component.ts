@@ -25,6 +25,13 @@ interface TenantUserInfo {
   lastName?: string;
 }
 
+interface RbacEntityGroup {
+  id: string;
+  name: string;
+  entityType: string;
+  entityIds: string[];
+}
+
 @Component({
     selector: 'tb-roles',
     templateUrl: './roles.component.html',
@@ -39,6 +46,13 @@ export class RolesComponent extends PageComponent implements OnInit {
 
   roles: RbacRole[] = [];
   users: TenantUserInfo[] = [];
+  groups: RbacEntityGroup[] = [];
+  readonly entityTypes = ['DEVICE', 'ASSET', 'ENTITY_VIEW'];
+  readonly groupColumns = ['name', 'entityType', 'members', 'actions'];
+
+  groupNameControl = new FormControl('');
+  groupTypeControl = new FormControl('DEVICE');
+  groupIdsControl = new FormControl('');
 
   nameControl = new FormControl('');
   resourceControl = new FormControl('DEVICE');
@@ -57,12 +71,44 @@ export class RolesComponent extends PageComponent implements OnInit {
     if (getCurrentAuthState(this.store).authUser?.authority === Authority.TENANT_ADMIN) {
       this.load();
       this.loadUsers();
+      this.loadGroups();
     }
   }
 
   loadUsers() {
     this.http.get<{data: TenantUserInfo[]}>('/api/users?pageSize=100&page=0',
       defaultHttpOptionsFromConfig(undefined)).subscribe(page => this.users = page?.data || []);
+  }
+
+  loadGroups() {
+    this.http.get<{groups: RbacEntityGroup[]}>('/api/tenant/entityGroup',
+      defaultHttpOptionsFromConfig(undefined)).subscribe(settings => this.groups = settings?.groups || []);
+  }
+
+  addGroup() {
+    const name = (this.groupNameControl.value || '').trim();
+    if (!name) {
+      return;
+    }
+    const entityIds = (this.groupIdsControl.value || '')
+      .split(/[\s,;]+/).map(id => id.trim()).filter(id => !!id);
+    this.groups = [...this.groups, {
+      id: Math.random().toString(36).substring(2, 10),
+      name,
+      entityType: this.groupTypeControl.value,
+      entityIds
+    }];
+    this.groupNameControl.setValue('');
+    this.groupIdsControl.setValue('');
+  }
+
+  removeGroup(group: RbacEntityGroup) {
+    this.groups = this.groups.filter(g => g.id !== group.id);
+  }
+
+  saveGroups() {
+    this.http.post<{groups: RbacEntityGroup[]}>('/api/tenant/entityGroup', {groups: this.groups},
+      defaultHttpOptionsFromConfig(undefined)).subscribe(settings => this.groups = settings?.groups || []);
   }
 
   setRoleUsers(role: RbacRole, userIds: string[]) {
