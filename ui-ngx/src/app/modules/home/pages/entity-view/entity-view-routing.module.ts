@@ -24,9 +24,8 @@ export const entityViewRoutes: Routes = [
     children: [
       {
         path: '',
-        component: EntityGroupsPageComponent,
+        component: EntitiesTableComponent,
         data: {
-          entityType: 'ENTITY_VIEW',
           auth: [Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
           title: 'entity-view.entity-views',
           entityViewsType: 'tenant'

@@ -2,17 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 :host ::ng-deep {
   .mat-mdc-tab .mdc-tab__content {
-    justify-content: center;
-    gap: 8px;
+    justify-content: flex-start;
   }
-}
-
-.tb-tab-icon {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
-}
-
-.tb-tab-text {
-  font-weight: 500;
 }
