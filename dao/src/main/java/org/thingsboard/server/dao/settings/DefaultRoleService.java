@@ -19,7 +19,7 @@ public class DefaultRoleService implements RoleService {
 
     @Override
     public RbacRoleSettings getRoleSettings(TenantId tenantId) {
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByKey(tenantId, ROLES_SETTINGS_KEY);
+        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, ROLES_SETTINGS_KEY);
         if (adminSettings == null || adminSettings.getJsonValue() == null) {
             return new RbacRoleSettings();
         }
@@ -32,7 +32,7 @@ public class DefaultRoleService implements RoleService {
 
     @Override
     public RbacRoleSettings saveRoleSettings(TenantId tenantId, RbacRoleSettings settings) {
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByKey(tenantId, ROLES_SETTINGS_KEY);
+        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, ROLES_SETTINGS_KEY);
         if (adminSettings == null) {
             adminSettings = new AdminSettings();
             adminSettings.setTenantId(tenantId);

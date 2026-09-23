@@ -19,7 +19,7 @@ public class DefaultEntityGroupService implements EntityGroupService {
 
     @Override
     public RbacEntityGroupSettings getEntityGroupSettings(TenantId tenantId) {
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByKey(tenantId, ENTITY_GROUPS_SETTINGS_KEY);
+        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, ENTITY_GROUPS_SETTINGS_KEY);
         if (adminSettings == null || adminSettings.getJsonValue() == null) {
             return new RbacEntityGroupSettings();
         }
@@ -32,7 +32,7 @@ public class DefaultEntityGroupService implements EntityGroupService {
 
     @Override
     public RbacEntityGroupSettings saveEntityGroupSettings(TenantId tenantId, RbacEntityGroupSettings settings) {
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByKey(tenantId, ENTITY_GROUPS_SETTINGS_KEY);
+        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, ENTITY_GROUPS_SETTINGS_KEY);
         if (adminSettings == null) {
             adminSettings = new AdminSettings();
             adminSettings.setTenantId(tenantId);

@@ -19,7 +19,7 @@ public class DefaultCustomMenuService implements CustomMenuService {
 
     @Override
     public CustomMenuSettings getCustomMenuSettings(TenantId tenantId) {
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByKey(tenantId, CUSTOM_MENU_SETTINGS_KEY);
+        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, CUSTOM_MENU_SETTINGS_KEY);
         if (adminSettings == null || adminSettings.getJsonValue() == null) {
             return new CustomMenuSettings();
         }
@@ -32,7 +32,7 @@ public class DefaultCustomMenuService implements CustomMenuService {
 
     @Override
     public CustomMenuSettings saveCustomMenuSettings(TenantId tenantId, CustomMenuSettings settings) {
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByKey(tenantId, CUSTOM_MENU_SETTINGS_KEY);
+        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, CUSTOM_MENU_SETTINGS_KEY);
         if (adminSettings == null) {
             adminSettings = new AdminSettings();
             adminSettings.setTenantId(tenantId);

@@ -22,7 +22,7 @@ public class DefaultCustomTranslationService implements CustomTranslationService
 
     @Override
     public Map<String, Map<String, String>> getCustomTranslations(TenantId tenantId) {
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByKey(tenantId, CUSTOM_TRANSLATION_SETTINGS_KEY);
+        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, CUSTOM_TRANSLATION_SETTINGS_KEY);
         if (adminSettings == null || adminSettings.getJsonValue() == null) {
             return new HashMap<>();
         }
@@ -60,7 +60,7 @@ public class DefaultCustomTranslationService implements CustomTranslationService
     private Map<String, Map<String, String>> save(TenantId tenantId, Map<String, Map<String, String>> translations) {
         CustomTranslationSettings settings = new CustomTranslationSettings();
         settings.setTranslations(translations);
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByKey(tenantId, CUSTOM_TRANSLATION_SETTINGS_KEY);
+        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, CUSTOM_TRANSLATION_SETTINGS_KEY);
         if (adminSettings == null) {
             adminSettings = new AdminSettings();
             adminSettings.setTenantId(tenantId);

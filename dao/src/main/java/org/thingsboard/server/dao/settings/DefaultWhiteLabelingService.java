@@ -33,7 +33,7 @@ public class DefaultWhiteLabelingService implements WhiteLabelingService {
     }
 
     private WhiteLabelingSettings findWhiteLabelingSettings(TenantId tenantId) {
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByKey(tenantId, WHITE_LABELING_SETTINGS_KEY);
+        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, WHITE_LABELING_SETTINGS_KEY);
         if (adminSettings == null || adminSettings.getJsonValue() == null) {
             return null;
         }
@@ -52,7 +52,7 @@ public class DefaultWhiteLabelingService implements WhiteLabelingService {
     @Override
     public WhiteLabelingSettings saveWhiteLabelingSettings(TenantId tenantId, WhiteLabelingSettings settings) {
         ConstraintValidator.validateFields(settings);
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByKey(tenantId, WHITE_LABELING_SETTINGS_KEY);
+        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, WHITE_LABELING_SETTINGS_KEY);
         if (adminSettings == null) {
             adminSettings = new AdminSettings();
             adminSettings.setTenantId(tenantId);

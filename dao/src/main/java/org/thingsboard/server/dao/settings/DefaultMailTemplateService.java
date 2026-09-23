@@ -19,7 +19,7 @@ public class DefaultMailTemplateService implements MailTemplateService {
 
     @Override
     public MailTemplateSettings getMailTemplateSettings(TenantId tenantId) {
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByKey(tenantId, MAIL_TEMPLATES_SETTINGS_KEY);
+        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, MAIL_TEMPLATES_SETTINGS_KEY);
         if (adminSettings == null || adminSettings.getJsonValue() == null) {
             return new MailTemplateSettings();
         }
@@ -32,7 +32,7 @@ public class DefaultMailTemplateService implements MailTemplateService {
 
     @Override
     public MailTemplateSettings saveMailTemplateSettings(TenantId tenantId, MailTemplateSettings settings) {
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByKey(tenantId, MAIL_TEMPLATES_SETTINGS_KEY);
+        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, MAIL_TEMPLATES_SETTINGS_KEY);
         if (adminSettings == null) {
             adminSettings = new AdminSettings();
             adminSettings.setTenantId(tenantId);
