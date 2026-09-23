@@ -67,6 +67,7 @@ export enum MenuId {
   queues = 'queues',
   security_settings = 'security_settings',
   security_settings_general = 'security_settings_general',
+  roles = 'roles',
   two_fa = 'two_fa',
   oauth2 = 'oauth2',
   domains = 'domains',
@@ -404,6 +405,17 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
       type: 'link',
       path: '/settings/outgoing-mail',
       icon: 'mail_outline'
+    }
+  ],
+  [
+    MenuId.roles,
+    {
+      id: MenuId.roles,
+      name: 'admin.roles',
+      fullName: 'admin.roles',
+      type: 'link',
+      path: '/security-settings/roles',
+      icon: 'admin_panel_settings'
     }
   ],
   [
@@ -986,6 +998,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
               {id: MenuId.clients}
             ]
           },
+          {id: MenuId.roles},
           {id: MenuId.audit_log}
         ]
       },

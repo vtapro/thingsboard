@@ -1,0 +1,33 @@
+// SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+// SPDX-License-Identifier: Apache-2.0
+.tb-roles-add {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.tb-roles-field {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.tb-roles-ops {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding-top: 12px;
+}
+
+.tb-roles-table {
+  width: 100%;
+}
+
+.tb-roles-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+

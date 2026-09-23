@@ -1,0 +1,76 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<div>
+  <mat-card appearance="outlined" class="settings-card">
+    <mat-card-header>
+      <mat-card-title>
+        <span class="mat-headline-5" translate>admin.roles</span>
+      </mat-card-title>
+    </mat-card-header>
+    @if (isLoading$ | async) {
+      <mat-progress-bar color="warn" mode="indeterminate"></mat-progress-bar>
+    }
+    @if (!(isLoading$ | async)) {
+      <div style="height: 4px;"></div>
+    }
+    <mat-card-content>
+      <div class="tb-roles-add">
+        <mat-form-field class="tb-roles-field" subscriptSizing="dynamic" appearance="outline">
+          <mat-label translate>admin.roles-name</mat-label>
+          <input matInput [formControl]="nameControl">
+        </mat-form-field>
+        <mat-form-field class="tb-roles-field" subscriptSizing="dynamic" appearance="outline">
+          <mat-label translate>admin.roles-resource</mat-label>
+          <mat-select [formControl]="resourceControl">
+            @for (resource of resources; track resource) {
+              <mat-option [value]="resource">{{ resource }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <div class="tb-roles-ops">
+          @for (operation of operations; track operation) {
+            <mat-checkbox [formControl]="operationControls[operation]">{{ operation }}</mat-checkbox>
+          }
+        </div>
+        <button mat-stroked-button color="primary" type="button" (click)="addRole()">
+          {{ 'admin.roles-add' | translate }}
+        </button>
+      </div>
+      <table mat-table [dataSource]="roles" class="mat-elevation-z0 tb-roles-table">
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef translate>admin.roles-name</th>
+          <td mat-cell *matCellDef="let role">{{ role.name }}</td>
+        </ng-container>
+        <ng-container matColumnDef="permissions">
+          <th mat-header-cell *matHeaderCellDef translate>admin.roles-permissions</th>
+          <td mat-cell *matCellDef="let role">{{ permissionSummary(role) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="users">
+          <th mat-header-cell *matHeaderCellDef translate>admin.roles-users</th>
+          <td mat-cell *matCellDef="let role">{{ role.userIds?.length || 0 }}</td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let role">
+            <button mat-icon-button type="button" (click)="removeRole(role)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+      <div class="tb-roles-actions">
+        <span class="flex-1"></span>
+        <button mat-raised-button color="primary" type="button" (click)="save()">
+          {{ 'action.save' | translate }}
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>
+

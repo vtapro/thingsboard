@@ -30,6 +30,7 @@ import { MailTemplatesComponent } from '@home/pages/admin/mail-templates.compone
 import { CustomTranslationComponent } from '@home/pages/admin/custom-translation.component';
 import { CustomMenuComponent } from '@home/pages/admin/custom-menu.component';
 import { LoginSettingsComponent } from '@home/pages/admin/login-settings.component';
+import { RolesComponent } from '@home/pages/admin/roles.component';
 
 @NgModule({
   declarations:
@@ -55,7 +56,8 @@ import { LoginSettingsComponent } from '@home/pages/admin/login-settings.compone
       MailTemplatesComponent,
       CustomTranslationComponent,
       CustomMenuComponent,
-      LoginSettingsComponent
+      LoginSettingsComponent,
+      RolesComponent
     ],
   imports: [
     CommonModule,

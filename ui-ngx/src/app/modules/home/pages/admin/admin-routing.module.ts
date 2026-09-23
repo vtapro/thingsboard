@@ -35,6 +35,7 @@ import { JsLibraryTableConfigResolver } from '@home/pages/admin/resource/js-libr
 import { TrendzSettingsComponent } from '@home/pages/admin/trendz-settings.component';
 import { aiModelRoutes } from '@home/pages/ai-model/ai-model-routing.module';
 import { WhiteLabelingComponent } from '@home/pages/admin/white-labeling.component';
+import { RolesComponent } from '@home/pages/admin/roles.component';
 
 export const scadaSymbolResolver: ResolveFn<ScadaSymbolData> =
   (route: ActivatedRouteSnapshot,
@@ -442,6 +443,17 @@ const routes: Routes = [
         }
       },
       ...oAuth2Routes,
+      {
+        path: 'roles',
+        component: RolesComponent,
+        data: {
+          auth: [Authority.TENANT_ADMIN, Authority.SYS_ADMIN],
+          title: 'admin.roles',
+          breadcrumb: {
+            menuId: MenuId.roles
+          }
+        }
+      },
       ...auditLogsRoutes
     ]
   }
