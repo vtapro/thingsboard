@@ -14,6 +14,7 @@ import { Authority } from '@shared/models/authority.enum';
 import { defaultHttpOptionsFromConfig } from '@core/http/http-utils';
 import { PageComponent } from '@shared/components/page.component';
 import { SelectionModel } from '@angular/cdk/collections';
+import { PageEvent } from '@angular/material/paginator';
 
 interface EntityGroup {
   id: string;
@@ -40,7 +41,7 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
   groups: EntityGroup[] = [];
   selection = new SelectionModel<EntityGroup>(true, []);
 
-  readonly pageSizeOptions = [10, 25, 50];
+  readonly pageSizeOptions = [10, 20, 30];
   pageSize = 10;
   page = 0;
 
@@ -78,6 +79,11 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
 
   get totalPages(): number {
     return Math.max(1, Math.ceil(this.groups.length / this.pageSize));
+  }
+
+  onPageChange(event: PageEvent) {
+    this.page = event.pageIndex;
+    this.pageSize = event.pageSize;
   }
 
   get rangeFrom(): number {

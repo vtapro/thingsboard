@@ -77,30 +77,12 @@
     @if (!groups.length) {
       <div class="tb-entity-groups-empty">No entity groups found</div>
     }
-    <div class="tb-entity-groups-pagination">
-      <span class="tb-entity-groups-page-size">Items per page:</span>
-      <mat-form-field class="tb-entity-groups-page-select" subscriptSizing="dynamic" appearance="outline">
-        <mat-select [value]="pageSize" (selectionChange)="setPageSize($event.value)">
-          @for (size of pageSizeOptions; track size) {
-            <mat-option [value]="size">{{ size }}</mat-option>
-          }
-        </mat-select>
-      </mat-form-field>
-      <span class="tb-entity-groups-range">{{ rangeFrom }} – {{ rangeTo }} of {{ groups.length }}</span>
-      <span class="flex-1"></span>
-      <button mat-icon-button type="button" [disabled]="isFirstPage()" (click)="goToPage(0)">
-        <mat-icon>first_page</mat-icon>
-      </button>
-      <button mat-icon-button type="button" [disabled]="isFirstPage()" (click)="goToPage(page - 1)">
-        <mat-icon>chevron_left</mat-icon>
-      </button>
-      <button mat-icon-button type="button" [disabled]="isLastPage()" (click)="goToPage(page + 1)">
-        <mat-icon>chevron_right</mat-icon>
-      </button>
-      <button mat-icon-button type="button" [disabled]="isLastPage()" (click)="goToPage(totalPages - 1)">
-        <mat-icon>last_page</mat-icon>
-      </button>
-    </div>
+    <mat-paginator [length]="groups.length"
+                   [pageIndex]="page"
+                   [pageSize]="pageSize"
+                   [pageSizeOptions]="pageSizeOptions"
+                   (page)="onPageChange($event)"
+                   showFirstLastButtons></mat-paginator>
     </mat-card>
   }
 </div>
