@@ -51,7 +51,17 @@
         </ng-container>
         <ng-container matColumnDef="users">
           <th mat-header-cell *matHeaderCellDef translate>admin.roles-users</th>
-          <td mat-cell *matCellDef="let role">{{ role.userIds?.length || 0 }}</td>
+          <td mat-cell *matCellDef="let role">
+            <mat-form-field subscriptSizing="dynamic" appearance="outline" class="tb-roles-users">
+              <mat-select multiple
+                          [value]="role.userIds || []"
+                          (selectionChange)="setRoleUsers(role, $event.value)">
+                @for (user of users; track user.id.id) {
+                  <mat-option [value]="user.id.id">{{ userLabel(user) }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </td>
         </ng-container>
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef></th>
@@ -73,4 +83,3 @@
     </mat-card-content>
   </mat-card>
 </div>
-

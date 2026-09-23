@@ -18,6 +18,13 @@ interface RbacRole {
   userIds: string[];
 }
 
+interface TenantUserInfo {
+  id: { id: string };
+  email: string;
+  firstName?: string;
+  lastName?: string;
+}
+
 @Component({
     selector: 'tb-roles',
     templateUrl: './roles.component.html',
@@ -31,6 +38,7 @@ export class RolesComponent extends PageComponent implements OnInit {
   readonly displayedColumns = ['name', 'permissions', 'users', 'actions'];
 
   roles: RbacRole[] = [];
+  users: TenantUserInfo[] = [];
 
   nameControl = new FormControl('');
   resourceControl = new FormControl('DEVICE');
@@ -48,7 +56,22 @@ export class RolesComponent extends PageComponent implements OnInit {
   ngOnInit() {
     if (getCurrentAuthState(this.store).authUser?.authority === Authority.TENANT_ADMIN) {
       this.load();
+      this.loadUsers();
     }
+  }
+
+  loadUsers() {
+    this.http.get<{data: TenantUserInfo[]}>('/api/users?pageSize=100&page=0',
+      defaultHttpOptionsFromConfig(undefined)).subscribe(page => this.users = page?.data || []);
+  }
+
+  setRoleUsers(role: RbacRole, userIds: string[]) {
+    this.roles = this.roles.map(r => r.id === role.id ? {...r, userIds} : r);
+  }
+
+  userLabel(user: TenantUserInfo): string {
+    const name = [user.firstName, user.lastName].filter(Boolean).join(' ');
+    return name ? `${name} (${user.email})` : user.email;
   }
 
   load() {
@@ -88,4 +111,3 @@ export class RolesComponent extends PageComponent implements OnInit {
   }
 
 }
-
