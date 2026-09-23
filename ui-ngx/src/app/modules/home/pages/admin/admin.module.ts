@@ -29,6 +29,7 @@ import { AdvancedCssDialogComponent } from '@home/pages/admin/advanced-css-dialo
 import { MailTemplatesComponent } from '@home/pages/admin/mail-templates.component';
 import { CustomTranslationComponent } from '@home/pages/admin/custom-translation.component';
 import { CustomMenuComponent } from '@home/pages/admin/custom-menu.component';
+import { LoginSettingsComponent } from '@home/pages/admin/login-settings.component';
 
 @NgModule({
   declarations:
@@ -53,7 +54,8 @@ import { CustomMenuComponent } from '@home/pages/admin/custom-menu.component';
       AdvancedCssDialogComponent,
       MailTemplatesComponent,
       CustomTranslationComponent,
-      CustomMenuComponent
+      CustomMenuComponent,
+      LoginSettingsComponent
     ],
   imports: [
     CommonModule,
