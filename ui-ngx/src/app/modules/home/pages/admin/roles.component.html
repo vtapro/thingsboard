@@ -36,6 +36,14 @@
             <mat-checkbox [formControl]="operationControls[operation]">{{ operation }}</mat-checkbox>
           }
         </div>
+        <mat-form-field class="tb-roles-field" subscriptSizing="dynamic" appearance="outline">
+          <mat-label translate>admin.roles-scope-groups</mat-label>
+          <mat-select multiple [formControl]="groupScopeControl">
+            @for (group of groups; track group.id) {
+              <mat-option [value]="group.id">{{ group.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
         <button mat-stroked-button color="primary" type="button" (click)="addRole()">
           {{ 'admin.roles-add' | translate }}
         </button>

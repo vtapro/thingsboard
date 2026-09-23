@@ -15,6 +15,7 @@ interface RbacRole {
   id: string;
   name: string;
   permissions: { [resource: string]: string[] };
+  scopedPermissions?: { [resource: string]: { [operation: string]: string[] } };
   userIds: string[];
 }
 
@@ -70,6 +71,7 @@ export class RolesComponent extends PageComponent implements OnInit {
 
   nameControl = new FormControl('');
   resourceControl = new FormControl('DEVICE');
+  groupScopeControl = new FormControl<string[]>([]);
   operationControls: { [operation: string]: FormControl } = {
     READ: new FormControl(true),
     WRITE: new FormControl(false),
@@ -187,13 +189,28 @@ export class RolesComponent extends PageComponent implements OnInit {
     }
     const resource = this.resourceControl.value;
     const operations = this.operations.filter(op => this.operationControls[op].value);
+    const scopedGroups: string[] = this.groupScopeControl.value || [];
+    const permissions: { [resource: string]: string[] } = {};
+    const scopedPermissions: { [resource: string]: { [operation: string]: string[] } } = {};
+    if (operations.length) {
+      if (scopedGroups.length) {
+        scopedPermissions[resource] = {};
+        for (const operation of operations) {
+          scopedPermissions[resource][operation] = scopedGroups;
+        }
+      } else {
+        permissions[resource] = operations;
+      }
+    }
     this.roles = [...this.roles, {
       id: Math.random().toString(36).substring(2, 10),
       name,
-      permissions: operations.length ? {[resource]: operations} : {},
+      permissions,
+      scopedPermissions,
       userIds: []
     }];
     this.nameControl.setValue('');
+    this.groupScopeControl.setValue([]);
   }
 
   removeRole(role: RbacRole) {
@@ -201,9 +218,19 @@ export class RolesComponent extends PageComponent implements OnInit {
   }
 
   permissionSummary(role: RbacRole): string {
-    return Object.keys(role.permissions || {})
+    const global = Object.keys(role.permissions || {})
       .map(resource => `${resource}: ${(role.permissions[resource] || []).join('/')}`)
       .join(', ');
+    const scoped = Object.keys(role.scopedPermissions || {})
+      .map(resource => {
+        const byOperation = role.scopedPermissions[resource] || {};
+        return Object.keys(byOperation)
+          .map(operation => `${resource}: ${operation} (${(byOperation[operation] || []).length} group(s))`)
+          .join(', ');
+      })
+      .filter(part => !!part)
+      .join(', ');
+    return [global, scoped].filter(part => !!part).join(', ');
   }
 
   save() {

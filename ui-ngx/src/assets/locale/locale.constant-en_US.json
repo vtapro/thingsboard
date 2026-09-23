@@ -172,6 +172,7 @@
         "roles-user-groups": "User groups",
         "roles-add-user-group": "Add user group",
         "roles-role": "Role",
+        "roles-scope-groups": "Scope to groups (optional)",
         "white-labeling-image-hint": "Absolute URL or path, for example /api/images/public/logo.png",
         "white-labeling-primary-color": "Primary color",
         "white-labeling-accent-color": "Accent color",
