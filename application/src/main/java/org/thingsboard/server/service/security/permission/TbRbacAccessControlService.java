@@ -15,11 +15,15 @@ import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.rbac.RbacRole;
 import org.thingsboard.server.dao.settings.RoleService;
 import org.thingsboard.server.dao.settings.EntityGroupService;
+import org.thingsboard.server.dao.settings.UserGroupService;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroup;
+import org.thingsboard.server.common.data.rbac.RbacUserGroup;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.thingsboard.server.common.data.security.Authority.SYS_ADMIN;
 
@@ -44,10 +48,11 @@ public class TbRbacAccessControlService implements AccessControlService {
     private final DefaultAccessControlService defaultAccessControlService;
     private final RoleService roleService;
     private final EntityGroupService entityGroupService;
+    private final UserGroupService userGroupService;
 
     @Override
     public boolean hasPermission(SecurityUser user, Resource resource, Operation operation) throws ThingsboardException {
-        RbacRole role = getRbacRole(user);
+        RbacRole role = getEffectiveRole(user);
         if (role == null) {
             return defaultAccessControlService.hasPermission(user, resource, operation);
         }
@@ -64,7 +69,7 @@ public class TbRbacAccessControlService implements AccessControlService {
     @Override
     public <I extends EntityId, T extends HasTenantId> boolean hasPermission(SecurityUser user, Resource resource, Operation operation,
                                                                              I entityId, T entity) throws ThingsboardException {
-        RbacRole role = getRbacRole(user);
+        RbacRole role = getEffectiveRole(user);
         if (role == null) {
             return defaultAccessControlService.hasPermission(user, resource, operation, entityId, entity);
         }
@@ -86,22 +91,67 @@ public class TbRbacAccessControlService implements AccessControlService {
         }
     }
 
-    private RbacRole getRbacRole(SecurityUser user) {
+    private RbacRole getEffectiveRole(SecurityUser user) {
         if (user == null || user.getId() == null || user.getTenantId() == null || SYS_ADMIN.equals(user.getAuthority())) {
             return null;
         }
         try {
             String userId = user.getId().getId().toString();
-            for (RbacRole role : roleService.getRoleSettings(user.getTenantId()).getRoles()) {
+            List<RbacRole> roles = roleService.getRoleSettings(user.getTenantId()).getRoles();
+            Set<String> roleIds = new HashSet<>();
+            for (RbacRole role : roles) {
                 if (role.getUserIds() != null && role.getUserIds().contains(userId)) {
-                    return role;
+                    roleIds.add(role.getId());
                 }
             }
+            for (RbacUserGroup group : userGroupService.getUserGroupSettings(user.getTenantId()).getGroups()) {
+                if (group.getRoleIds() != null && group.getUserIds() != null && group.getUserIds().contains(userId)) {
+                    roleIds.addAll(group.getRoleIds());
+                }
+            }
+            if (roleIds.isEmpty()) {
+                return null;
+            }
+            RbacRole effective = new RbacRole();
+            effective.setId("effective");
+            effective.setName("effective");
+            for (RbacRole role : roles) {
+                if (roleIds.contains(role.getId())) {
+                    mergePermissions(role, effective);
+                }
+            }
+            return effective;
         } catch (Exception e) {
             log.warn("Failed to load RBAC roles for user [{}], falling back to default permissions: {}",
                     user.getId(), e.getMessage());
         }
         return null;
+    }
+
+    private void mergePermissions(RbacRole source, RbacRole target) {
+        if (source.getPermissions() != null) {
+            source.getPermissions().forEach((resource, operations) -> {
+                List<String> merged = target.getPermissions().computeIfAbsent(resource, r -> new java.util.ArrayList<>());
+                for (String operation : operations) {
+                    if (!merged.contains(operation)) {
+                        merged.add(operation);
+                    }
+                }
+            });
+        }
+        if (source.getScopedPermissions() != null) {
+            source.getScopedPermissions().forEach((resource, byOperation) ->
+                byOperation.forEach((operation, groupIds) -> {
+                    List<String> merged = target.getScopedPermissions()
+                        .computeIfAbsent(resource, r -> new java.util.HashMap<>())
+                        .computeIfAbsent(operation, o -> new java.util.ArrayList<>());
+                    for (String groupId : groupIds) {
+                        if (!merged.contains(groupId)) {
+                            merged.add(groupId);
+                        }
+                    }
+                }));
+        }
     }
 
     private boolean hasGlobalOperation(RbacRole role, Resource resource, Operation operation) {
