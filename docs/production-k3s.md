@@ -191,6 +191,54 @@ thì nền tảng ngừng ghi telemetry và không khởi động lại được
 chủ thành cụm (Kafka ≥ 3 broker, Cassandra ≥ 3 node RF=3, ZooKeeper ≥ 3, PostgreSQL primary +
 standby) rồi cập nhật lại `Endpoints` — manifest của ThingsBoard **không phải sửa**.
 
+Nếu PostgreSQL nằm ở **máy chủ khác** với Cassandra/Kafka/ZooKeeper, chỉ cần đổi `ip` trong khối
+`tb-postgres` của `03-external-data-plane.yaml` thành IP của máy đó — mỗi khối `Endpoints` có IP
+riêng, không bắt buộc cùng một máy chủ.
+
+### 3.3. Cụm hiện tại: 1 control plane + 2 worker
+
+Cụm k3s gồm **1 server (control plane) + 2 worker**, dữ liệu nằm trên máy chủ riêng. Với cấu hình này:
+
+**Phân bố pod**: mỗi Deployment đã khai báo `topologySpreadConstraints` (maxSkew 1 theo
+`kubernetes.io/hostname`) nên 2 replica được đẩy sang 2 node khác nhau. `whenUnsatisfiable:
+ScheduleAnyway` để pod vẫn chạy được khi chỉ còn 1 node trống (mất 1 worker không làm pod Pending).
+
+```bash
+kubectl -n thingsboard get pods -o wide        # kiểm tra NODE của từng pod
+kubectl top nodes                              # kiểm tra tài nguyên còn trống
+kubectl describe node <worker> | Select-String Taints   # k3s server mặc định KHÔNG bị taint
+```
+
+**Tài nguyên**: k3s server mặc định vẫn nhận workload, nên tổng capacity = 3 node. Tổng request của
+bộ manifest hiện tại:
+
+| Deployment | replica | request/pod | tổng request |
+|---|---|---|---|
+| tb-core | 2 | 1 CPU / 2Gi | 2 CPU / 4Gi |
+| tb-rule-engine | 2 | 1 CPU / 2Gi | 2 CPU / 4Gi |
+| tb-mqtt-transport | 2 | 500m / 1Gi | 1 CPU / 2Gi |
+| tb-http-transport | 2 | 500m / 1Gi | 1 CPU / 2Gi |
+| **tổng** | **8 pod** | — | **6 CPU / 12Gi** |
+
+Nếu 2 worker + 1 control plane không đủ 6 CPU / 12Gi (ví dụ 3 node × 2 vCPU / 4Gi), giảm xuống:
+
+```bash
+# cụm nhỏ: 1 replica cho transport, giữ 2 replica cho core và rule engine
+kubectl -n thingsboard scale deploy/tb-mqtt-transport --replicas=1
+kubectl -n thingsboard scale deploy/tb-http-transport --replicas=1
+# và hạ heap tương ứng trong ConfigMap: JAVA_OPTS=-Xms512M -Xmx2G -XX:+UseG1GC -XX:MaxRAMPercentage=70
+```
+
+Nhớ giữ `limits` > `requests` để HPA còn chỗ nhân bản, và đặt heap (`-Xmx`) thấp hơn `limits` memory
+khoảng 20–25% để JVM không bị OOMKilled.
+
+**Storage**: mọi trạng thái đã nằm ở máy chủ dữ liệu (PostgreSQL/Cassandra) và cache dùng Redis, nên
+các pod ThingsBoard **không cần PVC** — đây là điểm thuận lợi của mô hình data plane bên ngoài.
+
+**MQTT**: `tb-mqtt-transport` dùng `Service type=LoadBalancer`; k3s dùng servicelb nên `EXTERNAL-IP`
+sẽ là IP của các node. Nếu node không có IP public (sau NAT), đổi `type: NodePort` và NAT cổng 1883
+từ ngoài vào 2 worker, hoặc giữ LoadBalancer và trỏ DNS `mqtt.greeniq.vn` vào IP đó.
+
 ## 4. Cấu hình production (đối chiếu `thingsboard.yml`)
 
 Toàn bộ biến dưới đây do `thingsboard.yml` định nghĩa, đặt qua `ConfigMap`/`Secret`:

@@ -16,6 +16,10 @@ server outside the cluster** and is linked in with `03-external-data-plane.yaml`
 The production domain of this deployment is **`app.greeniq.vn`** (see `30-ingress.yaml`);
 the MQTT endpoint is the `LoadBalancer` of `tb-mqtt-transport` on port `1883`.
 
+Target cluster: **1 k3s server (control plane) + 2 workers**, plus one dedicated data server.
+Every Deployment spreads its replicas over the workers with `topologySpreadConstraints`; sizing
+numbers and the small-cluster tuning are in `docs/production-k3s.md` section 3.3.
+
 | Directory/file | Content |
 |---|---|
 | `00-namespace.yaml` | `thingsboard` namespace |

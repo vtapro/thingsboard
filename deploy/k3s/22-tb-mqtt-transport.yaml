@@ -33,6 +33,14 @@ spec:
         app.kubernetes.io/part-of: thingsboard
     spec:
       terminationGracePeriodSeconds: 60
+      # the cluster has two workers: keep the replicas on different nodes when possible
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: tb-mqtt-transport
       containers:
         - name: tb-mqtt-transport
           image: ghcr.io/vtapro/greeniq-backend:v4.4.0.0
