@@ -202,15 +202,34 @@ trong `CASSANDRA_URL`/JDBC URL khớp CN/SAN của cert).
 | TLS | `sslmode=require` trong JDBC URL (nâng lên `verify-full` khi có CA của provider) | `CASSANDRA_USE_SSL=true` + `CASSANDRA_SSL_HOSTNAME_VALIDATION=true` |
 | Credentials | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` trong secret `tb-secrets` | `CASSANDRA_USERNAME` / `CASSANDRA_PASSWORD` trong secret `tb-secrets` |
 | Database/keyspace | DB `greeniq` đã tạo sẵn (đổi tên trong `SPRING_DATASOURCE_URL` nếu muốn khác) | keyspace `greeniq` đã tạo sẵn; job install chỉ chạy `CREATE KEYSPACE IF NOT EXISTS` nên **không ghi đè** replication của keyspace hiện có |
-| Data center | — | `CASSANDRA_LOCAL_DATACENTER` phải **khớp tên datacenter của cluster** (mặc định `datacenter1`); sai tên này là lỗi phổ biến nhất |
+| Data center | — | `CASSANDRA_LOCAL_DATACENTER` phải khớp tên datacenter của cluster — đã kiểm tra thực tế: **`DC1`** (không phải `datacenter1`) |
+| Truststore | — | server dùng **cert self-signed của CloudClusters**, không có trong JVM truststore → phải tải `cassandra.truststore.jks` từ console, tạo Secret `tb-cassandra-tls` và khai `CASSANDRA_SSL_TRUST_STORE=/certs/cassandra.truststore.jks` + password trong `tb-secrets` |
+| Hostname validation | — | `CASSANDRA_SSL_HOSTNAME_VALIDATION=false` vì cert có `CN=US, OU=CassandraCluster` (không chứa hostname); kết nối vẫn được mã hoá và CA được pin qua truststore |
 
 Kiểm tra tên datacenter của Cassandra (mở Shell/SSH trong CloudClusters hoặc dùng `cqlsh`):
 
 ```bash
 cqlsh --ssl cassandra-215233-0.cloudclusters.net 19948 -u vtheanh04@gmail.com -p '<password>' \
-  -e "SELECT data_center FROM system.local;"
-# đặt kết quả vào CASSANDRA_LOCAL_DATACENTER trong 01-config.yaml nếu khác 'datacenter1'
+  -e "SELECT data_center, release_version FROM system.local;"
+# kết quả trên cluster hiện tại: DC1 / 3.11.10
 ```
+
+Tạo 2 secret cho Cassandra (file `cassandra.truststore.jks` tải từ tab **Security** của console):
+
+```bash
+kubectl -n thingsboard create secret generic tb-cassandra-tls \
+  --from-file=cassandra.truststore.jks=./cassandra.truststore.jks
+# password của truststore nằm trong tb-secrets (chạy scripts/set-tb-secrets.ps1 hoặc thêm key
+# CASSANDRA_SSL_TRUST_STORE_PASSWORD)
+```
+
+Hai file `user.cer.pem` / `user.key.pem` (keystore) **chỉ cần** khi cluster bật xác thực bằng client
+certificate (mTLS). Cluster hiện tại không yêu cầu: đã kết nối thành công chỉ với user + password
++ TLS, nên ta bỏ qua keystore.
+
+> Lưu ý phiên bản: CloudClusters đang chạy **Cassandra 3.11.10**. ThingsBoard CE 4.4 dùng DataStax
+> driver 4.x (hỗ trợ từ 3.11 trở lên) nên về nguyên tắc là chạy được, nhưng bản 3.11 đã hết hỗ trợ
+> chính thức — nếu console cho phép nâng lên 4.x/5.x thì nên nâng để tránh rủi ro về sau.
 
 Tất cả biến trên đã khai báo sẵn trong `01-config.yaml`; chỉ cần điền user/password vào secret:
 

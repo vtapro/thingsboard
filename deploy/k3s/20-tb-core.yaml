@@ -71,6 +71,11 @@ spec:
               containerPort: 8080
             - name: edge-grpc
               containerPort: 7070
+          volumeMounts:
+            # Cassandra truststore (self-signed cluster CA of the managed service)
+            - name: cassandra-tls
+              mountPath: /certs
+              readOnly: true
           startupProbe:
             httpGet:
               path: /actuator/health
@@ -98,6 +103,10 @@ spec:
             limits:
               cpu: "2"
               memory: 3Gi
+      volumes:
+        - name: cassandra-tls
+          secret:
+            secretName: tb-cassandra-tls
 ---
 apiVersion: v1
 kind: Service

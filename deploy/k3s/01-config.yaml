@@ -54,11 +54,20 @@ data:
   # keyspace "greeniq" (already created in the CloudClusters console; the installer only runs
   # CREATE KEYSPACE IF NOT EXISTS, so the replication settings of the existing keyspace stay)
   CASSANDRA_KEYSPACE_NAME: greeniq
-  # must match the datacenter name of the Cassandra cluster — check with: DESCRIBE KEYSPACES / nodetool status
-  CASSANDRA_LOCAL_DATACENTER: datacenter1
+  # must match the datacenter name of the Cassandra cluster — verified with:
+  #   SELECT data_center FROM system.local;   ->  DC1
+  CASSANDRA_LOCAL_DATACENTER: DC1
   CASSANDRA_USE_CREDENTIALS: "true"
   CASSANDRA_USE_SSL: "true"
-  CASSANDRA_SSL_HOSTNAME_VALIDATION: "true"
+  # The server certificate is signed by the CloudClusters cluster CA (self-signed), which is not
+  # in the JVM truststore, so the truststore downloaded from the console has to be mounted:
+  #   kubectl -n thingsboard create secret generic tb-cassandra-tls \
+  #     --from-file=cassandra.truststore.jks=./cassandra.truststore.jks
+  # and its password goes to tb-secrets as CASSANDRA_SSL_TRUST_STORE_PASSWORD.
+  CASSANDRA_SSL_TRUST_STORE: /certs/cassandra.truststore.jks
+  # the certificate carries no host name (CN=US, OU=CassandraCluster), so hostname verification
+  # cannot succeed; the connection is still encrypted and the CA is pinned through the truststore
+  CASSANDRA_SSL_HOSTNAME_VALIDATION: "false"
   # the driver negotiates compression with the server; keep 'none' unless the Cassandra
   # server is explicitly configured for lz4
   CASSANDRA_COMPRESSION: none

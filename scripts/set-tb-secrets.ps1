@@ -15,6 +15,7 @@ param(
     [string]$PostgresPassword,
     [string]$CassandraUser = "vtheanh04@gmail.com",
     [string]$CassandraPassword,
+    [string]$CassandraTrustStorePassword,
     [string]$HaproxyStatsUser = "admin",
     [string]$HaproxyStatsPassword,
     [string]$Namespace = "thingsboard",
@@ -38,6 +39,7 @@ $env:KUBECONFIG = $Kubeconfig
 
 if ([string]::IsNullOrWhiteSpace($PostgresPassword)) { $PostgresPassword = Read-SecretValue "Mat khau PostgreSQL ($PostgresUser)" }
 if ([string]::IsNullOrWhiteSpace($CassandraPassword)) { $CassandraPassword = Read-SecretValue "Mat khau Cassandra ($CassandraUser)" }
+if ([string]::IsNullOrWhiteSpace($CassandraTrustStorePassword)) { $CassandraTrustStorePassword = Read-SecretValue "Mat khau truststore Cassandra (cassandra.truststore.jks)" }
 if ([string]::IsNullOrWhiteSpace($HaproxyStatsPassword)) { $HaproxyStatsPassword = Read-SecretValue "Mat khau trang /stats HAProxy ($HaproxyStatsUser)" }
 
 Write-Host "Cap nhat secret $SecretName trong namespace $Namespace ..."
@@ -48,6 +50,7 @@ $createArgs = @(
     "--from-literal=SPRING_DATASOURCE_PASSWORD=$PostgresPassword",
     "--from-literal=CASSANDRA_USERNAME=$CassandraUser",
     "--from-literal=CASSANDRA_PASSWORD=$CassandraPassword",
+    "--from-literal=CASSANDRA_SSL_TRUST_STORE_PASSWORD=$CassandraTrustStorePassword",
     "--from-literal=HAPROXY_STATS_USER=$HaproxyStatsUser",
     "--from-literal=HAPROXY_STATS_PASSWORD=$HaproxyStatsPassword",
     "--dry-run=client", "-o", "yaml"

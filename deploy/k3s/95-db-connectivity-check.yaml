@@ -1,0 +1,112 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# One-off connectivity check for the two managed databases. Not part of kustomization.yaml —
+# apply it manually when the credentials change or when ThingsBoard cannot reach a database:
+#
+#   kubectl apply -f deploy/k3s/95-db-connectivity-check.yaml
+#   kubectl -n thingsboard logs job/tb-check-postgres
+#   kubectl -n thingsboard logs job/tb-check-cassandra
+#   kubectl -n thingsboard delete job tb-check-postgres tb-check-cassandra
+#
+# The passwords are read from the tb-secrets Secret, never from this file.
+
+# ---- PostgreSQL -----------------------------------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tb-check-postgres
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: ghcr
+      containers:
+        - name: psql
+          image: postgres:16-alpine
+          env:
+            - name: PGHOST
+              value: postgresql-215231-0.cloudclusters.net
+            - name: PGPORT
+              value: "10012"
+            - name: PGDATABASE
+              value: greeniq
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: tb-secrets
+                  key: SPRING_DATASOURCE_USERNAME
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tb-secrets
+                  key: SPRING_DATASOURCE_PASSWORD
+            - name: PGSSLMODE
+              value: require
+          command: ["sh", "-c"]
+          args:
+            - >-
+              psql -c "select current_database() as db, current_user as usr,
+              (select count(*) from information_schema.tables where table_schema='public') as tables,
+              ssl from pg_stat_ssl where pid = pg_backend_pid();"
+---
+# ---- Cassandra ------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tb-check-cassandra
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: ghcr
+      containers:
+        - name: cqlsh
+          image: cassandra:5.0
+          env:
+            - name: CASSANDRA_HOST
+              value: cassandra-215233-0.cloudclusters.net
+            - name: CASSANDRA_PORT
+              value: "19948"
+            - name: CQLSH_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tb-secrets
+                  key: CASSANDRA_USERNAME
+            - name: CQLSH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tb-secrets
+                  key: CASSANDRA_PASSWORD
+          command: ["sh", "-c"]
+          args:
+            - |
+              echo "--- certificate of the server (issuer/subject/SAN) ---"
+              keytool -printcert -sslserver "$CASSANDRA_HOST:$CASSANDRA_PORT" 2>/dev/null \
+                | grep -E "Owner:|Issuer:|SubjectAlternativeName" | head -6
+              echo "--- cqlsh (TLS without local truststore, this image has no CA bundle) ---"
+              mkdir -p /root/.cassandra
+              printf "[ssl]\nvalidate = false\n" > /root/.cassandra/cqlshrc
+              cqlsh --ssl -u "$CQLSH_USER" -p "$CQLSH_PASSWORD" "$CASSANDRA_HOST" "$CASSANDRA_PORT" \
+                -e "SELECT data_center, release_version FROM system.local; DESCRIBE KEYSPACE greeniq;"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
