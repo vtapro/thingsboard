@@ -48,7 +48,7 @@ spec:
         - name: tb-core
           # tb-node image: same jar as tb-rule-engine, role selected by TB_SERVICE_TYPE
           image: ghcr.io/vtapro/tb-node:v4.4.0.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           envFrom:
             - configMapRef:
                 name: tb-common

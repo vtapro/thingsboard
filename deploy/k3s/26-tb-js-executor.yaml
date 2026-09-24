@@ -45,7 +45,7 @@ spec:
       containers:
         - name: tb-js-executor
           image: ghcr.io/vtapro/tb-js-executor:v4.4.0.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           envFrom:
             - configMapRef:
                 name: tb-common

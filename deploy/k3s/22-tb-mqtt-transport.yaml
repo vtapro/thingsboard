@@ -47,7 +47,7 @@ spec:
       containers:
         - name: tb-mqtt-transport
           image: ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           envFrom:
             - configMapRef:
                 name: tb-common

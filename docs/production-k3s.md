@@ -584,7 +584,7 @@ Ba việc phải làm sau khi deploy:
 | Lọc entity theo nhóm | hiện lọc trong bộ nhớ, giới hạn 1000 entity/lần | với tenant lớn cần chuyển sang query theo group (đã ghi trong [access-control-roadmap.md](access-control-roadmap.md)) |
 | Schema | không thêm bảng/cột | nâng cấp ThingsBoard CE bản mới không xung đột DB |
 
-## 8. Giới hạn đã biết: Cassandra + danh sách key telemetry
+## 8. Đã vá: Cassandra + danh sách key telemetry
 
 Bản **CE gốc** không hiện thực việc liệt kê key telemetry theo entity trong implementation Cassandra:
 
@@ -603,13 +603,16 @@ Hệ quả khi production dùng `DATABASE_TS_TYPE=cassandra`:
 - Nhưng widget dashboard khi chọn data key (API `POST /api/entitiesQuery/find/keys`) sẽ **không thấy
   key nào**, vì API này đi qua hàm bị stub ở trên. Đã kiểm chứng thực tế trên stack Cassandra.
 
-Ba lựa chọn (chọn 1 khi go-live):
+**Fork này đã vá** trong `dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesLatestDao.java`:
 
-1. **Chấp nhận**: người dùng tự nhập tên key trong widget (đúng hành vi CE hiện tại).
-2. **Vá**: hiện thực `findAllKeysByEntityIds(Async)` cho Cassandra (đã thử và chạy đúng ở local,
-   nhưng cần bản patch riêng vì đụng vào file gốc của ThingsBoard — cân nhắc khi merge upstream).
-3. **Hybrid theo nhu cầu**: `DATABASE_TS_TYPE=cassandra` cho dữ liệu nóng, hoặc dùng `timescale/sql`
-   nếu ưu tiên trải nghiệm UI hơn khả năng ghi cực lớn.
+- `findAllKeysByEntityIds(Async)`: `SELECT DISTINCT key FROM ts_kv_latest_cf WHERE entity_type = ?
+  AND entity_id = ?` cho từng entity, hợp nhất và loại trùng — đúng ngữ nghĩa của bản SQL
+  (`SqlTimeseriesLatestDao`).
+- `findLatestByEntityIds(Async)`: hợp nhất `findAllLatest` của từng entity.
+
+Vì file nằm trong module `dao` (mã gốc ThingsBoard), khi merge upstream cần giữ lại hai đoạn này;
+header SPDX của file vẫn nguyên vẹn. Sau khi deploy image mới, widget dashboard chọn được data key
+như bản dùng PostgreSQL.
 
 ## 9. Bằng chứng: code không bị cắt bỏ nhánh production
 

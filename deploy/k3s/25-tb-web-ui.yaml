@@ -47,7 +47,7 @@ spec:
       containers:
         - name: tb-web-ui
           image: ghcr.io/vtapro/tb-web-ui:v4.4.0.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           env:
             - name: NODE_ENV
               value: production

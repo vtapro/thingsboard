@@ -45,7 +45,7 @@ spec:
       containers:
         - name: tb-rule-engine
           image: ghcr.io/vtapro/tb-node:v4.4.0.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           envFrom:
             - configMapRef:
                 name: tb-common

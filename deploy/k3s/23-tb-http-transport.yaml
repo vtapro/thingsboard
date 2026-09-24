@@ -45,7 +45,7 @@ spec:
       containers:
         - name: tb-http-transport
           image: ghcr.io/vtapro/tb-http-transport:v4.4.0.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           envFrom:
             - configMapRef:
                 name: tb-common

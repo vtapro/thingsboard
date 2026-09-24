@@ -31,6 +31,7 @@ import org.thingsboard.server.dao.util.NoSqlTsLatestDao;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
 
@@ -45,6 +46,7 @@ public class CassandraBaseTimeseriesLatestDao extends AbstractCassandraBaseTimes
     private PreparedStatement latestInsertStmt;
     private PreparedStatement findLatestStmt;
     private PreparedStatement findAllLatestStmt;
+    private PreparedStatement findAllKeysStmt;
 
     @Override
     public ListenableFuture<Optional<TsKvEntry>> findLatestOpt(TenantId tenantId, EntityId entityId, String key) {
@@ -81,24 +83,65 @@ public class CassandraBaseTimeseriesLatestDao extends AbstractCassandraBaseTimes
         return Collections.emptyList();
     }
 
+    /**
+     * Liệt kê toàn bộ key telemetry (latest) của các entity được yêu cầu.
+     *
+     * <p>Bản CE để trống hai hàm này, nên khi timeseries lưu ở Cassandra thì API dùng cho widget
+     * (POST /api/entitiesQuery/find/keys) không trả về key nào và widget không chọn được data key.
+     * Cách hiện thực giống bản SQL: lấy key của từng entity rồi hợp nhất, loại trùng.
+     */
     @Override
     public List<String> findAllKeysByEntityIds(TenantId tenantId, List<EntityId> entityIds) {
-        return Collections.emptyList();
+        if (entityIds == null || entityIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return Futures.getUnchecked(findAllKeysByEntityIdsAsync(tenantId, entityIds));
     }
 
     @Override
     public ListenableFuture<List<String>> findAllKeysByEntityIdsAsync(TenantId tenantId, List<EntityId> entityIds) {
-        return Futures.immediateFuture(Collections.emptyList());
+        if (entityIds == null || entityIds.isEmpty()) {
+            return Futures.immediateFuture(Collections.emptyList());
+        }
+        List<ListenableFuture<List<String>>> futures = entityIds.stream()
+                .map(entityId -> findAllKeysByEntityId(tenantId, entityId))
+                .collect(Collectors.toList());
+        return Futures.transform(Futures.allAsList(futures),
+                keysPerEntity -> keysPerEntity.stream().flatMap(List::stream).distinct().collect(Collectors.toList()),
+                MoreExecutors.directExecutor());
     }
 
     @Override
     public List<TsKvEntry> findLatestByEntityIds(TenantId tenantId, List<EntityId> entityIds) {
-        return Collections.emptyList();
+        if (entityIds == null || entityIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return Futures.getUnchecked(findLatestByEntityIdsAsync(tenantId, entityIds));
     }
 
     @Override
     public ListenableFuture<List<TsKvEntry>> findLatestByEntityIdsAsync(TenantId tenantId, List<EntityId> entityIds) {
-        return Futures.immediateFuture(Collections.emptyList());
+        if (entityIds == null || entityIds.isEmpty()) {
+            return Futures.immediateFuture(Collections.emptyList());
+        }
+        List<ListenableFuture<List<TsKvEntry>>> futures = entityIds.stream()
+                .map(entityId -> findAllLatest(tenantId, entityId))
+                .collect(Collectors.toList());
+        return Futures.transform(Futures.allAsList(futures),
+                entriesPerEntity -> entriesPerEntity.stream().flatMap(List::stream).collect(Collectors.toList()),
+                MoreExecutors.directExecutor());
+    }
+
+    private ListenableFuture<List<String>> findAllKeysByEntityId(TenantId tenantId, EntityId entityId) {
+        BoundStatementBuilder stmtBuilder = new BoundStatementBuilder(getFindAllKeysStmt().bind());
+        stmtBuilder.setString(0, entityId.getEntityType().name());
+        stmtBuilder.setUuid(1, entityId.getId());
+        BoundStatement stmt = stmtBuilder.build();
+        log.debug(GENERATED_QUERY_FOR_ENTITY_TYPE_AND_ENTITY_ID, stmt, entityId.getEntityType(), entityId.getId());
+        return getFutureAsync(executeAsyncRead(tenantId, stmt), rs -> Futures.transform(
+                rs.allRows(readResultsProcessingExecutor, maxResultSetSizeBytes),
+                rows -> rows.stream().map(row -> row.getString(0)).collect(Collectors.toList()),
+                readResultsProcessingExecutor));
     }
 
     @Override
@@ -235,5 +278,16 @@ public class CassandraBaseTimeseriesLatestDao extends AbstractCassandraBaseTimes
                     "AND " + ModelConstants.ENTITY_ID_COLUMN + EQUALS_PARAM);
         }
         return findAllLatestStmt;
+    }
+
+    private PreparedStatement getFindAllKeysStmt() {
+        if (findAllKeysStmt == null) {
+            findAllKeysStmt = prepare(SELECT_PREFIX +
+                    "DISTINCT " + ModelConstants.KEY_COLUMN + " " +
+                    "FROM " + ModelConstants.TS_KV_LATEST_CF + " " +
+                    "WHERE " + ModelConstants.ENTITY_TYPE_COLUMN + EQUALS_PARAM +
+                    "AND " + ModelConstants.ENTITY_ID_COLUMN + EQUALS_PARAM);
+        }
+        return findAllKeysStmt;
     }
 }
