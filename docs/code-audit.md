@@ -212,3 +212,38 @@ Dữ liệu test (device `parent-device`, 2 domain test, mail template độc h�
   ENTITY_VIEW, RULE_CHAIN, ADMIN_SETTINGS, USER); mỗi tab có READ/WRITE/DELETE, phạm vi theo entity group và
   badge hiển thị nhanh quyền đã chọn. Role yêu cầu ít nhất một quyền trước khi thêm (tránh tạo role rỗng).
 - Bố cục dùng CSS grid nên các ô nhập thẳng hàng trên mọi độ rộng màn hình.
+
+## 11. Vòng sửa lỗi sau khi bàn giao (đã kiểm chứng)
+
+| Vấn đề người dùng gặp | Nguyên nhân gốc | Trạng thái |
+|---|---|---|
+| Trang Devices / Entity views trắng bảng, không load dữ liệu | Thanh tab All\\|Groups được thêm bằng cách bọc bảng trong `@if/@else`, trong khi component dùng `@ViewChild(..., {static: true})` — ViewChild static không resolve trong structural directive nên `init()` ném lỗi và bảng không khởi tạo | ✅ đã sửa, kiểm chứng bằng Chrome headless |
+| Bấm Save trong "Add entities" không lưu thiết bị vào nhóm (cả 3 tab Devices/Assets/Entity views) | Dialog trộn `[selected]` của `mat-list-option` với `[(ngModel)]` trên `mat-selection-list`, giá trị trả về không khớp với checkbox | ✅ đã sửa — dialog dùng state đơn giản (`selectedIds` + `isSelected/toggle`), có hiển thị "N selected" |
+| Groups "không ghi vào Database" / mất nhóm | API cũ thay thế **toàn bộ** danh sách nhóm: chỉ cần client gửi danh sách rỗng/stale là xoá hết nhóm của tenant (đúng rủi ro M6). Việc này đã xảy ra với DB local trong lúc kiểm thử | ✅ đã sửa — thêm API theo từng nhóm: `POST /api/tenant/entityGroup/group` (upsert 1 nhóm, không đụng nhóm khác) và `DELETE /api/tenant/entityGroup/{id}`; UI chỉ dùng 2 API này. Trang Roles cũng đổi sang read-modify-write, chỉ xoá đúng những nhóm admin đã bỏ |
+| Xoá device báo "Can't delete device that has entity views or is referenced in calculated fields!" | Chốt chặn hợp lệ của CE nhưng thông báo không nói rõ đối tượng nào chặn | ✅ đã cải thiện — thông báo nêu tên: `Can't delete device that is referenced by entity view 'vuthanh'. Remove or update these entities first.` (asset cũng vậy); đã cập nhật 2 test tương ứng |
+| MQTTX báo "Bad User Name or Password (Code: 134)" | MQTTX đặt **device ID** vào Username; ThingsBoard yêu cầu **device access token** | ✅ không phải lỗi code — xem hướng dẫn bên dưới |
+| Lưu ở trang Roles không có phản hồi | Không có thông báo sau khi lưu | ✅ đã thêm — thành công/thất bại cho cả 4 mục (roles, entity groups, user groups, customer hierarchy) |
+
+### Hướng dẫn kết nối MQTTX (đã kiểm chứng thực tế)
+
+```text
+Protocol: mqtt://        (KHÔNG dùng mqtts/ws)
+Host:     127.0.0.1      (hoặc localhost)
+Port:     1883
+Username: <device access token>   ← KHÔNG phải device ID
+Password: để trống
+Client ID: tùy ý
+```
+
+Lấy access token: mở device → **Manage credentials** (hoặc nút *Copy access token* trong tab Details).
+Ví dụ token của `GW1` tại thời điểm kiểm chứng: `3CSgc0oe3OCmtzIspGLy` (token đổi theo thiết bị, không dùng lại cho thiết bị khác).
+Publish dữ liệu: topic `v1/devices/me/telemetry`, payload JSON.
+
+Kiểm chứng đã chạy: TCP tới `127.0.0.1:1883`, `::1:1883`, `localhost:1883` và MQTT CONNECT bằng token (có/không password) đều trả `CONNACK code=0`.
+
+### Cảnh báo dữ liệu
+
+Trong lúc kiểm thử vòng này, lỗi "thay thế toàn bộ danh sách nhóm" đã **xoá danh sách entity group trong DB local**
+(trước đó có 12 nhóm: *Nhóm 1..7* cho DEVICE và *Building 1..5* cho ASSET, tất cả đều 0 thành viên vì lỗi dialog).
+Đây là dữ liệu local, không có bản sao lưu. Khuyến nghị chạy `pg_dump` định kỳ (ví dụ đưa vào cron) và dùng
+`docker-compose.prod.yml` có volume riêng cho Postgres.

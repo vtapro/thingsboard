@@ -953,7 +953,8 @@ public class AssetServiceTest extends AbstractServiceTest {
 
         assertThatThrownBy(() -> assetService.deleteAsset(tenantId, savedAsset.getId()))
                 .isInstanceOf(DataValidationException.class)
-                .hasMessage("Can't delete asset that has entity views or is referenced in calculated fields!");
+                .hasMessageContaining("Can't delete asset that is referenced by")
+                .hasMessageContaining("a calculated field");
 
         calculatedFieldService.deleteCalculatedField(tenantId, savedCalculatedField.getId());
     }

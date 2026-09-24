@@ -7,7 +7,12 @@ import org.springframework.stereotype.Service;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.AdminSettings;
 import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.common.data.rbac.RbacEntityGroup;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroupSettings;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -43,5 +48,23 @@ public class DefaultEntityGroupService implements EntityGroupService {
         return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), RbacEntityGroupSettings.class);
     }
 
-}
+    @Override
+    public RbacEntityGroupSettings saveEntityGroup(TenantId tenantId, RbacEntityGroup group) {
+        RbacEntityGroupSettings settings = getEntityGroupSettings(tenantId);
+        List<RbacEntityGroup> groups = new ArrayList<>(settings.getGroups() != null ? settings.getGroups() : List.of());
+        groups.removeIf(existing -> Objects.equals(existing.getId(), group.getId()));
+        groups.add(group);
+        settings.setGroups(groups);
+        return saveEntityGroupSettings(tenantId, settings);
+    }
 
+    @Override
+    public RbacEntityGroupSettings deleteEntityGroup(TenantId tenantId, String groupId) {
+        RbacEntityGroupSettings settings = getEntityGroupSettings(tenantId);
+        List<RbacEntityGroup> groups = new ArrayList<>(settings.getGroups() != null ? settings.getGroups() : List.of());
+        groups.removeIf(existing -> Objects.equals(existing.getId(), groupId));
+        settings.setGroups(groups);
+        return saveEntityGroupSettings(tenantId, settings);
+    }
+
+}

@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.thingsboard.server.common.data.EntitySubtype;
 import org.thingsboard.server.common.data.EntityType;
+import org.thingsboard.server.common.data.EntityView;
 import org.thingsboard.server.common.data.NameConflictPolicy;
 import org.thingsboard.server.common.data.NameConflictStrategy;
 import org.thingsboard.server.common.data.ProfileEntityIdInfo;
@@ -223,8 +224,12 @@ public class BaseAssetService extends AbstractCachedEntityService<AssetCacheKey,
     @Override
     @Transactional
     public void deleteEntity(TenantId tenantId, EntityId id, boolean force) {
-        if (!force && (entityViewService.existsByTenantIdAndEntityId(tenantId, id) || calculatedFieldService.referencedInAnyCalculatedField(tenantId, id))) {
-            throw new DataValidationException("Can't delete asset that has entity views or is referenced in calculated fields!");
+        if (!force) {
+            List<String> references = findReferences(tenantId, id);
+            if (!references.isEmpty()) {
+                throw new DataValidationException("Can't delete asset that is referenced by " + String.join(", ", references)
+                        + ". Remove or update these entities first.");
+            }
         }
 
         Asset asset = assetDao.findById(tenantId, id.getId());
@@ -232,6 +237,21 @@ public class BaseAssetService extends AbstractCachedEntityService<AssetCacheKey,
             return;
         }
         deleteAsset(tenantId, asset);
+    }
+
+    /**
+     * Collects the entities that prevent the deletion of the asset, so that the message of the error
+     * tells the administrator exactly what has to be changed.
+     */
+    private List<String> findReferences(TenantId tenantId, EntityId entityId) {
+        List<String> references = new ArrayList<>();
+        for (EntityView entityView : entityViewService.findEntityViewsByTenantIdAndEntityId(tenantId, entityId)) {
+            references.add("entity view '" + entityView.getName() + "'");
+        }
+        if (calculatedFieldService.referencedInAnyCalculatedField(tenantId, entityId)) {
+            references.add("a calculated field");
+        }
+        return references;
     }
 
     private void deleteAsset(TenantId tenantId, Asset asset) {

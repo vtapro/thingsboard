@@ -7,11 +7,13 @@ import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { getCurrentAuthState } from '@core/auth/auth.selectors';
 import { Authority } from '@shared/models/authority.enum';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { defaultHttpOptionsFromConfig } from '@core/http/http-utils';
 import { PageComponent } from '@shared/components/page.component';
 import { ActionNotificationShow } from '@core/notification/notification.actions';
 import { TranslateService } from '@ngx-translate/core';
+import { forkJoin, of } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 
 interface RbacRole {
   id: string;
@@ -132,8 +134,14 @@ export class RolesComponent extends PageComponent implements OnInit {
 
   loadGroups() {
     this.http.get<{groups: RbacEntityGroup[]}>('/api/tenant/entityGroup',
-      defaultHttpOptionsFromConfig(undefined)).subscribe(settings => this.groups = settings?.groups || []);
+      defaultHttpOptionsFromConfig(undefined)).subscribe(settings => {
+      this.groups = settings?.groups || [];
+      this.loadedGroupIds = this.groups.map(group => group.id);
+    });
   }
+
+  /** Ids of the groups loaded from the server, used to delete only the groups removed by the administrator. */
+  private loadedGroupIds: string[] = [];
 
   addGroup() {
     const name = (this.groupNameControl.value || '').trim();
@@ -161,8 +169,35 @@ export class RolesComponent extends PageComponent implements OnInit {
   }
 
   saveGroups() {
-    this.http.post<{groups: RbacEntityGroup[]}>('/api/tenant/entityGroup', {groups: this.groups},
-      defaultHttpOptionsFromConfig(undefined)).subscribe(settings => this.groups = settings?.groups || []);
+    this.http.get<{groups: RbacEntityGroup[]}>('/api/tenant/entityGroup',
+      defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
+      next: current => {
+        const byId = new Map<string, RbacEntityGroup>();
+        (current?.groups || []).forEach(group => byId.set(group.id, group));
+        // The groups edited on this page win over the stored ones, the others are preserved.
+        this.groups.forEach(group => byId.set(group.id, group));
+        const removedIds = this.loadedGroupIds.filter(id => !this.groups.some(group => group.id === id));
+        const saved$ = removedIds.length
+          ? forkJoin(removedIds.map(id => this.http.delete(`/api/tenant/entityGroup/${id}`,
+              defaultHttpOptionsFromConfig({ignoreErrors: true}))))
+          : of(null);
+        saved$.pipe(
+          switchMap(() => this.http.post<{groups: RbacEntityGroup[]}>('/api/tenant/entityGroup',
+            {groups: Array.from(byId.values())}, defaultHttpOptionsFromConfig({ignoreErrors: true})))
+        ).subscribe({
+          next: settings => {
+            this.groups = settings?.groups || [];
+            this.loadedGroupIds = this.groups.map(group => group.id);
+            this.notifySaved('admin.roles-entity-groups-save-success');
+          },
+          error: (error: HttpErrorResponse) => {
+            this.notifySaveFailed('admin.roles-entity-groups-save-failed', error);
+            this.loadGroups();
+          }
+        });
+      },
+      error: (error: HttpErrorResponse) => this.notifySaveFailed('admin.roles-entity-groups-save-failed', error)
+    });
   }
 
   loadUserGroups() {
@@ -198,7 +233,13 @@ export class RolesComponent extends PageComponent implements OnInit {
 
   saveUserGroups() {
     this.http.post<{groups: RbacUserGroup[]}>('/api/tenant/userGroup', {groups: this.userGroups},
-      defaultHttpOptionsFromConfig(undefined)).subscribe(settings => this.userGroups = settings?.groups || []);
+      defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
+      next: settings => {
+        this.userGroups = settings?.groups || [];
+        this.notifySaved('admin.roles-user-groups-save-success');
+      },
+      error: (error: HttpErrorResponse) => this.notifySaveFailed('admin.roles-user-groups-save-failed', error)
+    });
   }
 
   loadHierarchy() {
@@ -237,7 +278,13 @@ export class RolesComponent extends PageComponent implements OnInit {
       parents[row.childId] = row.parentId;
     }
     this.http.post('/api/tenant/customerHierarchy', {parents},
-      defaultHttpOptionsFromConfig(undefined)).subscribe(() => this.loadHierarchy());
+      defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
+      next: () => {
+        this.loadHierarchy();
+        this.notifySaved('admin.roles-hierarchy-save-success');
+      },
+      error: (error: HttpErrorResponse) => this.notifySaveFailed('admin.roles-hierarchy-save-failed', error)
+    });
   }
 
   setRoleUsers(role: RbacRole, userIds: string[]) {
@@ -360,7 +407,33 @@ export class RolesComponent extends PageComponent implements OnInit {
 
   save() {
     this.http.post<{roles: RbacRole[]}>('/api/tenant/role', {roles: this.roles},
-      defaultHttpOptionsFromConfig(undefined)).subscribe(settings => this.roles = settings?.roles || []);
+      defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
+      next: settings => {
+        this.roles = settings?.roles || [];
+        this.notifySaved('admin.roles-save-success');
+      },
+      error: (error: HttpErrorResponse) => this.notifySaveFailed('admin.roles-save-failed', error)
+    });
+  }
+
+  /**
+   * Shows the result of a save operation, so that the administrator always knows whether it worked.
+   */
+  private notifySaved(messageKey: string) {
+    this.store.dispatch(new ActionNotificationShow({
+      message: this.translate.instant(messageKey),
+      type: 'success'
+    }));
+  }
+
+  private notifySaveFailed(messageKey: string, error: HttpErrorResponse) {
+    const details = error?.error?.message;
+    const message = this.translate.instant(messageKey);
+    this.store.dispatch(new ActionNotificationShow({
+      message: details ? `${message}: ${details}` : message,
+      type: 'error',
+      duration: 5000
+    }));
   }
 
 }

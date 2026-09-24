@@ -1290,7 +1290,8 @@ public class DeviceServiceTest extends AbstractServiceTest {
 
         assertThatThrownBy(() -> deviceService.deleteDevice(tenantId, device.getId()))
                 .isInstanceOf(DataValidationException.class)
-                .hasMessage("Can't delete device that has entity views or is referenced in calculated fields!");
+                .hasMessageContaining("Can't delete device that is referenced by")
+                .hasMessageContaining("a calculated field");
 
         calculatedFieldService.deleteCalculatedField(tenantId, savedCalculatedField.getId());
     }

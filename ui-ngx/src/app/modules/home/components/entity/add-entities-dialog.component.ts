@@ -3,7 +3,6 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { SelectionModel } from '@angular/cdk/collections';
 
 import { defaultHttpOptionsFromConfig } from '@core/http/http-utils';
 
@@ -20,7 +19,11 @@ export interface AddEntitiesDialogData {
 export class AddEntitiesDialogComponent implements OnInit {
 
   entities: Array<{id: string; name: string}> = [];
-  selection = new SelectionModel<string>(true, []);
+  /**
+   * Ids of the selected entities. A plain array is used on purpose: mixing the [selected] binding of
+   * mat-selection-list with ngModel made the check boxes and the value returned by the dialog disagree.
+   */
+  selectedIds: string[] = [];
   loading = true;
 
   constructor(private dialogRef: MatDialogRef<AddEntitiesDialogComponent>,
@@ -31,15 +34,26 @@ export class AddEntitiesDialogComponent implements OnInit {
   ngOnInit() {
     const path = this.data.entityType === 'DEVICE' ? 'devices'
       : this.data.entityType === 'ASSET' ? 'assets' : 'entityViews';
-    const selected = this.data.selectedIds || [];
+    this.selectedIds = [...(this.data.selectedIds || [])];
     this.http.get<{data: Array<{id: {id: string}; name: string}>}>(`/api/tenant/${path}?pageSize=100&page=0`,
       defaultHttpOptionsFromConfig(undefined)).subscribe(page => {
       this.entities = (page?.data || []).map(entity => ({id: entity.id.id, name: entity.name}));
-      this.selection = new SelectionModel<string>(true, this.entities
-        .filter(entity => selected.includes(entity.id))
-        .map(entity => entity.id));
       this.loading = false;
     });
+  }
+
+  isSelected(entityId: string): boolean {
+    return this.selectedIds.includes(entityId);
+  }
+
+  toggle(entityId: string, checked: boolean) {
+    if (checked) {
+      if (!this.selectedIds.includes(entityId)) {
+        this.selectedIds = [...this.selectedIds, entityId];
+      }
+    } else {
+      this.selectedIds = this.selectedIds.filter(id => id !== entityId);
+    }
   }
 
   cancel() {
@@ -47,8 +61,7 @@ export class AddEntitiesDialogComponent implements OnInit {
   }
 
   save() {
-    this.dialogRef.close(this.selection.selected);
+    this.dialogRef.close(this.selectedIds);
   }
 
 }
-

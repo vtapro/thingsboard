@@ -17,6 +17,8 @@ import { defaultHttpOptionsFromConfig } from '@core/http/http-utils';
 import { PageComponent } from '@shared/components/page.component';
 import { SelectionModel } from '@angular/cdk/collections';
 import { PageEvent } from '@angular/material/paginator';
+import { HttpErrorResponse } from '@angular/common/http';
+import { ActionNotificationShow } from '@core/notification/notification.actions';
 
 interface EntityGroup {
   id: string;
@@ -151,9 +153,9 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
         return;
       }
       if (group) {
-        this.groups = this.groups.map(g => g.id === group.id ? {...g, ...value} : g);
+        this.persistGroup({...group, ...value});
       } else {
-        this.groups = [...this.groups, {
+        this.persistGroup({
           id: Math.random().toString(36).substring(2, 10),
           name: value.name,
           entityType: this.entityType,
@@ -161,9 +163,8 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
           description: value.description || undefined,
           publicGroup: !!value.publicGroup,
           createdTime: Date.now()
-        }];
+        });
       }
-      this.persist();
     });
   }
 
@@ -176,15 +177,13 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
       true
     ).subscribe((result) => {
       if (result) {
-        this.groups = this.groups.filter(g => g.id !== group.id);
-        this.persist();
+        this.deleteGroup(group);
       }
     });
   }
 
   togglePublic(group: EntityGroup) {
-    this.groups = this.groups.map(g => g.id === group.id ? {...g, publicGroup: !g.publicGroup} : g);
-    this.persist();
+    this.persistGroup({...group, publicGroup: !group.publicGroup});
   }
 
   addMembers(group: EntityGroup) {
@@ -193,23 +192,56 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
       width: '480px'
     }).afterClosed().subscribe((entityIds: string[]) => {
       if (entityIds) {
-        this.groups = this.groups.map(g => g.id === group.id ? {...g, entityIds} : g);
-        this.persist();
+        this.persistGroup({...group, entityIds});
       }
     });
   }
 
-  save() {
-    this.persist();
+  /**
+   * Saves one group (with its members) without touching the other groups of the tenant.
+   */
+  private persistGroup(group: EntityGroup) {
+    this.http.post<{groups: EntityGroup[]}>('/api/tenant/entityGroup/group', group,
+      defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
+      next: settings => {
+        this.applySettings(settings);
+        this.notify('entity-group.save-success', 'success');
+      },
+      error: (error: HttpErrorResponse) => {
+        this.notify('entity-group.save-failed', 'error', error?.error?.message);
+        // Reload to show what is actually stored on the server.
+        this.load();
+      }
+    });
   }
 
-  private persist() {
-    const merged = [...this.allGroups.filter(group => group.entityType !== this.entityType), ...this.groups];
-    this.http.post<{groups: EntityGroup[]}>('/api/tenant/entityGroup', {groups: merged},
-      defaultHttpOptionsFromConfig(undefined)).subscribe(settings => {
-      this.allGroups = settings?.groups || [];
-      this.groups = this.allGroups.filter(group => group.entityType === this.entityType);
+  private deleteGroup(group: EntityGroup) {
+    this.http.delete<{groups: EntityGroup[]}>(`/api/tenant/entityGroup/${group.id}`,
+      defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
+      next: settings => {
+        this.applySettings(settings);
+        this.notify('entity-group.delete-success', 'success');
+      },
+      error: (error: HttpErrorResponse) => {
+        this.notify('entity-group.save-failed', 'error', error?.error?.message);
+        this.load();
+      }
     });
+  }
+
+  private applySettings(settings: {groups: EntityGroup[]}) {
+    this.allGroups = settings?.groups || [];
+    this.groups = this.allGroups.filter(group => group.entityType === this.entityType);
+    this.page = Math.min(this.page, Math.max(0, this.totalPages - 1));
+  }
+
+  private notify(translationKey: string, type: 'success' | 'error', details?: string) {
+    const message = this.translate.instant(translationKey);
+    this.store.dispatch(new ActionNotificationShow({
+      message: details ? `${message}: ${details}` : message,
+      type,
+      duration: 5000
+    }));
   }
 
 }

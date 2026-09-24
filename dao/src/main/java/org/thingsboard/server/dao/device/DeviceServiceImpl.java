@@ -352,8 +352,12 @@ public class DeviceServiceImpl extends CachedVersionedEntityService<DeviceCacheK
     @Override
     @Transactional
     public void deleteEntity(TenantId tenantId, EntityId id, boolean force) {
-        if (!force && (entityViewService.existsByTenantIdAndEntityId(tenantId, id) || calculatedFieldService.referencedInAnyCalculatedField(tenantId, id))) {
-            throw new DataValidationException("Can't delete device that has entity views or is referenced in calculated fields!");
+        if (!force) {
+            List<String> references = findReferences(tenantId, id);
+            if (!references.isEmpty()) {
+                throw new DataValidationException("Can't delete device that is referenced by " + String.join(", ", references)
+                        + ". Remove or update these entities first.");
+            }
         }
 
         Device device = deviceDao.findById(tenantId, id.getId());
@@ -361,6 +365,21 @@ public class DeviceServiceImpl extends CachedVersionedEntityService<DeviceCacheK
             return;
         }
         deleteDevice(tenantId, device);
+    }
+
+    /**
+     * Collects the entities that prevent the deletion of the device, so that the message of the error
+     * tells the administrator exactly what has to be changed.
+     */
+    private List<String> findReferences(TenantId tenantId, EntityId entityId) {
+        List<String> references = new ArrayList<>();
+        for (EntityView entityView : entityViewService.findEntityViewsByTenantIdAndEntityId(tenantId, entityId)) {
+            references.add("entity view '" + entityView.getName() + "'");
+        }
+        if (calculatedFieldService.referencedInAnyCalculatedField(tenantId, entityId)) {
+            references.add("a calculated field");
+        }
+        return references;
     }
 
     private void deleteDevice(TenantId tenantId, Device device) {
