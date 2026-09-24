@@ -59,7 +59,8 @@ export class LogoComponent implements OnInit {
     });
     if (!this.link) {
       const authState = getCurrentAuthState(this.store);
-      this.link = this.authService.defaultUrl(true, authState);
+      // The logo is also rendered on the login page, where there is no authenticated user yet.
+      this.link = authState?.authUser ? this.authService.defaultUrl(true, authState) : null;
     }
     if (typeof this.link === 'string' && this.link.startsWith('http')) {
       this.isExternal = true;

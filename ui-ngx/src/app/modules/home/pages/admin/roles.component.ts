@@ -10,6 +10,8 @@ import { Authority } from '@shared/models/authority.enum';
 import { HttpClient } from '@angular/common/http';
 import { defaultHttpOptionsFromConfig } from '@core/http/http-utils';
 import { PageComponent } from '@shared/components/page.component';
+import { ActionNotificationShow } from '@core/notification/notification.actions';
+import { TranslateService } from '@ngx-translate/core';
 
 interface RbacRole {
   id: string;
@@ -84,17 +86,17 @@ export class RolesComponent extends PageComponent implements OnInit {
   groupPublicControl = new FormControl(false);
 
   nameControl = new FormControl('');
-  resourceControl = new FormControl('DEVICE');
-  groupScopeControl = new FormControl<string[]>([]);
   ownCustomerOnlyControl = new FormControl(false);
-  operationControls: { [operation: string]: FormControl } = {
-    READ: new FormControl(true),
-    WRITE: new FormControl(false),
-    DELETE: new FormControl(false)
-  };
+
+  /**
+   * Permissions of the role being created, per entity type (resource). Each entity type is edited in its own tab.
+   */
+  private permissionDraft: { [resource: string]: { [operation: string]: boolean } } = {};
+  private groupScopeDraft: { [resource: string]: string[] } = {};
 
   constructor(protected store: Store<AppState>,
-              private http: HttpClient) {
+              private http: HttpClient,
+              private translate: TranslateService) {
     super();
   }
 
@@ -257,12 +259,14 @@ export class RolesComponent extends PageComponent implements OnInit {
     if (!name) {
       return;
     }
-    const resource = this.resourceControl.value;
-    const operations = this.operations.filter(op => this.operationControls[op].value);
-    const scopedGroups: string[] = this.groupScopeControl.value || [];
     const permissions: { [resource: string]: string[] } = {};
     const scopedPermissions: { [resource: string]: { [operation: string]: string[] } } = {};
-    if (operations.length) {
+    for (const resource of this.resources) {
+      const operations = this.operations.filter(operation => this.isOperationGranted(resource, operation));
+      if (!operations.length) {
+        continue;
+      }
+      const scopedGroups = this.groupsFor(resource);
       if (scopedGroups.length) {
         scopedPermissions[resource] = {};
         for (const operation of operations) {
@@ -271,6 +275,13 @@ export class RolesComponent extends PageComponent implements OnInit {
       } else {
         permissions[resource] = operations;
       }
+    }
+    if (!Object.keys(permissions).length && !Object.keys(scopedPermissions).length) {
+      this.store.dispatch(new ActionNotificationShow({
+        message: this.translate.instant('admin.roles-no-permissions'),
+        type: 'warn'
+      }));
+      return;
     }
     this.roles = [...this.roles, {
       id: Math.random().toString(36).substring(2, 10),
@@ -281,8 +292,49 @@ export class RolesComponent extends PageComponent implements OnInit {
       ownCustomerOnly: !!this.ownCustomerOnlyControl.value
     }];
     this.nameControl.setValue('');
-    this.groupScopeControl.setValue([]);
     this.ownCustomerOnlyControl.setValue(false);
+    this.permissionDraft = {};
+    this.groupScopeDraft = {};
+  }
+
+  isOperationGranted(resource: string, operation: string): boolean {
+    return !!this.permissionDraft[resource]?.[operation];
+  }
+
+  toggleOperation(resource: string, operation: string) {
+    const operations = this.permissionDraft[resource] || (this.permissionDraft[resource] = {});
+    operations[operation] = !operations[operation];
+    if (!this.hasAnyOperation(resource)) {
+      delete this.groupScopeDraft[resource];
+    }
+  }
+
+  hasAnyOperation(resource: string): boolean {
+    const operations = this.permissionDraft[resource];
+    return !!operations && this.operations.some(operation => operations[operation]);
+  }
+
+  groupsFor(resource: string): string[] {
+    return this.groupScopeDraft[resource] || [];
+  }
+
+  setGroups(resource: string, groupIds: string[]) {
+    if (groupIds?.length) {
+      this.groupScopeDraft[resource] = groupIds;
+    } else {
+      delete this.groupScopeDraft[resource];
+    }
+  }
+
+  /**
+   * Short summary of the operations configured for the entity type, shown as a badge on the tab.
+   */
+  resourceGrantSummary(resource: string): string {
+    const operations = this.permissionDraft[resource];
+    if (!operations) {
+      return '';
+    }
+    return this.operations.filter(operation => operations[operation]).join(', ');
   }
 
   removeRole(role: RbacRole) {

@@ -215,6 +215,13 @@
         "roles-add-user-group": "Add user group",
         "roles-role": "Role",
         "roles-scope-groups": "Scope to groups (optional)",
+        "roles-permissions-hint": "Select the operations per entity type. Leave the scope empty to apply the operation to all entities of the tenant, or pick entity groups to limit it.",
+        "roles-no-permissions": "Select at least one operation for the role",
+        "roles-own-customer-only": "Own customer only",
+        "roles-customer-hierarchy": "Customer hierarchy",
+        "roles-child-customer": "Child customer",
+        "roles-parent-customer": "Parent customer",
+        "roles-add-relation": "Add relation",
         "entity-group-members": {
             "add-members": "Add entities",
             "no-entities": "No entities found"

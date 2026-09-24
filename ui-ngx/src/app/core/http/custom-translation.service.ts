@@ -6,6 +6,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { Observable } from 'rxjs';
 
 import { defaultHttpOptionsFromConfig, RequestConfig } from '@core/http/http-utils';
+import { AuthService } from '@core/auth/auth.service';
 
 export type CustomTranslations = { [key: string]: string };
 
@@ -43,6 +44,10 @@ export class CustomTranslationService {
   }
 
   public loadAndApplyCustomTranslations(locale: string): void {
+    // Custom translations are tenant scoped: skip the API call while the user is not authenticated (login page).
+    if (!AuthService.getJwtToken()) {
+      return;
+    }
     this.getCustomTranslations(locale, {ignoreLoading: true, ignoreErrors: true}).subscribe(translations => {
       if (translations && Object.keys(translations).length) {
         this.translate.setTranslation(locale, translations, true);
@@ -51,4 +56,3 @@ export class CustomTranslationService {
   }
 
 }
-

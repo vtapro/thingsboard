@@ -14,9 +14,11 @@
     </button>
   </div>
 }
-@if (groupsTabEnabled() && groupsTab) {
-  <tb-entity-groups [entityType]="groupsEntityType()"></tb-entity-groups>
-} @else {
+<!--
+  NOTE: the table must not be wrapped into a structural directive (@if/@else), the component resolves
+  the "entityTableHeader" anchor with a static ViewChild and creates the custom header inside it.
+-->
+<div class="tb-entities-content" [class.tb-entities-hidden]="groupsTabEnabled() && groupsTab">
 <mat-drawer-container hasBackdrop="false" class="tb-absolute-fill">
   @if (entitiesTableConfig.detailsPanelEnabled) {
     <mat-drawer
@@ -391,4 +393,9 @@
     </div>
   </mat-drawer-content>
 </mat-drawer-container>
+</div>
+@if (groupsTab) {
+  <div class="tb-entities-content">
+    <tb-entity-groups [entityType]="groupsEntityType()"></tb-entity-groups>
+  </div>
 }

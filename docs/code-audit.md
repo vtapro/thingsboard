@@ -108,6 +108,30 @@ AdminSettings (JSON, 1 bản ghi / tenant)
 | `DefaultMailService`: gán giá trị cho `private final Configuration customTemplateConfig` trong `@PostConstruct` → `cannot assign a value to final variable` (Lombok đưa field final vào constructor). | ✅ đã sửa — bỏ `final`, field được khởi tạo trong `init()` |
 | `TbRbacAccessControlService` (viết lại): kiểm tra bằng `javap` trên `freemarker-2.3.34.jar` rằng `Configuration.getIncompatibleImprovements()` tồn tại trước khi dùng. | ✅ |
 
+### Lỗi hồi quy của tab All | Groups trong bảng entity (đã sửa)
+
+| Vấn đề | Nguyên nhân | Trạng thái |
+|---|---|---|
+| Trang Devices / Assets / Entity views trắng bảng, header bị cắt, không load dữ liệu | `EntitiesTableComponent` resolve `@ViewChild('entityTableHeader', {static: true})`. Tab bar được thêm bằng cách bọc bảng trong `@if/@else`, mà `static: true` **không resolve được** khi element nằm trong structural directive → `entityTableHeaderAnchor` là `undefined` → `init()` ném `TypeError: Cannot read properties of undefined (reading 'viewContainerRef')` và dừng toàn bộ khởi tạo bảng (đã xác nhận bằng console log của Chrome headless). | ✅ đã sửa — bảng không còn bị bọc trong điều kiện cấu trúc; tab bar là flex item, phần bảng/groups ẩn/hiện bằng class `.tb-entities-hidden` (có ghi chú ngay trong template để không tái phạm) |
+
+Kiểm chứng bằng Chrome headless (đăng nhập, đo layout, đọc console):
+
+```text
+DEVICES      tabs y=56 h=48 | table 1156x160, 2 dòng dữ liệu, paginator "1 - 2 of 2"
+ENTITY-VIEWS tabs y=56 h=48 | table 1156x160, 2 dòng dữ liệu
+ASSETS       tabs y=56 h=48 | table 1156x108
+GATEWAYS     (không có tab groups) table 1158x56
+GROUPS_TAB   groups 1190x896, bảng entity ẩn (display: none), header groups hiển thị đủ
+CONSOLE_ERRORS []   EXCEPTIONS []
+```
+
+### Hai lỗi console khác phát hiện khi kiểm chứng bằng browser (đã sửa)
+
+| Vấn đề | Nguyên nhân | Trạng thái |
+|---|---|---|
+| Trang login: `TypeError: Cannot read properties of null (reading 'authority')` | `LogoComponent` gọi `authService.defaultUrl(true, authState)` khi logo chưa có `link`; trang login chưa có `authUser` nên `defaultUrl` đọc `authUser.authority` của `null` (trước đây trang login truyền `link` nên không lộ lỗi này). | ✅ đã sửa — chỉ gọi `defaultUrl` khi đã có `authUser`; logo ở trang login không còn là link |
+| Trang login: log `ERROR` kèm `HttpErrorResponse 401` | `CustomTranslationService` gọi `/api/customTranslation/{locale}` (API cần token) ngay khi đổi ngôn ngữ ở trang login → interceptor tạo lỗi 401 tổng hợp (`global-http-interceptor.ts`) và log ra console. | ✅ đã sửa — bỏ qua khi chưa có JWT (`AuthService.getJwtToken()`), không còn log lỗi và không tốn request 401 |
+
 ## 5. Đánh giá khả năng tháo gỡ
 
 | Thành phần | Cách tháo |
@@ -179,3 +203,12 @@ Dữ liệu test (device `parent-device`, 2 domain test, mail template độc h�
 2. Chạy test trong CI bằng `--build-arg TEST_CLASSES=...` trước mỗi lần phát hành.
 3. Đăng ký domain thật của khách cho tenant (tab Login) — branding của trang login được resolve theo tên miền;
    nếu truy cập bằng IP/localhost mà chưa đăng ký domain thì trang login dùng branding của hệ thống.
+
+## 10. Trang Roles (tổ chức lại theo tab)
+
+- Trang **Security → Roles** nay chia 4 tab: **Roles**, **Entity groups**, **User groups**, **Customer hierarchy**
+  (trước đây tất cả nằm dồn trong một trang dài, dễ lệch hàng).
+- Trong tab Roles, quyền được cấu hình **mỗi entity type một tab** (DEVICE, ASSET, DASHBOARD, ALARM, CUSTOMER,
+  ENTITY_VIEW, RULE_CHAIN, ADMIN_SETTINGS, USER); mỗi tab có READ/WRITE/DELETE, phạm vi theo entity group và
+  badge hiển thị nhanh quyền đã chọn. Role yêu cầu ít nhất một quyền trước khi thêm (tránh tạo role rỗng).
+- Bố cục dùng CSS grid nên các ô nhập thẳng hàng trên mọi độ rộng màn hình.

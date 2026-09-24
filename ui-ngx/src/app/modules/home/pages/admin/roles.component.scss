@@ -1,23 +1,23 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
 .tb-roles-add {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
+  align-items: start;
+  margin-bottom: 12px;
 }
 
 .tb-roles-field {
-  flex: 1 1 200px;
   min-width: 0;
 }
 
 .tb-roles-ops {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
-  padding-top: 12px;
+  padding-top: 8px;
 }
 
 .tb-roles-table {
@@ -42,4 +42,47 @@
 
 .tb-roles-public {
   padding-top: 12px;
+  align-self: center;
+}
+
+.tb-roles-tabs {
+  .mat-mdc-tab-body-wrapper {
+    padding-top: 16px;
+  }
+}
+
+.tb-roles-tab-content {
+  padding-top: 8px;
+}
+
+.tb-roles-hint {
+  margin-bottom: 8px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.tb-roles-resource-tabs {
+  margin-bottom: 16px;
+}
+
+.tb-roles-resource {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+}
+
+.tb-roles-scope {
+  max-width: 480px;
+}
+
+.tb-roles-resource-name {
+  margin-right: 8px;
+}
+
+.tb-roles-resource-badge {
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 18px;
+  background: rgba(0, 0, 0, 0.08);
 }
