@@ -57,6 +57,9 @@ cluster. Nếu muốn id ổn định qua các lần restart, dùng `StatefulSet
 
 ## 2. Build image lên GHCR
 
+Image của sản phẩm là **`ghcr.io/vtapro/greeniq-backend`** (cùng nhóm với `greeniq-frontend` trên
+GHCR), version hiện tại **`v4.4.0.0`** — khai báo trong biến `IMAGE_VERSION` của workflow.
+
 Workflow [`.github/workflows/publish-images.yml`](../.github/workflows/publish-images.yml) build
 `docker/tb-custom/Dockerfile` và push lên GHCR mỗi khi push branch hoặc tag `v*`:
 
@@ -68,17 +71,51 @@ Workflow [`.github/workflows/publish-images.yml`](../.github/workflows/publish-i
 > và `docker push` lên GHCR.
 
 ```text
-ghcr.io/<owner>/<repo>:<branch>      # ví dụ ghcr.io/vtapro/thingsboard:RBAC-full-groups-tabs
-ghcr.io/<owner>/<repo>:sha-<short>
-ghcr.io/<owner>/<repo>:v1.2.3        # khi push tag
-ghcr.io/<owner>/<repo>:latest        # chỉ trên default branch
+ghcr.io/vtapro/greeniq-backend:v4.4.0.0          # version sản phẩm, tag chính để deploy
+ghcr.io/vtapro/greeniq-backend:<branch>          # ví dụ :RBAC-full-groups-tabs
+ghcr.io/vtapro/greeniq-backend:sha-<short>       # truy vết theo commit
+ghcr.io/vtapro/greeniq-backend:latest            # chỉ trên default branch
 ```
 
-Build local (kiểm tra trước khi push):
+### 2.1. Build/push khi máy có Docker
 
 ```bash
-docker build -f docker/tb-custom/Dockerfile -t ghcr.io/vtapro/thingsboard:dev .
+# build
+docker build -f docker/tb-custom/Dockerfile -t ghcr.io/vtapro/greeniq-backend:v4.4.0.0 .
+
+# đăng nhập GHCR (PAT cần scope write:packages)
+echo "$CR_PAT" | docker login ghcr.io -u vtapro --password-stdin
+
+# push
+docker push ghcr.io/vtapro/greeniq-backend:v4.4.0.0
 ```
+
+### 2.2. Không có Docker ở máy dev — dùng GitHub Actions
+
+Máy dev hiện tại **không cài Docker Desktop / docker CLI**, nên cách gọn nhất là để GitHub Actions
+build. Việc duy nhất còn thiếu là quyền `workflow` cho credential đang dùng để push file workflow:
+
+```bash
+# 1. cấp scope (mở trình duyệt, xác nhận 1 lần)
+gh auth refresh -h github.com -s workflow
+
+# 2. push file workflow lên repo
+git add .github/workflows/publish-images.yml
+git commit -m "ci: publish greeniq-backend image to GHCR"
+git push origin RBAC-full-groups-tabs
+
+# 3. theo dõi build (khoảng 10–20 phút cho lần đầu)
+gh run watch
+
+# 4. kiểm tra image đã lên GHCR
+docker manifest inspect ghcr.io/vtapro/greeniq-backend:v4.4.0.0    # nếu có docker
+# hoặc xem trực tiếp: https://github.com/vtapro?tab=packages
+```
+
+Nếu chưa muốn động vào scope, có thể copy nội dung file
+[`ci/publish-images.yml`](../ci/publish-images.yml) rồi tạo file
+`.github/workflows/publish-images.yml` bằng nút **Add file** trên web GitHub (web không bị giới hạn
+scope như token của git).
 
 Image là **private** theo mặc định của GHCR. Trên k3s tạo pull secret:
 
@@ -191,8 +228,9 @@ kubectl apply -f deploy/k3s/01-config.yaml
 kubectl apply -f deploy/k3s/03-external-data-plane.yaml
 kubectl -n thingsboard create secret generic tb-secrets --from-literal=...
 
-# 2. sửa image trong manifest (hoặc set sau khi apply)
-sed -i 's#ghcr.io/OWNER/REPO:TAG#ghcr.io/vtapro/thingsboard:RBAC-full-groups-tabs#' deploy/k3s/*.yaml
+# 2. image đã mặc định là ghcr.io/vtapro/greeniq-backend:v4.4.0.0 trong manifest;
+#    chỉ cần đổi tag khi roll bản mới
+sed -i 's#greeniq-backend:v4.4.0.0#greeniq-backend:v4.4.0.1#' deploy/k3s/*.yaml
 
 # 3. cài/cập nhật schema — 1 lần cho mỗi release, TRƯỚC khi rolling service
 kubectl apply -f deploy/k3s/10-install-job.yaml

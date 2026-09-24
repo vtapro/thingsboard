@@ -55,8 +55,12 @@ kubectl -n thingsboard create secret generic tb-secrets \
   --from-literal=CASSANDRA_PASSWORD='<password>' \
   --from-literal=REDIS_PASSWORD='<password>'
 
-# image tag produced by the GitHub workflow (ghcr.io/<owner>/<repo>:<branch>)
-kubectl -n thingsboard set image deployment/tb-core tb-core=ghcr.io/OWNER/REPO:BRANCH
+# the manifests already point to ghcr.io/vtapro/greeniq-backend:v4.4.0.0;
+# to roll a specific build of that image over every deployment:
+for d in tb-core tb-rule-engine tb-mqtt-transport tb-http-transport; do
+  kubectl -n thingsboard set image deployment/$d \
+    $(kubectl -n thingsboard get deploy/$d -o jsonpath='{.spec.template.spec.containers[0].name}')=ghcr.io/vtapro/greeniq-backend:v4.4.0.0
+done
 
 # schema install/upgrade, then the services
 kubectl apply -f deploy/k3s/10-install-job.yaml

@@ -34,7 +34,7 @@ spec:
       terminationGracePeriodSeconds: 120
       containers:
         - name: tb-rule-engine
-          image: ghcr.io/OWNER/REPO:TAG
+          image: ghcr.io/vtapro/greeniq-backend:v4.4.0.0
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
