@@ -32,6 +32,8 @@ spec:
         app.kubernetes.io/part-of: thingsboard
     spec:
       terminationGracePeriodSeconds: 60
+      imagePullSecrets:
+        - name: ghcr
       # the cluster has two workers: keep the replicas on different nodes when possible
       topologySpreadConstraints:
         - maxSkew: 1
@@ -42,7 +44,7 @@ spec:
               app.kubernetes.io/name: tb-http-transport
       containers:
         - name: tb-http-transport
-          image: ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0
+          image: ghcr.io/vtapro/tb-http-transport:v4.4.0.0
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
@@ -56,17 +58,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            # only HTTP is served by this deployment
-            - name: HTTP_ENABLED
-              value: "true"
-            - name: MQTT_ENABLED
-              value: "false"
-            - name: COAP_ENABLED
-              value: "false"
-            - name: LWM2M_ENABLED
-              value: "false"
-            - name: SNMP_ENABLED
-              value: "false"
+            - name: HTTP_BIND_ADDRESS
+              value: 0.0.0.0
+            - name: HTTP_BIND_PORT
+              value: "8080"
             - name: HTTP_REQUEST_TIMEOUT
               value: "60000"
           ports:
@@ -93,11 +88,11 @@ spec:
             failureThreshold: 5
           resources:
             requests:
-              cpu: 500m
-              memory: 1Gi
+              cpu: 250m
+              memory: 512Mi
             limits:
-              cpu: "4"
-              memory: 4Gi
+              cpu: "2"
+              memory: 2Gi
 ---
 apiVersion: v1
 kind: Service

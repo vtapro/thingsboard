@@ -20,72 +20,79 @@ CE vẫn nguyên vẹn (xem mục 8 để có bằng chứng kiểm tra).
 ## 1. Kiến trúc triển khai
 
 ```text
-                     ┌─────────────── Ingress (Traefik) ───────────────┐
+                     ┌─────────────── Ingress (nginx) ─────────────────┐
    user ── HTTPS ──▶ │  /  (UI + REST API)                             │
                      └──────────────────────┬──────────────────────────┘
                                             ▼
-                                   Service tb-core (8080, 7070)
+    ══════════════════════════ TRONG CỤM k3s ═══════════════════════════════════════
                      ┌──────────────────────┴──────────────────────────┐
-                     │  tb-core x N          tb-rule-engine x N        │
-                     │  tb-mqtt-transport x N   tb-http-transport x N  │
+                     │  tb-core x2           tb-rule-engine x2         │
+                     │  tb-mqtt-transport   tb-http-transport          │
+                     │  tb-coap / tb-lwm2m / tb-snmp (tuỳ chọn)        │
                      └───────┬───────────┬───────────┬─────────────────┘
-        ── TCP (Endpoints trỏ ra ngoài cụm) ──┼───────────┼─────────────┼─────
                              ▼           ▼           ▼
-                          Kafka     ZooKeeper    Cassandra ─ telemetry
-                             │           │
-                             ▼           ▼
-                        PostgreSQL ─ entities/relations/alarms
-                             │
-                          Redis ─ shared cache
-
-              (Kafka / ZooKeeper / Cassandra / PostgreSQL / Redis
-               nằm trên MÁY CHỦ DỮ LIỆU RIÊNG, không nằm trong k3s — xem mục 3)
+                          Kafka     ZooKeeper     Redis
+                       (1 broker)  (discovery)  (cache chia sẻ)
+    ══════════════ Endpoints trỏ ra ngoài cụm ════════════════════════════════════
+                             ▼                              ▼
+                    PostgreSQL ─ entities,             Cassandra ─ telemetry
+                    users, RBAC, white labeling
+                  (MÁY CHỦ 1, thuê riêng)          (MÁY CHỦ 2, thuê riêng)
 ```
 
-Một **image duy nhất** chạy mọi thành phần; `TB_SERVICE_TYPE` quyết định vai trò:
+**Mỗi service một image riêng** — deployment nào kéo đúng image đó:
 
-| Deployment | `TB_SERVICE_TYPE` | Cổng | Vai trò |
-|---|---|---|---|
-| `tb-core` | `tb-core` | 8080 (REST/UI/actuator), 7070 (edge gRPC) | API, entities, telemetry, white labeling, RBAC |
-| `tb-rule-engine` | `tb-rule-engine` | 8080 (actuator) | thực thi rule chain |
-| `tb-mqtt-transport` | `tb-transport` + `MQTT_ENABLED=true` | 1883 (MQTT), 8080 | thiết bị kết nối MQTT |
-| `tb-http-transport` | `tb-transport` + `HTTP_ENABLED=true` | 8080 | thiết bị gọi REST `/api/v1/**` |
-| Job `tb-install` | `monolith` (chỉ để chạy installer) | — | cài/nâng cấp schema, chạy 1 lần mỗi release |
+| Deployment | Image | `TB_SERVICE_TYPE` | Cổng | Vai trò |
+|---|---|---|---|---|
+| `tb-core` | `tb-node` | `tb-core` | 8080 (REST/UI/actuator), 7070 (edge gRPC) | API, entities, telemetry, white labeling, RBAC |
+| `tb-rule-engine` | `tb-node` | `tb-rule-engine` | 8080 (actuator) | thực thi rule chain |
+| `tb-mqtt-transport` | `tb-mqtt-transport` | `tb-transport` | 1883 (MQTT), 8080 (actuator) | thiết bị kết nối MQTT |
+| `tb-http-transport` | `tb-http-transport` | `tb-transport` | 8080 | thiết bị gọi REST `/api/v1/**` |
+| `tb-coap-transport` | `tb-coap-transport` | `tb-transport` | 5683/UDP | CoAP (tuỳ chọn) |
+| `tb-lwm2m-transport` | `tb-lwm2m-transport` | `tb-transport` | 5685/UDP | LwM2M (tuỳ chọn) |
+| `tb-snmp-transport` | `tb-snmp-transport` | `tb-transport` | 1620/UDP | SNMP (tuỳ chọn) |
+| `tb-edqs` | `tb-edqs` | — (service riêng) | 8080 | entity data query service (tuỳ chọn) |
+| `tb-vc-executor` | `tb-vc-executor` | `tb-vc-executor` | — | version control executor (tuỳ chọn) |
+| Job `tb-install` | `tb-node` | `monolith` (chỉ chạy installer) | — | cài/nâng cấp schema, chạy 1 lần mỗi release |
+
+`tb-core` và `tb-rule-engine` **dùng chung image `tb-node`** vì ThingsBoard CE đóng gói cùng một jar
+cho hai vai trò này (khác nhau ở `TB_SERVICE_TYPE`); các transport thì mỗi module Maven có main class
+riêng nên có image riêng.
 
 `TB_SERVICE_ID` lấy từ `metadata.name` của pod (duy nhất trong namespace) — đây là id node trong
 cluster. Nếu muốn id ổn định qua các lần restart, dùng `StatefulSet` thay `Deployment`.
 
 ## 2. Build image lên GHCR
 
-Image của sản phẩm là **`ghcr.io/vtapro/greeniq-thingsboard`**, version hiện tại **`v4.4.0.0`**
-(khai báo trong biến `IMAGE_VERSION` của workflow).
+Mỗi ThingsBoard service có **một image riêng**, đặt tên theo service, version sản phẩm hiện tại
+**`v4.4.0.0`** (biến `IMAGE_VERSION` trong workflow):
 
-Vì sao tên là `greeniq-thingsboard`:
+| Service | Image |
+|---|---|
+| tb-node (monolith / tb-core / tb-rule-engine, kiêm job installer) | `ghcr.io/vtapro/tb-node:v4.4.0.0` |
+| tb-mqtt-transport | `ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.0` |
+| tb-http-transport | `ghcr.io/vtapro/tb-http-transport:v4.4.0.0` |
+| tb-coap-transport | `ghcr.io/vtapro/tb-coap-transport:v4.4.0.0` |
+| tb-lwm2m-transport | `ghcr.io/vtapro/tb-lwm2m-transport:v4.4.0.0` |
+| tb-snmp-transport | `ghcr.io/vtapro/tb-snmp-transport:v4.4.0.0` |
+| tb-edqs | `ghcr.io/vtapro/tb-edqs:v4.4.0.0` |
+| tb-vc-executor | `ghcr.io/vtapro/tb-vc-executor:v4.4.0.0` |
 
-- `greeniq-backend` / `greeniq-frontend` trên GHCR **đã là của ứng dụng khác** (package
-  `greeniq-backend:v2.8.2.69`), không được dùng lại cho nền tảng IoT này.
-- Nền tảng này chạy trên mã nguồn ThingsBoard nên tên package phản ánh rõ điều đó, cùng nhóm
-  `greeniq-*` với các sản phẩm còn lại.
-- **Một image dùng cho mọi thành phần** ThingsBoard (`tb-core`, `tb-rule-engine`, `tb-transport`,
-  job installer) — đúng cách ThingsBoard CE đóng gói: cùng một jar, khác nhau ở biến
-  `TB_SERVICE_TYPE`. Nhờ vậy chỉ build/push 1 lần thay vì 4 image giống hệt nhau.
+Lưu ý: `greeniq-backend` / `greeniq-frontend` trên GHCR đã là của ứng dụng khác
+(`greeniq-backend:v2.8.2.69`), nên nền tảng ThingsBoard dùng nhóm `tb-*` để không đụng tên.
 
-Nếu anh vẫn muốn có **package riêng theo từng service** (ví dụ để dễ thấy trên trang Packages),
-chỉ cần gắn thêm tag rồi push cùng image (không build lại):
+Workflow [`.github/workflows/publish-images.yml`](../.github/workflows/publish-images.yml) chạy 2
+job: `build-jars` build toàn bộ repo **một lần** (backend + UI + boot jar của từng service), rồi
+`images` build song song từng image theo matrix và push lên GHCR mỗi khi push branch hoặc tag `v*`:
 
-```bash
-docker tag  ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0 ghcr.io/vtapro/tb-core:v4.4.0.0
-docker tag  ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0 ghcr.io/vtapro/tb-rule-engine:v4.4.0.0
-docker tag  ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0 ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.0
-docker push ghcr.io/vtapro/tb-core:v4.4.0.0
-docker push ghcr.io/vtapro/tb-rule-engine:v4.4.0.0
-docker push ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.0
+```text
+docker/msa/Dockerfile.tb-node     -> tb-node (+ script SQL/Cassandra cho installer)
+docker/msa/Dockerfile.service     -> mọi service còn lại (jre + đúng 1 boot jar)
 ```
 
-(Tương ứng, sửa `IMAGE` trong workflow hoặc thêm bước `docker tag` nếu muốn Actions làm việc này.)
-
-Workflow [`.github/workflows/publish-images.yml`](../.github/workflows/publish-images.yml) build
-`docker/tb-custom/Dockerfile` và push lên GHCR mỗi khi push branch hoặc tag `v*`:
+Cấu trúc image giống bản chính thức: `eclipse-temurin:25-jre` + boot jar của module tương ứng
+(`transport/mqtt` → `tb-mqtt-transport-boot.jar`, `transport/http` → `tb-http-transport-boot.jar`, …),
+nên mỗi pod chỉ mang đúng những gì nó chạy.
 
 > Lưu ý: GitHub **chặn push** file nằm trong `.github/workflows/` nếu token/credential đang dùng
 > không có scope `workflow`. Nếu gặp lỗi
@@ -94,24 +101,32 @@ Workflow [`.github/workflows/publish-images.yml`](../.github/workflows/publish-i
 > Trong lúc chờ, vẫn build image bằng tay: `docker build -f docker/tb-custom/Dockerfile -t ... .`
 > và `docker push` lên GHCR.
 
-```text
-ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0          # version sản phẩm, tag chính để deploy
-ghcr.io/vtapro/greeniq-thingsboard:<branch>          # ví dụ :RBAC-full-groups-tabs
-ghcr.io/vtapro/greeniq-thingsboard:sha-<short>       # truy vết theo commit
-ghcr.io/vtapro/greeniq-thingsboard:latest            # chỉ trên default branch
-```
+Mỗi image được gắn 4 tag giống nhau: `:v4.4.0.0` (tag để deploy), `:<branch>`, `:sha-<short>`
+(truy vết commit) và `:latest` (chỉ trên default branch).
 
 ### 2.1. Build/push khi máy có Docker
 
 ```bash
-# build
-docker build -f docker/tb-custom/Dockerfile -t ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0 .
+# build toàn bộ boot jar một lần
+mvn -B -T 1C clean install -DskipTests \
+  -Dpkg.skip.deb=true -Dpkg.skip.rpm=true -Dpkg.skip.zip=true
 
-# đăng nhập GHCR (PAT cần scope write:packages)
+# tb-node (kèm script SQL/Cassandra cho installer)
+mkdir -p /tmp/jars && cp application/target/thingsboard-4.4.0-SNAPSHOT-boot.jar /tmp/jars/tb-node.jar
+docker build -f docker/msa/Dockerfile.tb-node \
+  --build-context jars=/tmp/jars --build-arg SERVICE_JAR=tb-node.jar \
+  -t ghcr.io/vtapro/tb-node:v4.4.0.0 .
+
+# mqtt transport (lặp lại cho http/coap/lwm2m/snmp/edqs/vc-executor, đổi jar tương ứng)
+cp transport/mqtt/target/tb-mqtt-transport-4.4.0-SNAPSHOT-boot.jar /tmp/jars/tb-mqtt-transport.jar
+docker build -f docker/msa/Dockerfile.service \
+  --build-context jars=/tmp/jars --build-arg SERVICE_JAR=tb-mqtt-transport.jar \
+  -t ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.0 .
+
+# đăng nhập GHCR (PAT cần scope write:packages) rồi push
 echo "$CR_PAT" | docker login ghcr.io -u vtapro --password-stdin
-
-# push
-docker push ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0
+docker push ghcr.io/vtapro/tb-node:v4.4.0.0
+docker push ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.0
 ```
 
 ### 2.2. Không có Docker ở máy dev — dùng GitHub Actions
@@ -125,14 +140,14 @@ gh auth refresh -h github.com -s workflow
 
 # 2. push file workflow lên repo
 git add .github/workflows/publish-images.yml
-git commit -m "ci: publish greeniq-thingsboard image to GHCR"
+git commit -m "ci: publish the ThingsBoard service images to GHCR"
 git push origin RBAC-full-groups-tabs
 
-# 3. theo dõi build (khoảng 10–20 phút cho lần đầu)
+# 3. theo dõi build — job build-jars ~15 phút, sau đó 8 image build song song
 gh run watch
 
-# 4. kiểm tra image đã lên GHCR
-docker manifest inspect ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0    # nếu có docker
+# 4. kiểm tra image đã lên GHCR (8 package tb-*)
+docker manifest inspect ghcr.io/vtapro/tb-node:v4.4.0.0    # nếu có docker
 # hoặc xem trực tiếp: https://github.com/vtapro?tab=packages
 ```
 
@@ -153,71 +168,74 @@ kubectl -n thingsboard create secret docker-registry ghcr \
 và thêm `imagePullSecrets: [{name: ghcr}]` vào `spec.template.spec` của từng Deployment (hoặc gắn
 vào ServiceAccount của namespace).
 
-## 3. Data plane ngoài cụm (máy chủ riêng link vào k3s)
+## 3. Data plane: 2 máy chủ dữ liệu + hạ tầng trong cụm
 
-PostgreSQL, Cassandra, Kafka và ZooKeeper chạy trên **một máy chủ riêng**, kết nối vào cụm k3s
-qua TCP. Trong cụm không deploy data plane; các pod chỉ nhìn thấy 5 hostname nội bộ
-(`tb-postgres`, `tb-cassandra`, `tb-kafka`, `tb-zookeeper`, `tb-redis`) do
-[`deploy/k3s/03-external-data-plane.yaml`](../deploy/k3s/03-external-data-plane.yaml) tạo ra
-(`Service` không selector + `Endpoints` trỏ về IP máy chủ đó).
+Hai database nằm ở **2 máy chủ thuê riêng, ngoài cụm**:
 
 ```text
-  k3s cluster (namespace thingsboard)              máy chủ dữ liệu (1 VM)
-  ┌───────────────────────────────────┐            ┌──────────────────────────────┐
-  │  tb-core / tb-rule-engine / ...   │            │  PostgreSQL      :5432       │
-  │  ── Service + Endpoints ──────────┼── TCP ────▶│  Cassandra       :9042       │
-  │  tb-postgres / tb-cassandra /     │            │  Kafka           :9092       │
-  │  tb-kafka / tb-zookeeper /        │            │  ZooKeeper       :2181       │
-  │  tb-redis                         │            │  Redis/Valkey    :6379       │
-  └───────────────────────────────────┘            └──────────────────────────────┘
+  k3s cluster (namespace thingsboard)                 máy chủ 1            máy chủ 2
+  ┌───────────────────────────────────┐            ┌──────────────┐    ┌──────────────┐
+  │  tb-core / tb-rule-engine /       │            │  PostgreSQL  │    │  Cassandra   │
+  │  tb-*-transport / tb-edqs         │            │   :5432      │    │   :9042      │
+  │  ── Service + Endpoints ──────────┼── TCP ────▶│              │    │              │
+  │  tb-postgres                      │────────────┘              │    │              │
+  │  tb-cassandra                     │─────────────────────────────────┘              │
+  └───────┬───────────┬───────────────┘            └──────────────┘    └──────────────┘
+          ▼           ▼
+       Kafka      ZooKeeper + Redis        (chạy TRONG cụm: 04-kafka.yaml,
+      :9092         :2181 / :6379          05-zookeeper.yaml, 06-redis.yaml)
 ```
 
-### 3.1. Cấu hình bắt buộc trên máy chủ dữ liệu
+Các pod chỉ nhìn thấy 5 hostname nội bộ (`tb-postgres`, `tb-cassandra`, `tb-kafka`,
+`tb-zookeeper`, `tb-redis`). Hai hostname database do
+[`deploy/k3s/03-external-databases.yaml`](../deploy/k3s/03-external-databases.yaml) tạo ra
+(`Service` không selector + `Endpoints` trỏ về IP máy chủ), ba hostname còn lại là Service của
+hạ tầng chạy trong cụm.
+
+### 3.1. Cấu hình bắt buộc trên 2 máy chủ dữ liệu
 
 | Thành phần | Việc phải làm | Vì sao |
 |---|---|---|
-| PostgreSQL 16 | `listen_addresses='*'`, `pg_hba.conf` cho CIDR của pod/service k3s, user + DB `thingsboard` | pod nối trực tiếp tới `:5432` |
-| Cassandra 5 | `listen_address`/`rpc_address` = IP của VM, `broadcast_rpc_address` = IP mà pod thấy, `local_datacenter` khớp `CASSANDRA_LOCAL_DATACENTER` | driver dùng `broadcast_rpc_address` để nối lại các node |
-| Kafka | **`advertised.listeners` phải là địa chỉ pod resolve và reach được** (ví dụ `PLAINTEXT://10.10.0.5:9092`), không dùng `localhost` | sau handshake đầu, client nhận metadata và nối thẳng tới node được quảng cáo |
-| ZooKeeper | mở cổng client `2181`, đặt `maxClientCnxns` đủ lớn | mỗi pod TB giữ 1 session discovery |
-| Redis/Valkey | mở `6379`, đặt `requirepass`, `maxmemory-policy` (khuyến nghị `allkeys-lru`) | cache chia sẻ giữa các replica |
-| Firewall | cho phép dải CIDR của k3s vào 5 cổng trên | mặc định k3s: pod `10.42.0.0/16`, service `10.43.0.0/16` |
-
-Kafka (KRaft) tham khảo:
-
-```properties
-listeners=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-advertised.listeners=PLAINTEXT://<IP-máy-chủ-dữ-liệu>:9092
-```
+| PostgreSQL (máy chủ 1) | `listen_addresses='*'`, `pg_hba.conf` cho CIDR của pod/service k3s, tạo user + DB `thingsboard` | pod nối trực tiếp tới `:5432` |
+| Cassandra (máy chủ 2) | `listen_address`/`rpc_address` = IP của máy, `broadcast_rpc_address` = IP mà pod thấy, `local_datacenter` khớp `CASSANDRA_LOCAL_DATACENTER` | driver dùng `broadcast_rpc_address` để nối lại các node |
+| Firewall cả hai | cho phép dải CIDR của k3s vào `5432` (Postgres) và `9042` (Cassandra) | mặc định k3s: pod `10.42.0.0/16`, service `10.43.0.0/16` |
 
 Cassandra tham khảo (`cassandra.yaml`):
 
 ```yaml
-listen_address: <IP-máy-chủ-dữ-liệu>
+listen_address: <IP-máy-chủ-Cassandra>
 rpc_address: 0.0.0.0
-broadcast_rpc_address: <IP-máy-chủ-dữ-liệu>
+broadcast_rpc_address: <IP-máy-chủ-Cassandra>
 ```
 
 ### 3.2. Khai báo trong cụm và kiểm tra
 
 ```bash
-# 1. sửa IP 203.0.113.10 trong file này thành IP máy chủ dữ liệu (5 chỗ), rồi:
-kubectl apply -f deploy/k3s/03-external-data-plane.yaml
+# 1. sửa 2 IP mẫu (203.0.113.10 = Postgres, 203.0.113.11 = Cassandra) thành IP thật, rồi:
+kubectl apply -f deploy/k3s/03-external-databases.yaml
 
-# 2. kiểm tra pod thấy được data plane
+# 2. kiểm tra pod thấy được 2 database ngoài cụm
 kubectl -n thingsboard run netcheck --rm -it --restart=Never --image=busybox:1.37 -- \
-  sh -c 'for p in tb-postgres:5432 tb-cassandra:9042 tb-kafka:9092 tb-zookeeper:2181 tb-redis:6379; do \
+  sh -c 'for p in tb-postgres:5432 tb-cassandra:9042; do \
          nc -vz ${p%%:*} ${p##*:}; done'
 ```
 
-Quy mô hiện tại (1 máy chủ cho cả 4 dịch vụ) là điểm chết đơn lẻ cho toàn hệ thống: mất máy chủ đó
-thì nền tảng ngừng ghi telemetry và không khởi động lại được pod. Khi cần HA thật, chỉ cần tách máy
-chủ thành cụm (Kafka ≥ 3 broker, Cassandra ≥ 3 node RF=3, ZooKeeper ≥ 3, PostgreSQL primary +
-standby) rồi cập nhật lại `Endpoints` — manifest của ThingsBoard **không phải sửa**.
+### 3.1b. Hạ tầng chạy trong cụm
 
-Nếu PostgreSQL nằm ở **máy chủ khác** với Cassandra/Kafka/ZooKeeper, chỉ cần đổi `ip` trong khối
-`tb-postgres` của `03-external-data-plane.yaml` thành IP của máy đó — mỗi khối `Endpoints` có IP
-riêng, không bắt buộc cùng một máy chủ.
+| Manifest | Thành phần | Cấu hình hiện tại | Khi cần HA |
+|---|---|---|---|
+| `04-kafka.yaml` | Kafka | KRaft, **1 broker**, PVC 10Gi (`local-path`), `advertised.listeners=PLAINTEXT://tb-kafka:9092` | scale lên 3 broker (node id + quorum voters) và đặt `TB_QUEUE_KAFKA_REPLICATION_FACTOR=3`, `min.insync.replicas=2` |
+| `05-zookeeper.yaml` | ZooKeeper | **1 replica**, PVC 2Gi | 3 replica (số lẻ mới có quorum) |
+| `06-redis.yaml` | Redis | **1 replica**, `requirepass` từ `tb-secrets`, `maxmemory 512mb`, `allkeys-lru`, PVC 2Gi | sentinel hoặc cluster; hoặc bỏ Redis và đặt `CACHE_TYPE=caffeine` |
+
+Vì hạ tầng nằm trong cụm nên không cần cấu hình `advertised.listeners` thủ công hay mở firewall:
+Service name (`tb-kafka:9092`, `tb-zookeeper:2181`) đã đúng như giá trị trong `01-config.yaml`.
+
+Điểm chết đơn lẻ hiện tại: **mỗi thành phần hạ tầng chỉ 1 replica** và 2 máy chủ database riêng.
+Mất Kafka thì nền tảng ngừng xử lý; mất Cassandra thì không ghi/đọc telemetry; mất Postgres thì
+không đăng nhập được. Khi cần HA thật: Kafka ≥ 3 broker, ZooKeeper ≥ 3, Cassandra ≥ 3 node RF=3,
+PostgreSQL primary + standby — manifest của ThingsBoard **không phải sửa**, chỉ đổi `Endpoints`
+(nếu DB chuyển sang cụm mới) và tăng replica.
 
 ### 3.3. Cụm k3s thực tế (kiểm tra ngày 2026-09-24)
 
@@ -229,11 +247,12 @@ riêng, không bắt buộc cùng một máy chủ.
 | `vmi3215905` | worker | 4 / ~8Gi | `144.91.106.154`, IPv6 | Ready, nhận workload |
 | `vmi3320735` | control plane | 4 / ~8Gi | `62.171.137.148`, IPv6 | Ready nhưng **cordoned** (taint `node-role.kubernetes.io/control-plane`, `node.kubernetes.io/unschedulable`) |
 
-Version k3s: `v1.35.5+k3s1`. StorageClass: `local-path` (mặc định, chưa dùng vì TB không cần PVC).
+Version k3s: `v1.35.5+k3s1`. StorageClass: `local-path` (mặc định) — dùng cho PVC của Kafka,
+ZooKeeper, Redis chạy trong cụm; các pod ThingsBoard thì **không cần PVC** vì state nằm ở 2 máy
+chủ database.
 
 **Vậy capacity khả dụng = 2 worker = 8 vCPU / ~16Gi.** Control plane không nhận pod, nên đừng tính
-vào. Tổng request của bộ manifest (mục dưới) là 6 CPU / 12Gi — vừa đủ nhưng chỉ còn ~2 CPU dự phòng,
-vì thế nên chạy 1 replica cho mỗi transport (xem phần tuning).
+vào. Bộ manifest hiện tại (TB services + Kafka + ZooKeeper + Redis) đã được hạ request cho vừa cụm.
 
 **Thành phần hệ thống đang có / còn thiếu** (kiểm tra bằng `kubectl get pods -A`):
 
@@ -267,27 +286,23 @@ kubectl -n thingsboard get pods -o wide        # kiểm tra NODE của từng po
 kubectl top nodes                              # kiểm tra tài nguyên còn trống
 ```
 
-**Tài nguyên**: k3s server mặc định vẫn nhận workload, nên tổng capacity = 3 node. Tổng request của
-bộ manifest hiện tại:
+**Tài nguyên**: control plane bị cordon nên chỉ 2 worker nhận pod. Tổng request của bộ manifest hiện
+tại:
 
-| Deployment | replica | request/pod | tổng request |
+| Workload | replica | request/pod | tổng request |
 |---|---|---|---|
-| tb-core | 2 | 1 CPU / 2Gi | 2 CPU / 4Gi |
-| tb-rule-engine | 2 | 1 CPU / 2Gi | 2 CPU / 4Gi |
-| tb-mqtt-transport | 2 | 500m / 1Gi | 1 CPU / 2Gi |
-| tb-http-transport | 2 | 500m / 1Gi | 1 CPU / 2Gi |
-| **tổng** | **8 pod** | — | **6 CPU / 12Gi** |
+| tb-core | 2 | 500m / 1.5Gi | 1 CPU / 3Gi |
+| tb-rule-engine | 2 | 500m / 1.5Gi | 1 CPU / 3Gi |
+| tb-mqtt-transport | 2 | 250m / 512Mi | 0.5 CPU / 1Gi |
+| tb-http-transport | 2 | 250m / 512Mi | 0.5 CPU / 1Gi |
+| tb-zookeeper | 1 | 200m / 512Mi | 0.2 CPU / 0.5Gi |
+| tb-kafka | 1 | 500m / 1Gi | 0.5 CPU / 1Gi |
+| tb-redis | 1 | 100m / 256Mi | 0.1 CPU / 0.25Gi |
+| **tổng (chưa tính protocol transport tuỳ chọn)** | **11 pod** | — | **~3.8 CPU / ~9.8Gi** |
 
-Với 2 worker 4 vCPU / 8Gi, 6 CPU / 12Gi là vừa nhưng chật; nên giảm transport xuống 1 replica để
-giải phóng 1 CPU / 2Gi và giữ headroom cho HPA:
-
-```bash
-# cụm hiện tại: 1 replica cho transport, giữ 2 replica cho core và rule engine
-kubectl -n thingsboard scale deploy/tb-mqtt-transport --replicas=1
-kubectl -n thingsboard scale deploy/tb-http-transport --replicas=1
-# và hạ heap tương ứng trong ConfigMap:
-#   JAVA_OPTS=-Xms512M -Xmx2G -XX:+UseG1GC -XX:MaxRAMPercentage=70
-```
+Con số này nằm trong 8 vCPU / 16Gi của 2 worker, còn khoảng 4 CPU / 6Gi trống cho k3s system pods và
+HPA (HPA tối đa 4 replica cho tb-core và tb-rule-engine). `JAVA_OPTS` trong ConfigMap đã đặt heap
+`-Xmx2G`, thấp hơn `limits` 3Gi để tránh OOMKilled.
 
 Nhớ giữ `limits` > `requests` để HPA còn chỗ nhân bản, và đặt heap (`-Xmx`) thấp hơn `limits` memory
 khoảng 20–25% để JVM không bị OOMKilled.
@@ -324,37 +339,46 @@ Toàn bộ biến dưới đây do `thingsboard.yml` định nghĩa, đặt qua 
 | `RUN_INSTALL` | `false` | service không tự chạy migration |
 | `SECURITY_RBAC_ENABLED` | `true` | RBAC của fork; `false` = hành vi CE gốc |
 | `JS_EVALUATOR` | `remote` (khuyến nghị) hoặc `local` | `remote` cần service JS executor; `local` chạy Nashorn trong rule engine |
-| `JAVA_OPTS` | `-Xms1G -Xmx4G -XX:+UseG1GC -XX:MaxRAMPercentage=70` | đặt heap < limit container |
+| `JAVA_OPTS` | `-Xms512M -Xmx2G -XX:+UseG1GC -XX:MaxRAMPercentage=70` | heap (`-Xmx`) phải thấp hơn `limits` memory |
 
 ## 5. Quy trình deploy
 
 ```bash
-# 0. máy chủ dữ liệu đã chạy Postgres/Cassandra/Kafka/ZooKeeper(/Redis) và mở firewall
+# 0. 2 máy chủ đã chạy PostgreSQL và Cassandra, firewall đã mở cho CIDR của k3s
 
-# 1. namespace, config, endpoints trỏ ra máy chủ dữ liệu, secret, pull secret
+# 1. namespace, config, endpoints trỏ ra 2 máy chủ database, secret, pull secret
 kubectl apply -f deploy/k3s/00-namespace.yaml
 kubectl apply -f deploy/k3s/01-config.yaml
-kubectl apply -f deploy/k3s/03-external-data-plane.yaml
+kubectl apply -f deploy/k3s/03-external-databases.yaml
 kubectl -n thingsboard create secret generic tb-secrets --from-literal=...
 
-# 2. image đã mặc định là ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0 trong manifest;
-#    chỉ cần đổi tag khi roll bản mới
-sed -i 's#greeniq-thingsboard:v4.4.0.0#greeniq-thingsboard:v4.4.0.1#' deploy/k3s/*.yaml
+# 2. hạ tầng trong cụm: ZooKeeper trước, sau đó Kafka và Redis
+kubectl apply -f deploy/k3s/05-zookeeper.yaml
+kubectl apply -f deploy/k3s/04-kafka.yaml
+kubectl apply -f deploy/k3s/06-redis.yaml
+kubectl -n thingsboard rollout status statefulset/tb-zookeeper --timeout=5m
+kubectl -n thingsboard rollout status statefulset/tb-kafka --timeout=5m
+kubectl -n thingsboard rollout status statefulset/tb-redis --timeout=5m
 
-# 3. cài/cập nhật schema — 1 lần cho mỗi release, TRƯỚC khi rolling service
+# 3. image đã mặc định là ghcr.io/vtapro/tb-*:v4.4.0.0 trong manifest;
+#    chỉ đổi tag khi roll bản mới
+sed -i 's#:v4.4.0.0#:v4.4.0.1#' deploy/k3s/*.yaml
+
+# 4. cài/cập nhật schema — 1 lần cho mỗi release, TRƯỚC khi rolling service
 kubectl apply -f deploy/k3s/10-install-job.yaml
 kubectl -n thingsboard wait --for=condition=complete job/tb-install --timeout=15m
 kubectl -n thingsboard logs job/tb-install --tail=50
 kubectl -n thingsboard delete job tb-install
 
-# 4. services
+# 5. services
 kubectl apply -f deploy/k3s/20-tb-core.yaml
 kubectl apply -f deploy/k3s/21-tb-rule-engine.yaml
 kubectl apply -f deploy/k3s/22-tb-mqtt-transport.yaml
 kubectl apply -f deploy/k3s/23-tb-http-transport.yaml
+kubectl apply -f deploy/k3s/24-protocol-transports.yaml   # tuỳ chọn
 kubectl apply -f deploy/k3s/30-ingress.yaml
 
-# 5. kiểm tra
+# 6. kiểm tra
 kubectl -n thingsboard rollout status deploy/tb-core
 kubectl -n thingsboard get pods,svc,ingress
 curl -fsS https://app.greeniq.vn/api/noauth/whiteLabeling

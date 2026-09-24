@@ -1,0 +1,95 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Shared cache of the ThingsBoard cluster (device credentials, sessions, attributes, latest
+# telemetry). With more than one replica of tb-core a shared cache is mandatory, otherwise each
+# pod caches its own view and devices/credentials changes take effect inconsistently.
+#
+# If you would rather not run Redis at all, drop this file and set CACHE_TYPE: caffeine in
+# 01-config.yaml — acceptable for a lab, not recommended for production.
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-redis
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-redis
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: tb-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tb-redis
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-redis
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  serviceName: tb-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tb-redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tb-redis
+        app.kubernetes.io/part-of: thingsboard
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: redis
+          image: redis:7.4.2
+          command: ["sh", "-c"]
+          args:
+            - exec redis-server --requirepass "$REDIS_PASSWORD" --appendonly yes --maxmemory 512mb
+              --maxmemory-policy allkeys-lru
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tb-secrets
+                  key: REDIS_PASSWORD
+          ports:
+            - name: redis
+              containerPort: 6379
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "redis-cli -a \"$REDIS_PASSWORD\" ping | grep -q PONG"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: redis
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 2Gi

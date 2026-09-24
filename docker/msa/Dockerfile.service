@@ -1,0 +1,40 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Generic runtime image for one ThingsBoard microservice (transport, edqs, rule engine...).
+#
+# The boot jar is NOT built here: the CI job builds the whole repository once and passes the
+# jar through a named build context, so every service image stays a thin jre + one jar layer.
+#
+# Local equivalent:
+#   mkdir -p /tmp/jars && cp transport/mqtt/target/tb-mqtt-transport-*-boot.jar /tmp/jars/app.jar
+#   docker build -f docker/msa/Dockerfile.service \
+#     --build-context jars=/tmp/jars \
+#     --build-arg SERVICE_JAR=app.jar \
+#     -t ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.0 .
+
+ARG BASE_IMAGE=eclipse-temurin:25-jre
+
+FROM ${BASE_IMAGE}
+
+# name of the jar inside the "jars" build context
+ARG SERVICE_JAR=app.jar
+
+ENV APP_JAR=/app/app.jar
+ENV JAVA_OPTS=""
+
+WORKDIR /app
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=jars ${SERVICE_JAR} ${APP_JAR}
+COPY docker/msa/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+EXPOSE 8080
+
+ENTRYPOINT ["/app/entrypoint.sh"]

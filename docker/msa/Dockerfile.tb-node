@@ -1,0 +1,44 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Image of the application module ("tb-node"): runs as monolith, tb-core or tb-rule-engine
+# depending on TB_SERVICE_TYPE. It is also the image used by the schema install job, so it
+# ships the install scripts (SQL + Cassandra) and the entrypoint that supports RUN_INSTALL.
+#
+# Local equivalent:
+#   mkdir -p /tmp/jars && cp application/target/thingsboard-*-boot.jar /tmp/jars/app.jar
+#   docker build -f docker/msa/Dockerfile.tb-node \
+#     --build-context jars=/tmp/jars --build-arg SERVICE_JAR=app.jar \
+#     -t ghcr.io/vtapro/tb-node:v4.4.0.0 .
+
+ARG BASE_IMAGE=eclipse-temurin:25-jre
+
+FROM ${BASE_IMAGE}
+
+ARG SERVICE_JAR=app.jar
+
+ENV APP_JAR=/app/app.jar
+ENV JAVA_OPTS=""
+ENV INSTALL_DATA_DIR=/app/data
+
+WORKDIR /app
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=jars ${SERVICE_JAR} ${APP_JAR}
+
+# schema scripts used by the install job (postgres + cassandra + demo data)
+COPY application/src/main/data /app/data
+COPY dao/src/main/resources/sql /app/data/sql
+COPY dao/src/main/resources/cassandra /app/data/cassandra
+
+COPY docker/msa/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+EXPOSE 8080 1883 7070 5683/udp
+
+ENTRYPOINT ["/app/entrypoint.sh"]

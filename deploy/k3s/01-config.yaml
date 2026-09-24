@@ -6,10 +6,10 @@
 # Shared configuration of every ThingsBoard service.
 # Anything that is a secret lives in the tb-secrets Secret instead.
 #
-# The data plane (PostgreSQL, Cassandra, Kafka, ZooKeeper, Redis) is hosted OUTSIDE the k3s
-# cluster, on a dedicated server. The host names below are the cluster local aliases created
-# by 03-external-data-plane.yaml, which maps them to the real address of that server; change
-# the addresses there, not here.
+# Topology: PostgreSQL and Cassandra run outside the cluster (each on its own server, reached
+# through the Endpoints of 03-external-databases.yaml); Kafka, ZooKeeper and Redis run inside
+# the cluster (04-kafka.yaml, 05-zookeeper.yaml, 06-redis.yaml). All five names below resolve
+# inside the namespace either way, so nothing else has to change if a component later moves.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -22,7 +22,8 @@ data:
   # Kafka is required in microservices mode: services only talk to each other through it.
   TB_QUEUE_TYPE: kafka
   TB_KAFKA_SERVERS: tb-kafka:9092
-  TB_QUEUE_KAFKA_REPLICATION_FACTOR: "3"
+  # single broker in the cluster: raise to 3 together with a 3 broker Kafka setup
+  TB_QUEUE_KAFKA_REPLICATION_FACTOR: "1"
   # ZooKeeper is the discovery service used to find the other nodes of the cluster.
   ZOOKEEPER_ENABLED: "true"
   ZOOKEEPER_URL: tb-zookeeper:2181
@@ -31,7 +32,8 @@ data:
   ZOOKEEPER_SESSION_TIMEOUT_MS: "30000"
 
   # ---- databases ------------------------------------------------------------
-  # Entities/relations/alarms stay in PostgreSQL, telemetry goes to Cassandra.
+  # Entities/relations/alarms stay in PostgreSQL (external server), telemetry in Cassandra
+  # (second external server).
   SPRING_DRIVER_CLASS_NAME: org.postgresql.Driver
   SPRING_DATASOURCE_URL: jdbc:postgresql://tb-postgres:5432/thingsboard
   # note: spring.jpa.hibernate.ddl-auto is already "none" in thingsboard.yml; the schema is
@@ -42,7 +44,9 @@ data:
   CASSANDRA_KEYSPACE_NAME: thingsboard
   CASSANDRA_LOCAL_DATACENTER: datacenter1
   CASSANDRA_USE_CREDENTIALS: "true"
-  CASSANDRA_COMPRESSION: lz4
+  # the driver negotiates compression with the server; keep 'none' unless the Cassandra
+  # server is explicitly configured for lz4
+  CASSANDRA_COMPRESSION: none
 
   # ---- cache ----------------------------------------------------------------
   # Mandatory in microservices: a local caffeine cache is not shared between replicas.
@@ -66,4 +70,5 @@ data:
   SECURITY_RBAC_ENABLED: "true"
 
   # ---- JVM ------------------------------------------------------------------
-  JAVA_OPTS: "-Xms1G -Xmx4G -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=70"
+  # sized for the 2 worker cluster (4 vCPU / 8Gi each): heap well below the container limit
+  JAVA_OPTS: "-Xms512M -Xmx2G -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=70"

@@ -32,6 +32,10 @@ spec:
         app.kubernetes.io/part-of: thingsboard
     spec:
       terminationGracePeriodSeconds: 90
+      # GHCR packages are private: create the secret with
+      #   kubectl -n thingsboard create secret docker-registry ghcr --docker-server=ghcr.io ...
+      imagePullSecrets:
+        - name: ghcr
       # the cluster has two workers: keep the replicas on different nodes when possible
       topologySpreadConstraints:
         - maxSkew: 1
@@ -42,7 +46,8 @@ spec:
               app.kubernetes.io/name: tb-core
       containers:
         - name: tb-core
-          image: ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0
+          # tb-node image: same jar as tb-rule-engine, role selected by TB_SERVICE_TYPE
+          image: ghcr.io/vtapro/tb-node:v4.4.0.0
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
@@ -88,11 +93,11 @@ spec:
             failureThreshold: 5
           resources:
             requests:
-              cpu: "1"
-              memory: 2Gi
+              cpu: 500m
+              memory: 1536Mi
             limits:
-              cpu: "4"
-              memory: 5Gi
+              cpu: "2"
+              memory: 3Gi
 ---
 apiVersion: v1
 kind: Service
@@ -125,7 +130,7 @@ spec:
     kind: Deployment
     name: tb-core
   minReplicas: 2
-  maxReplicas: 6
+  maxReplicas: 4
   metrics:
     - type: Resource
       resource:

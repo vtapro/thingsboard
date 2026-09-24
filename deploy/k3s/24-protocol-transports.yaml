@@ -1,0 +1,286 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# CoAP, LwM2M and SNMP transports — optional, one Deployment per protocol, each one with its
+# own image and its own UDP port. Remove the blocks you do not use (and the corresponding images
+# from the CI matrix) to keep the cluster small.
+#
+# These modules disable their web server by default; WEB_APPLICATION_* is enabled here only so
+# that /actuator/health can be used as probe.
+
+# ---- CoAP (UDP 5683, DTLS 5684) ------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tb-coap-transport
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-coap-transport
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tb-coap-transport
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tb-coap-transport
+        app.kubernetes.io/part-of: thingsboard
+    spec:
+      containers:
+        - name: tb-coap-transport
+          image: ghcr.io/vtapro/tb-coap-transport:v4.4.0.0
+          envFrom:
+            - configMapRef:
+                name: tb-common
+            - secretRef:
+                name: tb-secrets
+          env:
+            - name: TB_SERVICE_TYPE
+              value: tb-transport
+            - name: TB_SERVICE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: COAP_BIND_ADDRESS
+              value: 0.0.0.0
+            - name: COAP_BIND_PORT
+              value: "5683"
+            - name: WEB_APPLICATION_ENABLE
+              value: "true"
+            - name: WEB_APPLICATION_TYPE
+              value: servlet
+            - name: HTTP_BIND_PORT
+              value: "8080"
+          ports:
+            - name: coap
+              containerPort: 5683
+              protocol: UDP
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-coap-transport
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-coap-transport
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: tb-coap-transport
+  ports:
+    - name: coap
+      port: 5683
+      targetPort: coap
+      protocol: UDP
+      nodePort: 30683
+---
+# ---- LwM2M (UDP 5685) ----------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tb-lwm2m-transport
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-lwm2m-transport
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tb-lwm2m-transport
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tb-lwm2m-transport
+        app.kubernetes.io/part-of: thingsboard
+    spec:
+      containers:
+        - name: tb-lwm2m-transport
+          image: ghcr.io/vtapro/tb-lwm2m-transport:v4.4.0.0
+          envFrom:
+            - configMapRef:
+                name: tb-common
+            - secretRef:
+                name: tb-secrets
+          env:
+            - name: TB_SERVICE_TYPE
+              value: tb-transport
+            - name: TB_SERVICE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: LWM2M_ENABLED
+              value: "true"
+            - name: LWM2M_BIND_ADDRESS
+              value: 0.0.0.0
+            - name: LWM2M_BIND_PORT
+              value: "5685"
+            - name: WEB_APPLICATION_ENABLE
+              value: "true"
+            - name: WEB_APPLICATION_TYPE
+              value: servlet
+            - name: HTTP_BIND_PORT
+              value: "8080"
+          ports:
+            - name: lwm2m
+              containerPort: 5685
+              protocol: UDP
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-lwm2m-transport
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-lwm2m-transport
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: tb-lwm2m-transport
+  ports:
+    - name: lwm2m
+      port: 5685
+      targetPort: lwm2m
+      protocol: UDP
+      nodePort: 30685
+---
+# ---- SNMP (UDP 1620 by default, change SNMP_BIND_PORT to 162 to use the standard port) --
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tb-snmp-transport
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-snmp-transport
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tb-snmp-transport
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tb-snmp-transport
+        app.kubernetes.io/part-of: thingsboard
+    spec:
+      containers:
+        - name: tb-snmp-transport
+          image: ghcr.io/vtapro/tb-snmp-transport:v4.4.0.0
+          envFrom:
+            - configMapRef:
+                name: tb-common
+            - secretRef:
+                name: tb-secrets
+          env:
+            - name: TB_SERVICE_TYPE
+              value: tb-transport
+            - name: TB_SERVICE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: SNMP_ENABLED
+              value: "true"
+            - name: SNMP_BIND_PORT
+              value: "1620"
+            - name: WEB_APPLICATION_ENABLE
+              value: "true"
+            - name: WEB_APPLICATION_TYPE
+              value: servlet
+            - name: HTTP_BIND_PORT
+              value: "8080"
+          ports:
+            - name: snmp
+              containerPort: 1620
+              protocol: UDP
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-snmp-transport
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-snmp-transport
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: tb-snmp-transport
+  ports:
+    - name: snmp
+      port: 1620
+      targetPort: snmp
+      protocol: UDP
+      nodePort: 30162

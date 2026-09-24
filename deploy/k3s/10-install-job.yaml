@@ -27,9 +27,11 @@ spec:
         app.kubernetes.io/name: tb-install
     spec:
       restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: ghcr
       containers:
         - name: tb-install
-          image: ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0
+          image: ghcr.io/vtapro/tb-node:v4.4.0.0
           envFrom:
             - configMapRef:
                 name: tb-common

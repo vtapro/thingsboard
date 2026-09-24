@@ -19,7 +19,7 @@ Cách cài đặt/chạy chi tiết: [local-dev.md](local-dev.md).
 | 10 | User groups + customer hierarchy | ✅ | ✅ | role gán theo nhóm, lan quyền theo cây customer |
 | 11 | Trang Roles: 4 tab, mỗi entity type một tab quyền, thông báo lưu | ✅ | ✅ | |
 | 12 | Kafka + Cassandra cho môi trường dev | ➖ | — | **đã bỏ ở local**: bản Cassandra của CE không hiện thực `findAllKeysByEntityIds` nên widget không liệt kê được key telemetry; dev dùng PostgreSQL + queue in-memory. Production vẫn dùng Kafka + Cassandra (xem [production-k3s.md](production-k3s.md)) |
-| 13 | Deploy production trên k3s (microservices HA, domain `app.greeniq.vn`) | 🟡 | 🟡 | manifest tham chiếu ở `deploy/k3s/` (data plane ngoài cụm: Cassandra/Kafka/ZooKeeper/Postgres), workflow GHCR ở `.github/workflows/publish-images.yml`; code nhánh Kafka/Cassandra/microservices giữ nguyên |
+| 13 | Deploy production trên k3s (microservices, domain `app.greeniq.vn`) | 🟡 | 🟡 | 8 image riêng theo từng service (`ghcr.io/vtapro/tb-*`), manifest ở `deploy/k3s/`: PostgreSQL + Cassandra ở 2 máy chủ ngoài cụm, Kafka/ZooKeeper/Redis trong cụm; workflow GHCR ở `.github/workflows/publish-images.yml` |
 
 ## 2. Môi trường local hiện tại (native, không Docker)
 

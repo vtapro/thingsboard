@@ -35,6 +35,8 @@ spec:
         app.kubernetes.io/part-of: thingsboard
     spec:
       terminationGracePeriodSeconds: 60
+      imagePullSecrets:
+        - name: ghcr
       # the cluster has two workers: keep the replicas on different nodes when possible
       topologySpreadConstraints:
         - maxSkew: 1
@@ -45,7 +47,7 @@ spec:
               app.kubernetes.io/name: tb-mqtt-transport
       containers:
         - name: tb-mqtt-transport
-          image: ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0
+          image: ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.0
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
@@ -59,17 +61,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            # only MQTT is served by this deployment
-            - name: MQTT_ENABLED
-              value: "true"
-            - name: HTTP_ENABLED
-              value: "false"
-            - name: COAP_ENABLED
-              value: "false"
-            - name: LWM2M_ENABLED
-              value: "false"
-            - name: SNMP_ENABLED
-              value: "false"
             - name: MQTT_BIND_ADDRESS
               value: 0.0.0.0
             - name: MQTT_BIND_PORT
@@ -80,6 +71,13 @@ spec:
               value: "65536"
             - name: NETTY_LEAK_DETECTOR_LVL
               value: DISABLED
+            # this module disables the web server by default; enabled here for /actuator/health
+            - name: WEB_APPLICATION_ENABLE
+              value: "true"
+            - name: WEB_APPLICATION_TYPE
+              value: servlet
+            - name: HTTP_BIND_PORT
+              value: "8080"
           ports:
             - name: mqtt
               containerPort: 1883
@@ -105,11 +103,11 @@ spec:
             failureThreshold: 5
           resources:
             requests:
-              cpu: 500m
-              memory: 1Gi
+              cpu: 250m
+              memory: 512Mi
             limits:
-              cpu: "4"
-              memory: 4Gi
+              cpu: "2"
+              memory: 2Gi
 ---
 apiVersion: v1
 kind: Service

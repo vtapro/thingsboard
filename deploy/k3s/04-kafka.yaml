@@ -1,0 +1,121 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Kafka runs in the cluster (KRaft mode, no ZooKeeper needed by Kafka itself) and is the only
+# way the ThingsBoard services talk to each other in microservices mode.
+#
+# Single broker to start with, which is enough for this 2 worker cluster and matches
+# TB_QUEUE_KAFKA_REPLICATION_FACTOR=1 in 01-config.yaml. To move to a 3 broker HA setup later:
+# scale to 3 replicas, give each pod its own node id / quorum voters (or install Strimzi) and
+# raise the replication factor. Topics are created by ThingsBoard itself on first start.
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-kafka
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-kafka
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: tb-kafka
+  ports:
+    - name: broker
+      port: 9092
+      targetPort: broker
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tb-kafka
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-kafka
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  serviceName: tb-kafka
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tb-kafka
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tb-kafka
+        app.kubernetes.io/part-of: thingsboard
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: kafka
+          image: apache/kafka:3.9.1
+          ports:
+            - name: broker
+              containerPort: 9092
+            - name: controller
+              containerPort: 9093
+          env:
+            - name: KAFKA_NODE_ID
+              value: "1"
+            - name: KAFKA_PROCESS_ROLES
+              value: broker,controller
+            # a fixed cluster id is required to format the KRaft storage the first time
+            - name: CLUSTER_ID
+              value: thingsboard-kraft-1
+            - name: KAFKA_LISTENERS
+              value: PLAINTEXT://:9092,CONTROLLER://:9093
+            # pods connect through the cluster local name of the Service
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: PLAINTEXT://tb-kafka:9092
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: CONTROLLER
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: 1@tb-kafka:9093
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "1"
+            - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
+              value: "0"
+            - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              value: "false"
+            - name: KAFKA_LOG_DIRS
+              value: /var/lib/kafka/data
+            - name: KAFKA_HEAP_OPTS
+              value: -Xms512M -Xmx1G
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+          readinessProbe:
+            tcpSocket:
+              port: broker
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: broker
+            initialDelaySeconds: 45
+            periodSeconds: 20
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 10Gi

@@ -1,0 +1,78 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# The two databases run OUTSIDE the cluster, each one on its own dedicated server:
+#
+#   PostgreSQL  -> entities, users, RBAC and white labeling admin settings
+#   Cassandra   -> telemetry
+#
+# Kafka, ZooKeeper and Redis stay inside the cluster (04-kafka.yaml, 05-zookeeper.yaml,
+# 06-redis.yaml) and are therefore NOT declared here.
+#
+# EDIT THE IP ADDRESSES before applying: 203.0.113.x are documentation addresses (RFC 5737) and
+# do not route anywhere — a Service without selector is bound to the Endpoints of the same name,
+# which is how the cluster-local names used by 01-config.yaml reach the external servers.
+# The two blocks may point to different servers, that is expected.
+#
+# Verify from a pod after applying:
+#
+#   kubectl -n thingsboard run netcheck --rm -it --restart=Never --image=busybox:1.37 -- \
+#     sh -c 'for p in tb-postgres:5432 tb-cassandra:9042; do nc -vz ${p%%:*} ${p##*:}; done'
+
+# ---- PostgreSQL server ---------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-postgres
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: tb-postgres
+  namespace: thingsboard
+subsets:
+  - addresses:
+      - ip: 203.0.113.10      # <-- IP máy chủ PostgreSQL
+    ports:
+      - name: postgres
+        port: 5432
+        protocol: TCP
+---
+# ---- Cassandra server ----------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-cassandra
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  ports:
+    - name: cql
+      port: 9042
+      targetPort: 9042
+      protocol: TCP
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: tb-cassandra
+  namespace: thingsboard
+subsets:
+  - addresses:
+      - ip: 203.0.113.11      # <-- IP máy chủ Cassandra
+    ports:
+      - name: cql
+        port: 9042
+        protocol: TCP

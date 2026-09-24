@@ -14,12 +14,19 @@ namespace: thingsboard
 resources:
   - 00-namespace.yaml
   - 01-config.yaml
-  - 03-external-data-plane.yaml
+  # PostgreSQL + Cassandra hosted outside the cluster (edit the IPs before applying)
+  - 03-external-databases.yaml
+  # in-cluster infrastructure
+  - 04-kafka.yaml
+  - 05-zookeeper.yaml
+  - 06-redis.yaml
   - 10-install-job.yaml
   - 20-tb-core.yaml
   - 21-tb-rule-engine.yaml
   - 22-tb-mqtt-transport.yaml
   - 23-tb-http-transport.yaml
+  # optional: CoAP / LwM2M / SNMP — delete the file if these protocols are not used
+  - 24-protocol-transports.yaml
   - 30-ingress.yaml
   # temporary access while there is no ingress controller on the cluster
   - 40-bringup-nodeport.yaml
