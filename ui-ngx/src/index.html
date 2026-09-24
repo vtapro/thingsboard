@@ -18,10 +18,15 @@
   <link rel="stylesheet" href="assets/fonts/material-icons.css" />
   <style type="text/css">
 
+    /*
+     * Nền của màn hình chờ (trước khi Angular khởi động xong) luôn là màu trắng.
+     * Màu nền của white labeling được chèn sau khi ứng dụng boot, và vì stylesheet đó
+     * nằm sau stylesheet này nên nó vẫn thắng -> app dùng đúng màu tenant đã cấu hình.
+     */
     body, html {
       height: 100%;
       overflow: hidden;
-      background-color: #eee;
+      background-color: #fff;
     }
 
     .tb-loading-spinner {
