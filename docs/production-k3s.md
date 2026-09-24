@@ -152,10 +152,9 @@ docker manifest inspect ghcr.io/vtapro/tb-node:v4.4.0.0    # nếu có docker
 # hoặc xem trực tiếp: https://github.com/vtapro?tab=packages
 ```
 
-Nếu chưa muốn động vào scope, có thể copy nội dung file
-[`ci/publish-images.yml`](../ci/publish-images.yml) rồi tạo file
-`.github/workflows/publish-images.yml` bằng nút **Add file** trên web GitHub (web không bị giới hạn
-scope như token của git).
+Workflow đã nằm trong repo (`.github/workflows/publish-images.yml`), nên chỉ cần push nhánh là
+Actions chạy. Nếu sau này credential mất scope `workflow`, có thể tạo lại file này bằng nút
+**Add file** trên web GitHub (web không bị giới hạn scope như token của git).
 
 Image là **private** theo mặc định của GHCR. Trên k3s tạo pull secret:
 
