@@ -37,9 +37,34 @@ if (-not (Test-Path $Kubectl)) { $Kubectl = "kubectl" }
 if (-not (Test-Path $Kubeconfig)) { throw "Khong tim thay kubeconfig: $Kubeconfig" }
 $env:KUBECONFIG = $Kubeconfig
 
-if ([string]::IsNullOrWhiteSpace($PostgresPassword)) { $PostgresPassword = Read-SecretValue "Mat khau PostgreSQL ($PostgresUser)" }
-if ([string]::IsNullOrWhiteSpace($CassandraPassword)) { $CassandraPassword = Read-SecretValue "Mat khau Cassandra ($CassandraUser)" }
-if ([string]::IsNullOrWhiteSpace($CassandraTrustStorePassword)) { $CassandraTrustStorePassword = Read-SecretValue "Mat khau truststore Cassandra (cassandra.truststore.jks)" }
+# Gia tri nao khong truyen vao thi giu nguyen gia tri dang co trong secret, tranh vo tinh
+# ghi de mat khau khac (vi du chi muon sua mat khau Postgres).
+function Get-ExistingSecretValue($key) {
+    $b64 = & $Kubectl -n $Namespace get secret $SecretName -o "jsonpath={.data.$key}" 2>$null
+    if ([string]::IsNullOrWhiteSpace($b64)) { return $null }
+    return [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($b64))
+}
+
+if ([string]::IsNullOrWhiteSpace($PostgresPassword)) {
+    $PostgresPassword = Get-ExistingSecretValue "SPRING_DATASOURCE_PASSWORD"
+    if ($PostgresPassword) { Write-Host "Giu nguyen SPRING_DATASOURCE_PASSWORD dang co" }
+    else { $PostgresPassword = Read-SecretValue "Mat khau PostgreSQL ($PostgresUser)" }
+}
+if ([string]::IsNullOrWhiteSpace($CassandraPassword)) {
+    $CassandraPassword = Get-ExistingSecretValue "CASSANDRA_PASSWORD"
+    if ($CassandraPassword) { Write-Host "Giu nguyen CASSANDRA_PASSWORD dang co" }
+    else { $CassandraPassword = Read-SecretValue "Mat khau Cassandra ($CassandraUser)" }
+}
+if ([string]::IsNullOrWhiteSpace($CassandraTrustStorePassword)) {
+    $CassandraTrustStorePassword = Get-ExistingSecretValue "CASSANDRA_SSL_TRUST_STORE_PASSWORD"
+    if ($CassandraTrustStorePassword) { Write-Host "Giu nguyen CASSANDRA_SSL_TRUST_STORE_PASSWORD dang co" }
+    else { $CassandraTrustStorePassword = Read-SecretValue "Mat khau truststore Cassandra (cassandra.truststore.jks)" }
+}
+if ([string]::IsNullOrWhiteSpace($HaproxyStatsPassword)) {
+    $HaproxyStatsPassword = Get-ExistingSecretValue "HAPROXY_STATS_PASSWORD"
+    if ($HaproxyStatsPassword) { Write-Host "Giu nguyen HAPROXY_STATS_PASSWORD dang co" }
+    else { $HaproxyStatsPassword = Read-SecretValue "Mat khau trang /stats HAProxy ($HaproxyStatsUser)" }
+}
 if ([string]::IsNullOrWhiteSpace($HaproxyStatsPassword)) { $HaproxyStatsPassword = Read-SecretValue "Mat khau trang /stats HAProxy ($HaproxyStatsUser)" }
 
 Write-Host "Cap nhat secret $SecretName trong namespace $Namespace ..."
