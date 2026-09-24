@@ -41,6 +41,44 @@ Tài liệu này ghi lại chính xác tính năng nào đã xong, đang dở, v
 - Sau mỗi lần build **phải** `up -d --force-recreate` và kiểm tra digest đổi, nếu không container vẫn là bản cũ.
 - RBAC mặc định **tắt**; bật bằng `SECURITY_RBAC_ENABLED: "true"` trong environment của `tb-node`.
 
+## 1d. Cập nhật cuối (đã test trên stack local)
+
+### RBAC — đã hoàn thành và kiểm chứng
+
+- Role có 3 dạng quyền: **toàn cục** (`permissions`), **theo nhóm** (`scopedPermissions`), và **own customer only**
+  (`ownCustomerOnly`) — dùng cho customer user để giữ cách ly customer của CE (chỉ truy cập customer mình và customer con).
+- **Entity groups**: trang riêng *Entities → Groups* (3 tab Devices/Assets/Entity views) + tab **ALL | GROUPS** ngay
+  trong bảng entity (Devices, Assets, Entity views) + dialog Add/Edit + Add entities + phân trang `mat-paginator`.
+- **User groups**: gán role cho cả nhóm, thành viên thừa hưởng quyền.
+- **Customer hierarchy**: nhập quan hệ cha–con ở *Security → Roles → Customer hierarchy*; lan quyền theo cây customer.
+
+### Bằng chứng test (API thật trên local)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Customer user (thuộc Parent-Co) đọc device thuộc **Child Co** (customer con) | **200** — lan quyền hierarchy OK |
+| Cùng user đọc device **ngoài customer** khi role bật `ownCustomerOnly` | **403** — cách ly customer OK |
+| Endpoint tenant-scope (`/api/tenant/devices`) gọi bằng customer user | **403** — đúng |
+
+### Lưu ý khi gọi REST API (quan trọng cho script/CI)
+
+Payload `EntityId` **phải có `entityType`**, nếu thiếu TB trả về lỗi gây nhầm lẫn:
+
+```
+# SAI  -> 500 {"message":"I/O error while reading input message"}
+{"name":"dev","deviceProfileId":{"id":"<uuid>"}}
+
+# ĐÚNG -> 200
+{"name":"dev","deviceProfileId":{"entityType":"DEVICE_PROFILE","id":"<uuid>"}}
+```
+
+Tương tự với `customerId`, `tenantId`, `entityId` (thêm `"entityType":"CUSTOMER" | "TENANT" | ...`).
+
+### MQTT
+
+- TB MQTT đang ở **cổng chuẩn 1883** (`localhost:1883`, username = device access token, topic `v1/devices/me/telemetry`).
+- EMQX của stack GreenIQ đã dừng để giải phóng 1883; nếu cần dùng lại, chạy nó ở cổng khác (ví dụ `1884:1883`).
+
 ## 2. Quy trình làm việc đã dùng (giữ nguyên cho các mốc sau)
 
 ```powershell
