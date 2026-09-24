@@ -1,0 +1,127 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# tb-core: REST API, entity/telemetry handling, web UI, edge gRPC (7070).
+# Scale horizontally; every replica is stateless and joins the cluster through ZooKeeper
+# and Kafka. Bump maxReplicas when the API latency or the Kafka consumer lag grows.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tb-core
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-core
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tb-core
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tb-core
+        app.kubernetes.io/part-of: thingsboard
+    spec:
+      terminationGracePeriodSeconds: 90
+      containers:
+        - name: tb-core
+          image: ghcr.io/OWNER/REPO:TAG
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: tb-common
+            - secretRef:
+                name: tb-secrets
+          env:
+            - name: TB_SERVICE_TYPE
+              value: tb-core
+            # unique cluster node id — the pod name is unique inside the namespace
+            - name: TB_SERVICE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: EDGES_ENABLED
+              value: "true"
+            - name: JS_EVALUATOR
+              value: remote
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: edge-grpc
+              containerPort: 7070
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "4"
+              memory: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-core
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-core
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: tb-core
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+    - name: edge-grpc
+      port: 7070
+      targetPort: edge-grpc
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: tb-core
+  namespace: thingsboard
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tb-core
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

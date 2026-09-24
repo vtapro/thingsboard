@@ -1,0 +1,106 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# tb-rule-engine: executes rule chains. Entities (devices, tenants, ...) are partitioned
+# between the replicas through Kafka, so scaling up/down rebalances the load automatically.
+# No Service is required: the pods are reached through Kafka and ZooKeeper only.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tb-rule-engine
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-rule-engine
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tb-rule-engine
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tb-rule-engine
+        app.kubernetes.io/part-of: thingsboard
+    spec:
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: tb-rule-engine
+          image: ghcr.io/OWNER/REPO:TAG
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: tb-common
+            - secretRef:
+                name: tb-secrets
+          env:
+            - name: TB_SERVICE_TYPE
+              value: tb-rule-engine
+            - name: TB_SERVICE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # "remote" needs the tb-js-executor deployment; use "local" for a smaller cluster.
+            - name: JS_EVALUATOR
+              value: remote
+            # Optional: pin this replica to specific tenant profiles (isolation feature).
+            # - name: TB_RULE_ENGINE_ASSIGNED_TENANT_PROFILES
+            #   value: "profile-uuid-1,profile-uuid-2"
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "4"
+              memory: 5Gi
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: tb-rule-engine
+  namespace: thingsboard
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tb-rule-engine
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

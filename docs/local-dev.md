@@ -1,4 +1,4 @@
-# Phát triển local trên Windows (không dùng Docker)
+﻿# Phát triển local trên Windows (không dùng Docker)
 
 Dự án chạy trực tiếp trên Windows: PostgreSQL + ThingsBoard (Java) + Angular dev server.
 Không cần Docker cho vòng lặp phát triển hằng ngày.
@@ -8,19 +8,22 @@ Không cần Docker cho vòng lặp phát triển hằng ngày.
 | Thành phần | Phiên bản | Đường dẫn | Ghi chú |
 |---|---|---|---|
 | JDK (build/run ThingsBoard) | Temurin **25** | `C:\Program Files\Eclipse Adoptium\jdk-25.0.4.101-hotspot` | `pom.xml` yêu cầu `release 25` |
-| JDK (cho Cassandra) | Temurin **17** | `C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot` | Cassandra 5.0 cần Java 17, không chạy được với JDK 21/25 |
 | Maven | 3.9.11 | `C:\Users\vthea\tools\apache-maven-3.9.11` | đã thêm vào PATH user, `JAVA_HOME` trỏ JDK 25 |
 | Node.js + Yarn | Node 24, Yarn 1.22 (qua `corepack`) | — | dùng cho `ui-ngx` |
 | PostgreSQL | 16 (service `postgresql-x64-16`) | `C:\Program Files\PostgreSQL\16` | DB `thingsboard`, user `postgres` / mật khẩu `postgres` |
-| Kafka | 4.0.0 (KRaft, không cần ZooKeeper) | `C:\Users\vthea\tools\kafka` | broker `localhost:9092`, log ở `C:\Users\vthea\tb-data\kafka-logs` |
-| Cassandra | 5.0.9 (chạy trong **WSL Ubuntu**) | `~/tools/cassandra` (trong WSL) | `localhost:9042`, keyspace `thingsboard`; windows không có bản Cassandra 5.0 native |
-| Thư mục dữ liệu runtime | — | `C:\Users\vthea\tb-data` | chứa `sql/`, `cassandra/`, `json/` cho installer |
+| Thư mục dữ liệu runtime | — | `C:\Users\vthea\tb-data` | chỉ cần `sql/` + `json/` cho installer (không cần `cassandra/`) |
+
+> **Không dùng Kafka / ZooKeeper / Cassandra ở local.** Stack dev dùng đúng cấu hình CE: PostgreSQL cho cả
+> entities và timeseries, queue `in-memory`. Lý do bỏ Cassandra: bản CE không hiện thực
+> `findAllKeysByEntityIds(Async)` trong `CassandraBaseTimeseriesLatestDao` (stub trả rỗng), nên widget trên
+> dashboard **không liệt kê được key telemetry**; muốn dùng được thì phải sửa code ThingsBoard — không đáng
+> cho môi trường dev. Chỉ khi nào thật sự cần đo hiệu năng production-like mới dựng lại Kafka/Cassandra ở
+> môi trường riêng, kèm bản vá tương ứng.
 
 ### Cài lại từ đầu (khi cần)
 
 ```powershell
 winget install --id EclipseAdoptium.Temurin.25.JDK -e
-winget install --id EclipseAdoptium.Temurin.17.JDK -e
 winget install --id PostgreSQL.PostgreSQL.16 -e      # mật khẩu superuser: postgres
 corepack enable
 ```
@@ -94,7 +97,6 @@ $dataDir = "C:\Users\vthea\tb-data"
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 Copy-Item "application\src\main\data\*" $dataDir -Recurse -Force
 Copy-Item "dao\src\main\resources\sql" "$dataDir\sql" -Recurse -Force
-Copy-Item "dao\src\main\resources\cassandra" "$dataDir\cassandra" -Recurse -Force
 ```
 
 ### 4.2 Chạy installer
@@ -132,6 +134,10 @@ $args = @(
   "-Dspring.datasource.username=postgres",
   "-Dspring.datasource.password=postgres",
   "-Dqueue.type=in-memory",
+  "-Ddatabase.ts.type=sql",
+  "-Ddatabase.ts_latest.type=sql",
+  "-Dqueue.edqs.local.rocksdb_path=$($PWD.Path -replace '\\','/')/application/target/rocksdb/edqs",
+  "-Dqueue.calculated_fields.rocks_db_path=$($PWD.Path -replace '\\','/')/application/target/rocksdb/cf_states",
   "-Dservice.type=monolith",
   "-Dsecurity.rbac.enabled=true",
   "-cp", $cp,
@@ -159,75 +165,47 @@ corepack yarn ng serve --configuration development --host 0.0.0.0 --port 4200
 Mở **http://localhost:4200**. `ui-ngx/proxy.conf.js` tự chuyển `/api`, `/static/**`, `/oauth2` sang backend
 `http://localhost:8080`, nên không cần build UI mỗi lần sửa code.
 
-## 7. Kafka (queue) — KRaft, không cần ZooKeeper
-
-ThingsBoard 4.4 dùng Kafka 4.0; từ Kafka 3.3 có thể chạy **KRaft** nên **không cần ZooKeeper**.
+## 7. Chạy stack dev bằng script
 
 ```powershell
-# lần đầu: format storage KRaft (chỉ chạy 1 lần, xoá dữ liệu Kafka cũ)
-$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
-$kafka = "C:\Users\vthea\tools\kafka"
-$bytes = [Guid]::NewGuid().ToByteArray()
-$uuid  = [Convert]::ToBase64String($bytes).Replace('+','-').Replace('/','_').TrimEnd('=')
-& "$kafka\bin\windows\kafka-storage.bat" format -t $uuid -c "$kafka\config\server.properties" --standalone
-
-# chạy broker
-..\scripts\start-kafka.ps1          # tương đương lệnh bên dưới
-```
-
-`config/server.properties` đã được sửa `log.dirs=C:/Users/vthea/tb-data/kafka-logs`.
-Lưu ý bản `.bat` của Kafka gọi `wmic` (đã bị Windows mới xoá) — script `scripts/start-kafka.ps1` đặt sẵn
-`KAFKA_HEAP_OPTS` để bỏ qua bước đó.
-
-## 8. Cassandra 5.0 (timeseries) — chạy trong WSL
-
-Apache không phát hành bản Cassandra 5.0 chạy native trên Windows (chỉ có tarball Linux), nên dev dùng **WSL Ubuntu**
-(không phải Docker). ThingsBoard trên Windows kết nối qua `localhost:9042` nhờ WSL2 forward localhost.
-
-```powershell
-..\scripts\start-cassandra.ps1        # start + chờ cổng 9042
-..\scripts\stop-tb.ps1                # dừng TB, Kafka, UI và Cassandra
-```
-
-Thiết lập bên trong WSL (đã làm, ghi lại để tham khảo):
-
-```bash
-# JDK 17 + Cassandra 5.0.9 trong $HOME (không cần quyền root)
-mkdir -p ~/tools && cd ~/tools
-curl -fL -o jdk17.tar.gz "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz"
-mkdir -p jdk17 && tar xzf jdk17.tar.gz -C jdk17 --strip-components=1
-cp /mnt/c/Users/vthea/tools/cassandra.tgz . && mkdir -p cassandra && tar xzf cassandra.tgz -C cassandra --strip-components=1
-# conf/cassandra.yaml: cluster_name 'Thingsboard Cluster', data/commitlog/saved_caches/hints trỏ về ~/cassandra-data
-```
-
-Keyspace `thingsboard` và các bảng `ts_kv_cf`, `ts_kv_latest_cf`, `ts_kv_partitions_cf` do installer tạo:
-
-```powershell
-$env:SKIP_SCHEMA_VERSION_CHECK = "true"     # bắt buộc khi DB đã cài schema (upgrade)
-java "@$env:TEMP\tb-upgrade.args"
-```
-
-## 9. Chạy toàn bộ stack dev bằng script
-
-```powershell
-.\scripts\start-kafka.ps1         # Kafka 9092
-.\scripts\start-cassandra.ps1     # Cassandra 9042 (WSL)
-.\scripts\start-tb.ps1            # ThingsBoard 8080 (Postgres + Kafka + Cassandra + RBAC)
+# Windows đang chặn chạy script (.ps1) nên luôn gọi kèm ExecutionPolicy Bypass
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-tb.ps1   # ThingsBoard 8080 (Postgres + in-memory + SQL + RBAC)
 
 cd ui-ngx; corepack yarn ng serve --configuration development --port 4200   # UI
 
-.\scripts\stop-tb.ps1             # dừng tất cả
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-tb.ps1    # dừng backend + UI
 ```
 
 Kiểm tra nhanh sau khi chạy:
 
 ```powershell
 Invoke-WebRequest http://localhost:8080/api/noauth/whiteLabeling -UseBasicParsing | Select-Object StatusCode
-& "C:\Users\vthea\tools\kafka\bin\windows\kafka-topics.bat" --bootstrap-server localhost:9092 --list | Select-String "^tb_"
-wsl -d Ubuntu -e bash ~/tools/cassandra/bin/nodetool status     # UN = node bình thường
 ```
 
-## 10. Sự cố thường gặp
+### Kiểm chứng nhanh toàn tuyến (đã chạy đúng trên máy này)
+
+```powershell
+# 1. đăng nhập tenant
+$t = (Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/auth/login" -ContentType "application/json" `
+      -Body '{"username":"tenant@thingsboard.org","password":"tenant"}').token
+$hdr = @{ "X-Authorization" = "Bearer $t" }
+
+# 2. ghi telemetry qua REST
+$dev = (Invoke-RestMethod "http://localhost:8080/api/tenant/devices?pageSize=1&page=0" -Headers $hdr).data[0].id.id
+Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/plugins/telemetry/DEVICE/$dev/timeseries/ANY_SCOPE" `
+  -Headers $hdr -ContentType "application/json" -Body '{"temperature":42.5}'
+
+# 3. key telemetry phải hiện ở cả 2 API (widget data-key dùng API thứ hai)
+Invoke-RestMethod "http://localhost:8080/api/plugins/telemetry/DEVICE/$dev/keys/timeseries" -Headers $hdr
+Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/entitiesQuery/find/keys?attributes=true&timeseries=true" `
+  -Headers $hdr -ContentType "application/json" `
+  -Body '{"entityFilter":{"type":"deviceType","deviceType":"default"},"pageLink":{"pageSize":100,"page":0,"sortOrder":{"key":{"key":"createdTime","type":"ENTITY_FIELD"},"direction":"DESC"}},"keyFilters":[],"latestValues":[]}'
+```
+
+MQTT: cổng `1883` mở sẵn khi chạy monolith; username = **device access token**, publish JSON vào
+`v1/devices/me/telemetry` (MQTTX cấu hình `localhost:1883`).
+
+## 8. Sự cố thường gặp
 
 | Hiện tượng | Cách xử lý |
 |---|---|
@@ -238,8 +216,7 @@ wsl -d Ubuntu -e bash ~/tools/cassandra/bin/nodetool status     # UN = node bìn
 | Cổng 8080 bận | tắt process đang giữ cổng, hoặc thêm `-Dserver.port=8081` |
 | UI gọi API bị 404 | backend chưa chạy, hoặc chạy UI không qua proxy của `ng serve` |
 | Không đăng nhập được user mới | mật khẩu tối thiểu 6 ký tự; user phải được **activate** bằng token trong DB |
-| Kafka: `'wmic' is not recognized` | đặt `KAFKA_HEAP_OPTS` trước khi start (script đã làm) |
-| Kafka: `controller.quorum.voters is not set` khi format | thêm `--standalone` (KRaft single node) |
-| Cassandra không lên trong WSL | chạy `scripts/wsl/cassandra.sh status`, xem `~/tools/cassandra/logs/system.log`; Cassandra cần ~1 phút để bootstrap |
-| cqlsh báo `unsupported version of Python` | cqlsh cần Python 3.6–3.13, WSL đang có 3.14 → dùng `nodetool` để kiểm tra |
-| Installer: `database already upgraded` | thêm biến môi trường `SKIP_SCHEMA_VERSION_CHECK=true` |
+| Widget dashboard không liệt kê key telemetry | xảy ra khi timeseries lưu ở **Cassandra** (bản CE không hiện thực `findAllKeysByEntityIds`) → dùng `-Ddatabase.ts.type=sql` (mặc định trong `scripts/start-tb.ps1`) là hết |
+| `java.nio.file.AccessDeniedException: C:\.rocksdb` khi khởi động | trên máy này `user.home` = `C:\` nên đường dẫn mặc định `${user.home}/.rocksdb` bị chặn → phải truyền `-Dqueue.edqs.local.rocksdb_path` và `-Dqueue.calculated_fields.rocks_db_path` (script `start-tb.ps1` đã làm sẵn, trỏ vào `application/target/rocksdb`) |
+| `cannot be loaded because running scripts is disabled` | chạy script kèm `-ExecutionPolicy Bypass` (máy đang bị policy chặn) |
+| Installer: `database already upgraded` | thêm biến môi trường `SKIP_SCHEMA_VERSION_CHECK=true` khi chạy ở chế độ upgrade |

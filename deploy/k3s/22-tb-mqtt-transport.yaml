@@ -1,0 +1,119 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# MQTT transport: device connection point (devices/me/telemetry, rpc, ...).
+# Every replica serves any device, no session affinity is required.
+# Expose it through a LoadBalancer (k3s servicelb / MetalLB) or through the ingress of the
+# cluster; terminate TLS either in the transport itself (SSL_* variables) or in the LB.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tb-mqtt-transport
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-mqtt-transport
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tb-mqtt-transport
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tb-mqtt-transport
+        app.kubernetes.io/part-of: thingsboard
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: tb-mqtt-transport
+          image: ghcr.io/OWNER/REPO:TAG
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: tb-common
+            - secretRef:
+                name: tb-secrets
+          env:
+            - name: TB_SERVICE_TYPE
+              value: tb-transport
+            - name: TB_SERVICE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # only MQTT is served by this deployment
+            - name: MQTT_ENABLED
+              value: "true"
+            - name: HTTP_ENABLED
+              value: "false"
+            - name: COAP_ENABLED
+              value: "false"
+            - name: LWM2M_ENABLED
+              value: "false"
+            - name: SNMP_ENABLED
+              value: "false"
+            - name: MQTT_BIND_ADDRESS
+              value: 0.0.0.0
+            - name: MQTT_BIND_PORT
+              value: "1883"
+            - name: MQTT_TIMEOUT
+              value: "10000"
+            - name: NETTY_MAX_PAYLOAD_SIZE
+              value: "65536"
+            - name: NETTY_LEAK_DETECTOR_LVL
+              value: DISABLED
+          ports:
+            - name: mqtt
+              containerPort: 1883
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: mqtt
+            periodSeconds: 15
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "4"
+              memory: 4Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-mqtt-transport
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-mqtt-transport
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: tb-mqtt-transport
+  ports:
+    - name: mqtt
+      port: 1883
+      targetPort: mqtt

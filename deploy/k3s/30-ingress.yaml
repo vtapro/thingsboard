@@ -1,0 +1,48 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Web UI + REST API. k3s ships Traefik, so the Ingress below works out of the box;
+# add the cert-manager annotation (or a TLS secret) for HTTPS.
+#
+# The JSON body limit of the REST API (device/entity import, dashboards) is raised here.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tb-core
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-core
+    app.kubernetes.io/part-of: thingsboard
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: thingsboard-tb-body-limit@kubernetescrd
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: app.greeniq.vn
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: tb-core
+                port:
+                  name: http
+  # tls:
+  #   - hosts:
+  #       - app.greeniq.vn
+  #     secretName: tb-core-tls
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: tb-body-limit
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  buffering:
+    maxRequestBodyBytes: 52428800

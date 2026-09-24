@@ -1,19 +1,18 @@
-# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+﻿# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Chạy ThingsBoard backend ở môi trường dev local (không Docker):
-# PostgreSQL (entities) + Kafka (queue) + Cassandra (timeseries) + UI dev server riêng.
+# Chay ThingsBoard backend o moi truong dev local (khong Docker), dung cau hinh chuan cua CE:
+#   - PostgreSQL cho entities VA timeseries
+#   - queue in-memory (khong can Kafka/ZooKeeper)
+#   - UI chay rieng bang Angular dev server (ng serve)
 #
-# Yêu cầu: đã build bằng `mvn -B -T 1C clean install -DskipTests -Dpkg.skip=true -Dskip.ui.build=true`
-# và đã tạo application/target/classpath.txt (xem docs/local-dev.md).
+# Yeu cau: da build bang `mvn -B -T 1C clean install -DskipTests -Dpkg.skip=true -Dskip.ui.build=true`
+# va da co application/target/classpath.txt (xem docs/local-dev.md).
 
 param(
     [string]$DatabaseUrl = "jdbc:postgresql://localhost:5432/thingsboard",
     [string]$DatabaseUser = "postgres",
     [string]$DatabasePassword = "postgres",
-    [string]$KafkaServers = "localhost:9092",
-    [string]$CassandraUrl = "127.0.0.1:9042",
-    [string]$TimeseriesType = "cassandra",   # cassandra | sql
     [switch]$DisableRbac
 )
 
@@ -23,12 +22,15 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $jdk25 = "C:\Program Files\Eclipse Adoptium\jdk-25.0.4.101-hotspot"
 $classes = Join-Path $repoRoot "application\target\classes"
 $classpathFile = Join-Path $repoRoot "application\target\classpath.txt"
+$RocksDbDir = (Join-Path $repoRoot "application\target\rocksdb") -replace '\\', '/'
+
+New-Item -ItemType Directory -Force -Path ($RocksDbDir -replace '/', '\') | Out-Null
 
 if (-not (Test-Path $classpathFile)) {
-    throw "Thiếu $classpathFile — chạy: mvn -B -q -pl application dependency:build-classpath -Dmdep.outputFile=target\classpath.txt"
+    throw "Thieu $classpathFile - chay: mvn -B -q -pl application dependency:build-classpath -Dmdep.outputFile=target\classpath.txt"
 }
 if (Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue) {
-    throw "Cổng 8080 đang bận. Dừng tiến trình Java cũ trước (hoặc tắt container ThingsBoard cũ)."
+    throw "Cong 8080 dang ban. Dung tien trinh Java cu truoc (scripts\stop-tb.ps1)."
 }
 
 $cp = ($classes -replace '\\', '/') + ";" + ((Get-Content $classpathFile -Raw).Trim() -replace '\\', '/')
@@ -38,11 +40,13 @@ $props = @(
     "-Dspring.datasource.url=$DatabaseUrl",
     "-Dspring.datasource.username=$DatabaseUser",
     "-Dspring.datasource.password=$DatabasePassword",
-    "-Dqueue.type=kafka",
-    "-Dqueue.kafka.bootstrap.servers=$KafkaServers",
-    "-Ddatabase.ts.type=$TimeseriesType",
-    "-Ddatabase.ts_latest.type=$TimeseriesType",
-    "-Dcassandra.url=$CassandraUrl",
+    "-Dqueue.type=in-memory",
+    "-Ddatabase.ts.type=sql",
+    "-Ddatabase.ts_latest.type=sql",
+    # May nay co user.home = C:\ nen mac dinh ${user.home}/.rocksdb bi loi AccessDenied.
+    # Chi ro thu muc RocksDB (EDQS + calculated fields) nam trong data dir cua repo.
+    "-Dqueue.edqs.local.rocksdb_path=$RocksDbDir/edqs",
+    "-Dqueue.calculated_fields.rocks_db_path=$RocksDbDir/cf_states",
     "-Dservice.type=monolith"
 )
 if (-not $DisableRbac) {
@@ -60,9 +64,9 @@ $process.Id | Set-Content "$env:TEMP\tb-server.pid"
 for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep -Seconds 5
     if (Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue) {
-        Write-Host "ThingsBoard đã sẵn sàng: http://localhost:8080 (pid $($process.Id))"
+        Write-Host "ThingsBoard san sang: http://localhost:8080 (pid $($process.Id))"
         Write-Host "UI dev: cd ui-ngx; corepack yarn ng serve --configuration development --port 4200"
         exit 0
     }
 }
-throw "Backend không khởi động được, xem log: $env:TEMP\tb-server.out"
+throw "Backend khong khoi dong duoc, xem log: $env:TEMP\tb-server.out"

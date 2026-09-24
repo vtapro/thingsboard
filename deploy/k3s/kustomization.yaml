@@ -1,0 +1,23 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# kubectl apply -k deploy/k3s
+#
+# The tb-secrets Secret and the image tag are not managed here: create the secret with
+# kubectl (see 02-secret.example.yaml) and set the image in every manifest, or patch the
+# image globally with `kubectl -n thingsboard set image`.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: thingsboard
+resources:
+  - 00-namespace.yaml
+  - 01-config.yaml
+  - 03-external-data-plane.yaml
+  - 10-install-job.yaml
+  - 20-tb-core.yaml
+  - 21-tb-rule-engine.yaml
+  - 22-tb-mqtt-transport.yaml
+  - 23-tb-http-transport.yaml
+  - 30-ingress.yaml

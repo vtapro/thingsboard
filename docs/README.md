@@ -13,6 +13,7 @@ SPDX-License-Identifier: Apache-2.0
 | Tài liệu | Nội dung |
 |---|---|
 | [local-dev.md](local-dev.md) | Cài đặt và chạy local trên Windows (PostgreSQL, backend Java, UI dev server), tài khoản mặc định, xử lý sự cố |
+| [production-k3s.md](production-k3s.md) | Triển khai production trên k3s: microservices HA với Kafka/Cassandra/ZooKeeper/Redis, image GHCR, cấu hình, checklist |
 | [white-labeling.md](white-labeling.md) | Tính năng white labeling (system + tenant), API, cách cấu hình |
 | [white-labeling-roadmap.md](white-labeling-roadmap.md) | Lộ trình các phần white labeling còn lại |
 | [access-control-roadmap.md](access-control-roadmap.md) | Lộ trình RBAC (roles, entity groups, user groups, customer hierarchy) |
@@ -25,3 +26,5 @@ SPDX-License-Identifier: Apache-2.0
 2. Ưu tiên module/cấu hình riêng thay vì sửa file core ThingsBoard, để giảm conflict khi merge upstream.
 3. Khi thêm file mới, chạy `mvn license:check` để chắc chắn không vi phạm check license.
 4. Môi trường dev hiện tại chạy native trên Windows (xem [local-dev.md](local-dev.md)); không dùng Docker.
+5. Dev local **không** dùng Kafka/ZooKeeper/Cassandra, nhưng production **bắt buộc** có (k3s,
+   microservices HA) — xem [production-k3s.md](production-k3s.md); không cắt bỏ nhánh code production.

@@ -1,0 +1,109 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# HTTP transport: /api/v1/** device endpoints (telemetry, attributes, rpc, provisioning).
+# It is a separate deployment from tb-core on purpose so that device traffic never competes
+# with the web UI and the REST API of the platform.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tb-http-transport
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-http-transport
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tb-http-transport
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tb-http-transport
+        app.kubernetes.io/part-of: thingsboard
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: tb-http-transport
+          image: ghcr.io/OWNER/REPO:TAG
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: tb-common
+            - secretRef:
+                name: tb-secrets
+          env:
+            - name: TB_SERVICE_TYPE
+              value: tb-transport
+            - name: TB_SERVICE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # only HTTP is served by this deployment
+            - name: HTTP_ENABLED
+              value: "true"
+            - name: MQTT_ENABLED
+              value: "false"
+            - name: COAP_ENABLED
+              value: "false"
+            - name: LWM2M_ENABLED
+              value: "false"
+            - name: SNMP_ENABLED
+              value: "false"
+            - name: HTTP_REQUEST_TIMEOUT
+              value: "60000"
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "4"
+              memory: 4Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-http-transport
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-http-transport
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: tb-http-transport
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

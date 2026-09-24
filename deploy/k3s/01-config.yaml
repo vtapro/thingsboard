@@ -1,0 +1,69 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Shared configuration of every ThingsBoard service.
+# Anything that is a secret lives in the tb-secrets Secret instead.
+#
+# The data plane (PostgreSQL, Cassandra, Kafka, ZooKeeper, Redis) is hosted OUTSIDE the k3s
+# cluster, on a dedicated server. The host names below are the cluster local aliases created
+# by 03-external-data-plane.yaml, which maps them to the real address of that server; change
+# the addresses there, not here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tb-common
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/part-of: thingsboard
+data:
+  # ---- cluster / queue ------------------------------------------------------
+  # Kafka is required in microservices mode: services only talk to each other through it.
+  TB_QUEUE_TYPE: kafka
+  TB_KAFKA_SERVERS: tb-kafka:9092
+  TB_QUEUE_KAFKA_REPLICATION_FACTOR: "3"
+  # ZooKeeper is the discovery service used to find the other nodes of the cluster.
+  ZOOKEEPER_ENABLED: "true"
+  ZOOKEEPER_URL: tb-zookeeper:2181
+  ZOOKEEPER_RETRY_INTERVAL_MS: "3000"
+  ZOOKEEPER_CONNECTION_TIMEOUT_MS: "3000"
+  ZOOKEEPER_SESSION_TIMEOUT_MS: "30000"
+
+  # ---- databases ------------------------------------------------------------
+  # Entities/relations/alarms stay in PostgreSQL, telemetry goes to Cassandra.
+  SPRING_DRIVER_CLASS_NAME: org.postgresql.Driver
+  SPRING_DATASOURCE_URL: jdbc:postgresql://tb-postgres:5432/thingsboard
+  # note: spring.jpa.hibernate.ddl-auto is already "none" in thingsboard.yml; the schema is
+  # created/upgraded by the tb-install job only.
+  DATABASE_TS_TYPE: cassandra
+  DATABASE_TS_LATEST_TYPE: cassandra
+  CASSANDRA_URL: tb-cassandra:9042
+  CASSANDRA_KEYSPACE_NAME: thingsboard
+  CASSANDRA_LOCAL_DATACENTER: datacenter1
+  CASSANDRA_USE_CREDENTIALS: "true"
+  CASSANDRA_COMPRESSION: lz4
+
+  # ---- cache ----------------------------------------------------------------
+  # Mandatory in microservices: a local caffeine cache is not shared between replicas.
+  CACHE_TYPE: redis
+  REDIS_CONNECTION_TYPE: standalone
+  REDIS_HOST: tb-redis
+  REDIS_PORT: "6379"
+
+  # ---- observability --------------------------------------------------------
+  METRICS_ENABLED: "true"
+  METRICS_ENDPOINTS_EXPOSE: "info,health,prometheus"
+
+  # ---- schema install -------------------------------------------------------
+  # The image ships the SQL/Cassandra scripts in /app/data, used by the install job.
+  INSTALL_DATA_DIR: /app/data
+  # Never run a migration implicitly when a pod restarts; the install job does it.
+  RUN_INSTALL: "false"
+
+  # ---- fork specific --------------------------------------------------------
+  # Custom RBAC of this fork. Set to "false" to fall back to stock CE behaviour.
+  SECURITY_RBAC_ENABLED: "true"
+
+  # ---- JVM ------------------------------------------------------------------
+  JAVA_OPTS: "-Xms1G -Xmx4G -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=70"
