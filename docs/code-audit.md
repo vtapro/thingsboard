@@ -297,3 +297,25 @@ Kiểm chứng lại với user customer của DN1 (role DEVICE READ/WRITE/DELET
 /api/plugins/telemetry/.../attributes  -> 200   (trước đây 403)
 UI: mở chi tiết "child-device"         -> không còn dialog "Access Forbidden", panel hiển thị đầy đủ
 ```
+
+## 13. Audit các loại role khác (kết quả và bản sửa)
+
+| Hạng mục | Kiểm tra | Kết quả |
+|---|---|---|
+| Operation phụ | `Operation` enum có: `CREATE`, `ASSIGN_TO_CUSTOMER`, `UNASSIGN_FROM_CUSTOMER`, `ASSIGN_TO_TENANT`, `RPC_CALL`, `CLAIM_DEVICES`, `READ/WRITE_CREDENTIALS`, `READ/WRITE_ATTRIBUTES`, `READ/WRITE_TELEMETRY`, `READ/WRITE_CALCULATED_FIELD`, `ALL` | ✅ đã map: mọi operation bắt đầu bằng `READ` → cần `READ`; các operation còn lại (rpc, claim, assign, create, calculated field write, ALL) → cần `WRITE` |
+| Scope cho resource không thuộc nhóm | Gửi `POST /api/tenant/role` với `scopedPermissions: {DASHBOARD: …}` / `{CUSTOMER: …}` | ✅ **bị từ chối 400** — chỉ `DEVICE`, `ASSET`, `ENTITY_VIEW` mới được scope theo nhóm (vì chỉ các entity này có thể là thành viên nhóm) |
+| Trang Roles (UI) | Chọn tab `DASHBOARD`, `ALARM`, `CUSTOMER`, `USER`, `RULE_CHAIN`, `ADMIN_SETTINGS` | ✅ ô "Scope to groups" bị khoá và có ghi chú giải thích; chỉ DEVICE/ASSET/ENTITY_VIEW chọn được nhóm |
+| Danh sách Asset | user customer có role `ASSET: READ` scope vào nhóm rỗng | ✅ 200 và trả **0** asset (không lộ toàn bộ asset của tenant) |
+| Chi tiết Asset | `GET /api/asset/{id}`, `assetProfile`, attributes | ✅ 200 (nhờ luật "role chỉ siết resource được khai báo" + mapping operation) |
+| Danh sách Entity view | user customer có role `ENTITY_VIEW: READ` scope vào nhóm chứa `vuthanh` | ✅ chỉ trả `vuthanh` |
+| Chi tiết Entity view | `GET /api/entityView/{id}`, `attributes`, `relations` | ✅ 200 (trước đây cùng lớp lỗi với device) |
+| Entity view → device liên quan | role chỉ có ENTITY_VIEW, mở device của entity view | 403 — **đúng thiết kế**: muốn mở device phải cấp thêm quyền DEVICE (global hoặc theo nhóm) |
+| Danh sách Dashboard | Lọc theo scope được thêm vào `GET /api/tenant/dashboards` và `/api/customer/{id}/dashboards` | ✅ dự phòng cho dữ liệu role cũ; role mới không thể tạo scope cho DASHBOARD |
+
+### Sự cố dữ liệu trong lúc kiểm thử
+
+Trong khi dọn dẹp dữ liệu test, tôi đã gửi `POST /api/tenant/role` với `{"roles":[]}` và **xoá role "Nhóm Nhà Kính 1"**.
+Role đã được khôi phục ngay bằng đúng nội dung đã đọc trước đó (id `2uubkhrm`, scope DEVICE READ/WRITE/DELETE cho
+2 nhóm `g-asset-1`, `g-device-1`, gán cho user `debledanthu@gmail.com`, `ownCustomerOnly=true`) và đã đọc lại để xác nhận.
+Bạn nên mở trang Roles kiểm tra lại giúp tôi. Đây là lần thứ hai việc kiểm thử chạm vào dữ liệu thật — khuyến nghị
+bật `pg_dump` định kỳ trước khi tiếp tục các vòng kiểm thử.

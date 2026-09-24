@@ -183,21 +183,21 @@ public class TbRbacAccessControlService implements AccessControlService {
     }
 
     /**
+     * Only the entities that can be a member of an entity group may be scoped to groups.
+     */
+    public static final Set<String> GROUP_SCOPED_RESOURCES = Set.of("DEVICE", "ASSET", "ENTITY_VIEW");
+
+    /**
      * The role configures the operations READ, WRITE and DELETE. The auxiliary operations of the same entity
-     * (telemetry, attributes, credentials, rpc) are mapped to the configured one.
+     * (telemetry, attributes, credentials, rpc, claim, assign, calculated fields) are mapped to the configured one.
      */
     private static Operation grantedOperation(Operation operation) {
-        switch (operation) {
-            case READ_ATTRIBUTES, READ_TELEMETRY, READ_CREDENTIALS -> {
-                return Operation.READ;
-            }
-            case WRITE_ATTRIBUTES, WRITE_TELEMETRY, WRITE_CREDENTIALS, RPC_CALL, ASSIGN_TO_CUSTOMER, UNASSIGN_FROM_CUSTOMER -> {
-                return Operation.WRITE;
-            }
-            default -> {
-                return operation;
-            }
+        if (operation == Operation.READ || operation == Operation.WRITE || operation == Operation.DELETE) {
+            return operation;
         }
+        // Everything that reads (attributes, telemetry, credentials, calculated fields) requires READ,
+        // every other auxiliary operation (rpc, claim, assign, create, ALL) requires WRITE.
+        return operation.name().startsWith("READ") ? Operation.READ : Operation.WRITE;
     }
 
     private RbacRole getEffectiveRole(SecurityUser user) {

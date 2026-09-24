@@ -64,6 +64,12 @@ export class RolesComponent extends PageComponent implements OnInit {
 
   readonly resources = ['DEVICE', 'ASSET', 'DASHBOARD', 'ALARM', 'CUSTOMER', 'ENTITY_VIEW', 'RULE_CHAIN',
     'ADMIN_SETTINGS', 'USER'];
+
+  /**
+   * Only devices, assets and entity views may be a member of an entity group, so only their permissions can be
+   * scoped to groups (same rule as the backend validation).
+   */
+  readonly groupScopedResources = ['DEVICE', 'ASSET', 'ENTITY_VIEW'];
   readonly operations = ['READ', 'WRITE', 'DELETE'];
   readonly displayedColumns = ['name', 'permissions', 'users', 'actions'];
 
@@ -359,6 +365,10 @@ export class RolesComponent extends PageComponent implements OnInit {
   hasAnyOperation(resource: string): boolean {
     const operations = this.permissionDraft[resource];
     return !!operations && this.operations.some(operation => operations[operation]);
+  }
+
+  canScopeToGroups(resource: string): boolean {
+    return this.groupScopedResources.includes(resource);
   }
 
   groupsFor(resource: string): string[] {

@@ -14,6 +14,8 @@ import org.thingsboard.server.common.data.rbac.RbacRole;
 import org.thingsboard.server.common.data.rbac.RbacRoleSettings;
 import org.thingsboard.server.config.annotations.ApiOperation;
 import org.thingsboard.server.dao.settings.RoleService;
+import org.thingsboard.server.dao.exception.IncorrectParameterException;
+import org.thingsboard.server.service.security.permission.TbRbacAccessControlService;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.security.permission.Operation;
 import org.thingsboard.server.service.security.permission.Resource;
@@ -46,7 +48,30 @@ public class RoleController extends BaseController {
             @Parameter(description = "A JSON value representing the roles.")
             @RequestBody RbacRoleSettings settings) throws ThingsboardException {
         accessControlService.checkPermission(getCurrentUser(), Resource.ADMIN_SETTINGS, Operation.WRITE);
+        validateScopedPermissions(settings);
         return roleService.saveRoleSettings(getCurrentUser().getTenantId(), settings);
+    }
+
+    /**
+     * Permissions can be scoped to entity groups only for the entities that may belong to a group (devices, assets
+     * and entity views). Everything else has to be granted globally, otherwise the scope would always be empty.
+     */
+    private void validateScopedPermissions(RbacRoleSettings settings) {
+        if (settings == null || settings.getRoles() == null) {
+            return;
+        }
+        for (RbacRole role : settings.getRoles()) {
+            if (role.getScopedPermissions() == null) {
+                continue;
+            }
+            for (String resource : role.getScopedPermissions().keySet()) {
+                if (!TbRbacAccessControlService.GROUP_SCOPED_RESOURCES.contains(resource)) {
+                    throw new IncorrectParameterException("Permissions of " + resource
+                            + " can not be scoped to entity groups, allowed resources: "
+                            + TbRbacAccessControlService.GROUP_SCOPED_RESOURCES);
+                }
+            }
+        }
     }
 
     @ApiOperation(value = "Get roles assigned to the current user (getCurrentUserRoles)",

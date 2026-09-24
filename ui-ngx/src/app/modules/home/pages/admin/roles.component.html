@@ -55,13 +55,16 @@
                     <mat-form-field class="tb-roles-scope" subscriptSizing="dynamic" appearance="outline">
                       <mat-label translate>admin.roles-scope-groups</mat-label>
                       <mat-select multiple
-                                  [disabled]="!hasAnyOperation(resource)"
+                                  [disabled]="!hasAnyOperation(resource) || !canScopeToGroups(resource)"
                                   [value]="groupsFor(resource)"
                                   (selectionChange)="setGroups(resource, $event.value)">
                         @for (group of groups; track group.id) {
                           <mat-option [value]="group.id">{{ group.name }}</mat-option>
                         }
                       </mat-select>
+                      @if (!canScopeToGroups(resource)) {
+                        <mat-hint>{{ 'admin.roles-scope-not-supported' | translate: {resource} }}</mat-hint>
+                      }
                     </mat-form-field>
                   </div>
                 </mat-tab>
