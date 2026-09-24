@@ -86,6 +86,12 @@ spec:
               value: servlet
             - name: HTTP_BIND_PORT
               value: "8080"
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: file:/config/cache-specs.yml
+          volumeMounts:
+            - name: cache-specs
+              mountPath: /config
+              readOnly: true
           ports:
             - name: mqtt
               containerPort: 1883
@@ -114,10 +120,14 @@ spec:
           resources:
             requests:
               cpu: 250m
-              memory: 512Mi
+              memory: 384Mi
             limits:
               cpu: "2"
               memory: 2Gi
+      volumes:
+        - name: cache-specs
+          configMap:
+            name: tb-cache-specs
 ---
 apiVersion: v1
 kind: Service

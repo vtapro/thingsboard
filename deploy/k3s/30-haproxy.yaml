@@ -7,6 +7,12 @@
 # haproxy-certbot: it terminates the public traffic for app.greeniq.vn (HTTP/HTTPS), forwards the
 # WebSocket /api/ws traffic and proxies MQTT (TCP) to the MQTT transport.
 #
+# HAProxy listens on 8080/1883/7070 inside the container and the pods declare hostPort for the
+# standard numbers (80, 1883, 7070, 443, 8883) — the node maps them, so the container does not
+# need root or NET_BIND_SERVICE to serve port 80. The cluster has no LoadBalancer implementation,
+# which is why the DNS records of app.greeniq.vn pointing at the two workers are served this way.
+# The NodePort Service below stays for in-cluster access.
+#
 # The /stats page is exposed only inside the cluster (port forward it when needed):
 #   kubectl -n thingsboard port-forward svc/tb-haproxy-stats 9999:9999   ->  http://localhost:9999/stats
 apiVersion: v1
@@ -139,7 +145,7 @@ data:
       server tb-core tb-core.thingsboard.svc.cluster.local:7070 check resolvers kube resolve-prefer ipv4
 
     listen stats
-      bind *:9999
+      bind 127.0.0.1:9999
       mode http
       stats enable
       stats uri /stats
@@ -172,6 +178,14 @@ spec:
         app.kubernetes.io/part-of: thingsboard
     spec:
       terminationGracePeriodSeconds: 30
+      # hostPort is per node, so keep exactly one HAProxy per node (two workers -> two replicas)
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: tb-haproxy
+              topologyKey: kubernetes.io/hostname
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
@@ -199,14 +213,19 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+              hostPort: 80
             - name: https
               containerPort: 8443
+              hostPort: 443
             - name: mqtt
               containerPort: 1883
+              hostPort: 1883
             - name: mqtts
               containerPort: 8883
+              hostPort: 8883
             - name: edge
               containerPort: 7070
+              hostPort: 7070
             - name: stats
               containerPort: 9999
           volumeMounts:
@@ -222,8 +241,9 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
+            # the stats page listens on 127.0.0.1 only, so probe the public listener instead
             tcpSocket:
-              port: stats
+              port: http
             initialDelaySeconds: 15
             periodSeconds: 20
           resources:

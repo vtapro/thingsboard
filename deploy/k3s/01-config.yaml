@@ -73,25 +73,22 @@ data:
   CASSANDRA_COMPRESSION: none
 
   # ---- cache ----------------------------------------------------------------
-  # No Redis in this deployment: every pod keeps its own in-process (caffeine) cache. That is a
-  # supported CE mode, but a change made on one replica is not visible on the other one until its
-  # own entry expires, so the TTLs below are deliberately short (5 minutes instead of 24 hours).
-  # If Redis/Valkey is added later, set CACHE_TYPE=redis and drop the CACHE_SPECS_*_TTL overrides.
+  # No Redis in this deployment: every pod keeps its own in-process (caffeine) cache.
+  # The application module reads the cache specs from thingsboard.yml, but the transport
+  # modules ship their own yml without a "specs" section, so the specs are declared here as
+  # environment variables (Spring relaxed binding). Without them the transports fail with
+  # "Cache 'x' is not configured" as soon as CACHE_TYPE is caffeine.
+  # TTL is 5 minutes for the caches whose staleness is visible (devices, credentials, sessions,
+  # users, attributes, tenants, ...), otherwise the ThingsBoard default of 24 hours.
   CACHE_TYPE: caffeine
-  CACHE_SPECS_DEVICES_TTL: "5"
-  CACHE_SPECS_DEVICE_CREDENTIALS_TTL: "5"
-  CACHE_SPECS_SESSIONS_TTL: "5"
-  CACHE_SPECS_USERS_TTL: "5"
-  CACHE_SPECS_RELATIONS_TTL: "5"
-  CACHE_SPECS_ATTRIBUTES_TTL: "5"
-  CACHE_SPECS_TENANTS_TTL: "5"
-  CACHE_SPECS_TENANT_PROFILES_TTL: "5"
-  CACHE_SPECS_SECURITY_SETTINGS_TTL: "5"
-  CACHE_SPECS_TS_LATEST_TTL: "5"
 
   # ---- observability --------------------------------------------------------
   METRICS_ENABLED: "true"
   METRICS_ENDPOINTS_EXPOSE: "info,health,prometheus"
+  # There is no Redis in this deployment, but spring-data-redis is on the classpath of every
+  # service, so the actuator would report the (missing) Redis as DOWN and the readiness probe
+  # would never pass. The indicator is disabled explicitly.
+  MANAGEMENT_HEALTH_REDIS_ENABLED: "false"
 
   # ---- schema install -------------------------------------------------------
   # The image ships the SQL/Cassandra scripts in /app/data, used by the install job.

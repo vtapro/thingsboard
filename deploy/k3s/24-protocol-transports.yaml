@@ -68,6 +68,12 @@ spec:
               value: servlet
             - name: HTTP_BIND_PORT
               value: "8080"
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: file:/config/cache-specs.yml
+          volumeMounts:
+            - name: cache-specs
+              mountPath: /config
+              readOnly: true
           ports:
             - name: coap
               containerPort: 5683
@@ -97,6 +103,10 @@ spec:
             limits:
               cpu: "2"
               memory: 2Gi
+      volumes:
+        - name: cache-specs
+          configMap:
+            name: tb-cache-specs
 ---
 apiVersion: v1
 kind: Service
@@ -183,6 +193,12 @@ spec:
               value: servlet
             - name: HTTP_BIND_PORT
               value: "8080"
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: file:/config/cache-specs.yml
+          volumeMounts:
+            - name: cache-specs
+              mountPath: /config
+              readOnly: true
           ports:
             - name: lwm2m
               containerPort: 5685
@@ -218,6 +234,10 @@ spec:
             limits:
               cpu: "2"
               memory: 2Gi
+      volumes:
+        - name: cache-specs
+          configMap:
+            name: tb-cache-specs
 ---
 apiVersion: v1
 kind: Service
@@ -300,6 +320,12 @@ spec:
               value: servlet
             - name: HTTP_BIND_PORT
               value: "8080"
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: file:/config/cache-specs.yml
+          volumeMounts:
+            - name: cache-specs
+              mountPath: /config
+              readOnly: true
           ports:
             - name: snmp
               containerPort: 161
@@ -326,6 +352,10 @@ spec:
             limits:
               cpu: "2"
               memory: 2Gi
+      volumes:
+        - name: cache-specs
+          configMap:
+            name: tb-cache-specs
 ---
 apiVersion: v1
 kind: Service

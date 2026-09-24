@@ -1,0 +1,144 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Cache specs shared by every ThingsBoard service.
+#
+# The application module reads cache.specs from thingsboard.yml, but the transport modules ship
+# their own yml without that section ? with CACHE_TYPE=caffeine (no Redis) they fail with
+# "Cache x is not configured". This file is mounted into the pods and loaded through
+# SPRING_CONFIG_ADDITIONAL_LOCATION, so all services share the same definitions, and the caches
+# whose staleness is visible get a 5 minute TTL instead of the default 24 hours.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tb-cache-specs
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/part-of: thingsboard
+data:
+  cache-specs.yml: |
+    cache:
+      # Ghi de cache.specs cho cac service dung yml rieng (transport) va giu TTL ngan cho cache nhay cam.
+      specs:
+        relations:
+          timeToLiveInMinutes: 5
+          maxSize: 10000
+        deviceCredentials:
+          timeToLiveInMinutes: 5
+          maxSize: 10000
+        devices:
+          timeToLiveInMinutes: 5
+          maxSize: 10000
+        sessions:
+          timeToLiveInMinutes: 5
+          maxSize: 10000
+        assets:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        customers:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        users:
+          timeToLiveInMinutes: 5
+          maxSize: 10000
+        entityViews:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        claimDevices:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        securitySettings:
+          timeToLiveInMinutes: 5
+          maxSize: 10000
+        tenantProfiles:
+          timeToLiveInMinutes: 5
+          maxSize: 10000
+        tenants:
+          timeToLiveInMinutes: 5
+          maxSize: 10000
+        tenantsExist:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        deviceProfiles:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        assetProfiles:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        notificationSettings:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        sentNotifications:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        attributes:
+          timeToLiveInMinutes: 5
+          maxSize: 10000
+        tsLatest:
+          timeToLiveInMinutes: 5
+          maxSize: 10000
+        userSessionsInvalidation:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        otaPackages:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        otaPackagesData:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        edges:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        edgeSessions:
+          timeToLiveInMinutes: 5
+          maxSize: 10000
+        relatedEdges:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        repositorySettings:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        autoCommitSettings:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        twoFaVerificationCodes:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        versionControlTask:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        userSettings:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        dashboardTitles:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        entityCount:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        resourceInfo:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        alarmTypes:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        qrCodeSettings:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        mobileSecretKey:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        trendzSettings:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        aiModel:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        apiKeys:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000
+        etag:
+          timeToLiveInMinutes: 1440
+          maxSize: 10000

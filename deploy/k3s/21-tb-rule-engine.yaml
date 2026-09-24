@@ -54,6 +54,8 @@ spec:
           env:
             - name: TB_SERVICE_TYPE
               value: tb-rule-engine
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: file:/config/cache-specs.yml
             - name: TB_SERVICE_ID
               valueFrom:
                 fieldRef:
@@ -72,22 +74,24 @@ spec:
             - name: cassandra-tls
               mountPath: /certs
               readOnly: true
+            - name: cache-specs
+              mountPath: /config
+              readOnly: true
           startupProbe:
-            httpGet:
-              path: /actuator/health
+            # the rule engine secures /actuator/** (403), so the probe only checks the listener;
+            # the rule chains themselves are registered in ZooKeeper a few seconds later
+            tcpSocket:
               port: http
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            httpGet:
-              path: /actuator/health
+            tcpSocket:
               port: http
             periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 3
           livenessProbe:
-            httpGet:
-              path: /actuator/health
+            tcpSocket:
               port: http
             periodSeconds: 30
             timeoutSeconds: 5
@@ -95,7 +99,7 @@ spec:
           resources:
             requests:
               cpu: 500m
-              memory: 1536Mi
+              memory: 1Gi
             limits:
               cpu: "2"
               memory: 3Gi
@@ -103,23 +107,20 @@ spec:
         - name: cassandra-tls
           secret:
             secretName: tb-cassandra-tls
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: tb-rule-engine
-  namespace: thingsboard
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: tb-rule-engine
-  minReplicas: 2
-  maxReplicas: 4
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
+        - name: cache-specs
+          configMap:
+            name: tb-cache-specs
+
+# NOTE: the HorizontalPodAutoscaler was removed from this file on purpose. With 2 workers
+# (8 vCPU total) the CPU based autoscaling scaled tb-core to 4 replicas during startup and the
+# nodes ran out of CPU, so the replicas are fixed at 2 for now. To scale automatically later,
+# raise the cpu request first and re-add:
+#
+#   apiVersion: autoscaling/v2
+#   kind: HorizontalPodAutoscaler
+#   metadata: { name: tb-core, namespace: thingsboard }
+#   spec:
+#     scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: tb-core }
+#     minReplicas: 2
+#     maxReplicas: 4
+#     metrics: [{ type: Resource, resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } } }]

@@ -57,6 +57,8 @@ spec:
           env:
             - name: TB_SERVICE_TYPE
               value: tb-core
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: file:/config/cache-specs.yml
             # unique cluster node id — the pod name is unique inside the namespace
             - name: TB_SERVICE_ID
               valueFrom:
@@ -75,6 +77,9 @@ spec:
             # Cassandra truststore (self-signed cluster CA of the managed service)
             - name: cassandra-tls
               mountPath: /certs
+              readOnly: true
+            - name: cache-specs
+              mountPath: /config
               readOnly: true
           startupProbe:
             httpGet:
@@ -99,7 +104,7 @@ spec:
           resources:
             requests:
               cpu: 500m
-              memory: 1536Mi
+              memory: 1Gi
             limits:
               cpu: "2"
               memory: 3Gi
@@ -107,6 +112,9 @@ spec:
         - name: cassandra-tls
           secret:
             secretName: tb-cassandra-tls
+        - name: cache-specs
+          configMap:
+            name: tb-cache-specs
 ---
 apiVersion: v1
 kind: Service
@@ -127,23 +135,17 @@ spec:
     - name: edge-grpc
       port: 7070
       targetPort: edge-grpc
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: tb-core
-  namespace: thingsboard
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: tb-core
-  minReplicas: 2
-  maxReplicas: 4
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
+
+# NOTE: the HorizontalPodAutoscaler was removed from this file on purpose. With 2 workers
+# (8 vCPU total) the CPU based autoscaling scaled tb-core to 4 replicas during startup and the
+# nodes ran out of CPU, so the replicas are fixed at 2 for now. To scale automatically later,
+# raise the cpu request first and re-add:
+#
+#   apiVersion: autoscaling/v2
+#   kind: HorizontalPodAutoscaler
+#   metadata: { name: tb-core, namespace: thingsboard }
+#   spec:
+#     scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: tb-core }
+#     minReplicas: 2
+#     maxReplicas: 4
+#     metrics: [{ type: Resource, resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } } }]

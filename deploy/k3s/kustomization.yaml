@@ -19,6 +19,8 @@ resources:
   - 05-zookeeper.yaml
   # Kafka/ZooKeeper accept connections only from pods of this namespace
   - 07-network-policies.yaml
+  # cache.specs shared by every service (the transport yml has none, and there is no Redis)
+  - 09-cache-specs.yaml
   - 10-install-job.yaml
   - 20-tb-core.yaml
   - 21-tb-rule-engine.yaml
