@@ -4,6 +4,19 @@
     SPDX-License-Identifier: Apache-2.0
 
 -->
+@if (groupsTabEnabled()) {
+  <div class="tb-entities-tabs">
+    <button type="button" class="tb-entities-tab" [class.tb-active]="!groupsTab" (click)="groupsTab = false">
+      All
+    </button>
+    <button type="button" class="tb-entities-tab" [class.tb-active]="groupsTab" (click)="groupsTab = true">
+      Groups
+    </button>
+  </div>
+}
+@if (groupsTabEnabled() && groupsTab) {
+  <tb-entity-groups [entityType]="groupsEntityType()"></tb-entity-groups>
+} @else {
 <mat-drawer-container hasBackdrop="false" class="tb-absolute-fill">
   @if (entitiesTableConfig.detailsPanelEnabled) {
     <mat-drawer
@@ -378,3 +391,4 @@
     </div>
   </mat-drawer-content>
 </mat-drawer-container>
+}

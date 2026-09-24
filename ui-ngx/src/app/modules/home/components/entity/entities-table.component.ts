@@ -68,6 +68,16 @@ export class EntitiesTableComponent extends PageComponent implements IEntitiesTa
   @Input()
   entitiesTableConfig: EntityTableConfig<BaseData<HasId>>;
 
+  groupsTab = false;
+
+  groupsEntityType(): string {
+    return (this.entitiesTableConfig as any)?.entityType;
+  }
+
+  groupsTabEnabled(): boolean {
+    return ['DEVICE', 'ASSET', 'ENTITY_VIEW'].includes(this.groupsEntityType());
+  }
+
   translations: EntityTypeTranslation;
 
   headerActionDescriptors: Array<HeaderActionDescriptor>;
