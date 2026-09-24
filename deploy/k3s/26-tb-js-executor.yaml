@@ -1,0 +1,89 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# tb-js-executor: runs the JavaScript of the rule nodes in a separate Node.js process pool.
+# It consumes the Kafka topic js_eval.requests, so it must be deployed whenever tb-core and
+# tb-rule-engine run with JS_EVALUATOR=remote (the manifests set that value). Without this
+# deployment, set JS_EVALUATOR=local in 20-tb-core.yaml and 21-tb-rule-engine.yaml instead.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tb-js-executor
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-js-executor
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tb-js-executor
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tb-js-executor
+        app.kubernetes.io/part-of: thingsboard
+    spec:
+      terminationGracePeriodSeconds: 60
+      imagePullSecrets:
+        - name: ghcr
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: tb-js-executor
+      containers:
+        - name: tb-js-executor
+          image: ghcr.io/vtapro/tb-js-executor:v4.4.0.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: tb-common
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: DOCKER_MODE
+              value: "true"
+            - name: TB_QUEUE_TYPE
+              value: kafka
+            - name: TB_KAFKA_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: tb-common
+                  key: TB_KAFKA_SERVERS
+            # /livenessProbe endpoint of this service
+            - name: HTTP_PORT
+              value: "8888"
+          ports:
+            - name: http
+              containerPort: 8888
+          readinessProbe:
+            httpGet:
+              path: /livenessProbe
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /livenessProbe
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi

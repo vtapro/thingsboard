@@ -19,6 +19,8 @@ metadata:
     app.kubernetes.io/part-of: thingsboard
 spec:
   clusterIP: None
+  # the container resolves the pod name from ZOO_SERVERS before it becomes ready
+  publishNotReadyAddresses: true
   selector:
     app.kubernetes.io/name: tb-zookeeper
   ports:

@@ -1,0 +1,282 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# HAProxy is the edge of the platform, the same way the official ThingsBoard docker-compose uses
+# haproxy-certbot: it terminates the public traffic for app.greeniq.vn (HTTP/HTTPS), forwards the
+# WebSocket /api/ws traffic and proxies MQTT (TCP) to the MQTT transport.
+#
+# The /stats page is exposed only inside the cluster (port forward it when needed):
+#   kubectl -n thingsboard port-forward svc/tb-haproxy-stats 9999:9999   ->  http://localhost:9999/stats
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tb-haproxy-config
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-haproxy
+    app.kubernetes.io/part-of: thingsboard
+data:
+  haproxy.cfg: |
+    global
+      maxconn 20480
+      log stdout format raw local0
+
+    defaults
+      log global
+      timeout connect 5s
+      timeout client  60s
+      timeout server  60s
+      # WebSocket / MQTT long lived connections
+      timeout tunnel  3h
+      # do not refuse to start when a backend DNS entry is not resolvable yet
+      default-server init-addr none
+
+    # resolve the Kubernetes Service names on every check, so pods can move between nodes
+    resolvers kube
+      parse-resolv-conf
+      resolve_retries 3
+      timeout resolve 1s
+      timeout retry   1s
+      hold valid      10s
+      hold nx         1s
+
+    # Routing follows the official ThingsBoard HAProxy: device endpoints go to the HTTP transport,
+    # the platform REST API and the web socket to tb-core, everything else is the static web UI.
+    frontend http-in
+      mode http
+      bind *:8080
+      option httplog
+      option forwardfor
+      http-request set-header X-Forwarded-Proto http
+
+      acl transport_http_acl path_beg /api/v1/
+      acl tb_images_api_acl path_beg /api/images/
+      acl tb_api_acl path_beg /api/ /swagger /webjars /v2/ /v3/ /static/rulenode/ /oauth2/ /login/oauth2/ /static/widgets/ /.well-known/assetlinks.json /.well-known/apple-app-site-association
+
+      use_backend tb_http_transport if transport_http_acl
+      use_backend tb_core if tb_images_api_acl
+      use_backend tb_core if tb_api_acl
+      default_backend tb_web_ui
+
+    backend tb_core
+      mode http
+      option httpchk GET /actuator/health
+      http-check expect status 200
+      server tb-core tb-core.thingsboard.svc.cluster.local:8080 check resolvers kube resolve-prefer ipv4
+
+    backend tb_http_transport
+      mode http
+      option httpchk GET /actuator/health
+      http-check expect status 200
+      server tb-http tb-http-transport.thingsboard.svc.cluster.local:8080 check resolvers kube resolve-prefer ipv4
+
+    backend tb_web_ui
+      mode http
+      balance leastconn
+      option httpchk GET /
+      server tb-web tb-web-ui.thingsboard.svc.cluster.local:8080 check resolvers kube resolve-prefer ipv4
+
+    # ---- HTTPS ----------------------------------------------------------------------
+    # Create the certificate secret, then uncomment this frontend and the 8443 binding:
+    #   kubectl -n thingsboard create secret generic tb-haproxy-tls \
+    #     --from-file=tls.pem=fullchain-with-key.pem
+    #frontend https-in
+    #  bind *:8443 ssl crt /certs/tls.pem alpn h2,http/1.1
+    #  http-request set-header X-Forwarded-Proto https
+    #  acl transport_http_acl path_beg /api/v1/
+    #  acl tb_api_acl path_beg /api/ /swagger /webjars /v2/ /v3/ /static/rulenode/ /oauth2/ /login/oauth2/ /static/widgets/
+    #  use_backend tb_http_transport if transport_http_acl
+    #  use_backend tb_core if tb_api_acl
+    #  default_backend tb_web_ui
+
+    # ---- MQTT for devices -----------------------------------------------------------
+    frontend mqtt-in
+      mode tcp
+      bind *:1883
+      option tcplog
+      option clitcpka
+      timeout client 3h
+      default_backend tb_mqtt
+
+    backend tb_mqtt
+      mode tcp
+      balance leastconn
+      timeout server 3h
+      server tb-mqtt tb-mqtt-transport.thingsboard.svc.cluster.local:1883 check resolvers kube resolve-prefer ipv4
+
+    # ---- MQTT over SSL (8883) --------------------------------------------------------
+    # Reuses the same certificate secret as the HTTPS frontend; make sure the MQTT transport
+    # also has MQTT_SSL_ENABLED=true and the certificate mounted.
+    #frontend mqtts-in
+    #  bind *:8883
+    #  mode tcp
+    #  option clitcpka
+    #  timeout client 3h
+    #  timeout server 3h
+    #  default_backend tb_mqtts
+
+    #backend tb_mqtts
+    #  mode tcp
+    #  balance leastconn
+    #  server tb-mqtt tb-mqtt-transport.thingsboard.svc.cluster.local:8883 check resolvers kube resolve-prefer ipv4
+
+    # ---- Edge RPC (gRPC, 7070) -------------------------------------------------------
+    # Edge instances connect here; keep it closed on the public interface if not needed.
+    frontend edge-in
+      mode tcp
+      bind *:7070
+      option tcplog
+      option clitcpka
+      timeout client 3h
+      default_backend tb_edge
+
+    backend tb_edge
+      mode tcp
+      balance leastconn
+      timeout server 3h
+      server tb-core tb-core.thingsboard.svc.cluster.local:7070 check resolvers kube resolve-prefer ipv4
+
+    listen stats
+      bind *:9999
+      mode http
+      stats enable
+      stats uri /stats
+      stats refresh 10s
+      stats auth admin:admin
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tb-haproxy
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-haproxy
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tb-haproxy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tb-haproxy
+        app.kubernetes.io/part-of: thingsboard
+    spec:
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: tb-haproxy
+      containers:
+        - name: haproxy
+          image: haproxy:3.1-alpine
+          args: ["-f", "/usr/local/etc/haproxy/haproxy.cfg"]
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: https
+              containerPort: 8443
+            - name: mqtt
+              containerPort: 1883
+            - name: mqtts
+              containerPort: 8883
+            - name: edge
+              containerPort: 7070
+            - name: stats
+              containerPort: 9999
+          volumeMounts:
+            - name: config
+              mountPath: /usr/local/etc/haproxy
+            # optional: certificate for the https frontend above
+            - name: certs
+              mountPath: /certs
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: stats
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: tb-haproxy-config
+        - name: certs
+          secret:
+            secretName: tb-haproxy-tls
+            optional: true
+---
+# public entry point: http://<node-ip>:30080 and mqtt://<node-ip>:31883
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-haproxy
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-haproxy
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: tb-haproxy
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      nodePort: 30080
+    - name: mqtt
+      port: 1883
+      targetPort: mqtt
+      nodePort: 31883
+    - name: edge
+      port: 7070
+      targetPort: edge
+      nodePort: 30707
+    # enable together with the mqtts-in frontend in the ConfigMap
+    - name: mqtts
+      port: 8883
+      targetPort: mqtts
+      nodePort: 30883
+    # enable together with the https frontend in the ConfigMap
+    - name: https
+      port: 8443
+      targetPort: https
+      nodePort: 30443
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-haproxy-stats
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-haproxy
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  selector:
+    app.kubernetes.io/name: tb-haproxy
+  ports:
+    - name: stats
+      port: 9999
+      targetPort: stats

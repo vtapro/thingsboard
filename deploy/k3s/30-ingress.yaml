@@ -12,8 +12,7 @@
 #   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
 #   kubectl -n ingress-nginx get pods,svc        # wait for the controller and note the NodePorts
 #
-# Then point the DNS record of app.greeniq.vn to the IP of a worker node. Until the controller is
-# installed, use 40-bringup-nodeport.yaml to reach the platform directly on <node-ip>:30080.
+# Then point the DNS record of app.greeniq.vn to the IP of a worker node.
 #
 # HTTPS: install cert-manager and set the annotation below, or upload a TLS secret and enable the
 # `tls:` block. The body limit annotation is required for dashboard/entity import uploads.

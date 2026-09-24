@@ -1,0 +1,101 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# tb-web-ui: static web application (Node/express) that HAProxy routes to for every path that is
+# not an API call. It keeps the same behaviour as the official image: the API proxy is disabled
+# (TB_ENABLE_PROXY=false) because HAProxy already sends /api/** to tb-core / the HTTP transport.
+#
+# tb-core can also serve the UI on its own (the UI assets are inside the tb-node image); this
+# deployment is what makes the web layer scale independently.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tb-web-ui
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-web-ui
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tb-web-ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tb-web-ui
+        app.kubernetes.io/part-of: thingsboard
+    spec:
+      terminationGracePeriodSeconds: 30
+      imagePullSecrets:
+        - name: ghcr
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: tb-web-ui
+      containers:
+        - name: tb-web-ui
+          image: ghcr.io/vtapro/tb-web-ui:v4.4.0.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: DOCKER_MODE
+              value: "true"
+            - name: HTTP_BIND_ADDRESS
+              value: 0.0.0.0
+            - name: HTTP_BIND_PORT
+              value: "8080"
+            - name: HTTP_COMPRESSION_ENABLED
+              value: "true"
+            # HAProxy splits /api/** and the UI, so no proxy inside this service
+            - name: TB_ENABLE_PROXY
+              value: "false"
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-web-ui
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-web-ui
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  selector:
+    app.kubernetes.io/name: tb-web-ui
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

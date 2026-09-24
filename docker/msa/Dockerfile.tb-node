@@ -39,6 +39,6 @@ COPY dao/src/main/resources/cassandra /app/data/cassandra
 COPY docker/msa/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-EXPOSE 8080 1883 7070 5683/udp
+EXPOSE 8080 7070 1883 8883
 
 ENTRYPOINT ["/app/entrypoint.sh"]

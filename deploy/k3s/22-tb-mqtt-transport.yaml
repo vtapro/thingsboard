@@ -6,9 +6,8 @@
 # MQTT transport: device connection point (devices/me/telemetry, rpc, ...).
 # Every replica serves any device, no session affinity is required.
 #
-# The cluster has no LoadBalancer implementation (no k3s servicelb, no MetalLB), so the Service
-# below is a NodePort: devices connect to <worker-ip>:31883 and NAT/DNS forward to both workers.
-# Replace type/ports with `LoadBalancer` + `port: 1883` after installing MetalLB or servicelb.
+# The Service is internal on purpose: devices reach MQTT through HAProxy (30-haproxy.yaml), which
+# owns the public port 31883. Set type: NodePort (nodePort: 31883) only if HAProxy is not used.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -67,6 +66,15 @@ spec:
               value: "1883"
             - name: MQTT_TIMEOUT
               value: "10000"
+            # MQTT over SSL (8883): enable together with the certificate secret
+            # - name: MQTT_SSL_ENABLED
+            #   value: "true"
+            # - name: MQTT_SSL_BIND_PORT
+            #   value: "8883"
+            # - name: MQTT_SSL_CREDENTIALS_TYPE
+            #   value: PEM
+            # - name: MQTT_SSL_PEM_CERT
+            #   value: /certs/mqtt-server.pem
             - name: NETTY_MAX_PAYLOAD_SIZE
               value: "65536"
             - name: NETTY_LEAK_DETECTOR_LVL
@@ -81,6 +89,8 @@ spec:
           ports:
             - name: mqtt
               containerPort: 1883
+            - name: mqtts
+              containerPort: 8883
             - name: http
               containerPort: 8080
           startupProbe:
@@ -118,11 +128,10 @@ metadata:
     app.kubernetes.io/name: tb-mqtt-transport
     app.kubernetes.io/part-of: thingsboard
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app.kubernetes.io/name: tb-mqtt-transport
   ports:
     - name: mqtt
       port: 1883
       targetPort: mqtt
-      nodePort: 31883

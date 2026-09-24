@@ -237,6 +237,44 @@ không đăng nhập được. Khi cần HA thật: Kafka ≥ 3 broker, ZooKeepe
 PostgreSQL primary + standby — manifest của ThingsBoard **không phải sửa**, chỉ đổi `Endpoints`
 (nếu DB chuyển sang cụm mới) và tăng replica.
 
+### 3.4. Bảng cổng chuẩn của ThingsBoard (và cách expose trong cụm này)
+
+Đây là danh sách cổng chính thức của ThingsBoard, đối chiếu với manifest trong `deploy/k3s/`:
+
+| Cổng | Protocol | Dịch vụ | Ai giữ cổng trong cụm này | Expose ra ngoài |
+|---|---|---|---|---|
+| 8080 | TCP | Web UI + REST API | `tb-web-ui` (UI) và `tb-core` (API) — `tb-haproxy` nhận ở `:8080` | `http://<node-ip>:30080` (HAProxy) |
+| 1883 | TCP | MQTT | `tb-mqtt-transport` — `tb-haproxy` proxy TCP ở `:1883` | `mqtt://<node-ip>:31883` |
+| 8883 | TCP | MQTT over SSL | `tb-mqtt-transport` (bật `MQTT_SSL_ENABLED=true` + cert), HAProxy frontend `mqtts-in` | NodePort 30883 (bật cùng lúc) |
+| 5683 | UDP | CoAP | `tb-coap-transport` | NodePort 30683 (UDP) |
+| 5684 | UDP | CoAP over DTLS | `tb-coap-transport` (`COAP_DTLS_ENABLED=true` + cert) | NodePort 30684 (UDP) |
+| 5685 | UDP | LwM2M CoAP | `tb-lwm2m-transport` | NodePort 30685 (UDP) |
+| 5686 | UDP | LwM2M over DTLS | `tb-lwm2m-transport` + cert | NodePort 30686 (UDP) |
+| 5687 | UDP | LwM2M Bootstrap | `tb-lwm2m-transport` (`LWM2M_ENABLED_BS=true`) | NodePort 30687 (UDP) |
+| 5688 | UDP | LwM2M Bootstrap DTLS | `tb-lwm2m-transport` + cert | NodePort 30688 (UDP) |
+| 161 | UDP | SNMP | `tb-snmp-transport` (`SNMP_BIND_PORT=161`) | NodePort 30161 (UDP) |
+| 7070 | TCP | Edge RPC (gRPC) | `tb-core` — HAProxy frontend `edge-in` | NodePort 30707 |
+
+Hai lưu ý quan trọng:
+
+- **HAProxy không hỗ trợ UDP**, nên CoAP/LwM2M/SNMP phải expose trực tiếp bằng `NodePort` (đúng như
+  manifest 24-protocol-transports.yaml). Muốn đúng số cổng công khai (5683, 5685, 161...) thì cần
+  thêm rule DNAT trên firewall của 2 worker, hoặc dùng MetalLB/`hostNetwork`:
+
+  ```bash
+  # ví dụ DNAT trên worker (cần chạy với quyền root trên node)
+  # /etc/nftables.conf hoặc iptables:
+  #   udp dport 5683 dnat to <node-ip>:30683
+  #   udp dport 5685 dnat to <node-ip>:30685
+  #   udp dport 161  dnat to <node-ip>:30161
+  ```
+
+- **Cổng NodePort phải nằm trong 30000–32767**, nên bảng trên dùng số chuyển tiếp; khách/thiết bị
+  chỉ cần cấu hình đúng số đó (hoặc rule DNAT ở trên nếu muốn số gốc).
+
+Firewall trên 2 worker cần mở (nếu expose công khai): `30080/tcp`, `31883/tcp`, `30707/tcp`,
+`30683-30688/udp`, `30161/udp`, và `30883/tcp` khi bật MQTT over SSL.
+
 ### 3.3. Cụm k3s thực tế (kiểm tra ngày 2026-09-24)
 
 Đọc trực tiếp từ cụm bằng kubectl (kubeconfig trong `%APPDATA%\Lens\kubeconfigs`):
@@ -274,8 +312,9 @@ kubectl -n ingress-nginx get pods,svc        # chờ controller Running, xem Nod
 #    kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.9/config/manifests/metallb-native.yaml
 ```
 
-Trong lúc chưa có ingress controller, dùng file tạm `40-bringup-nodeport.yaml` để vào nền tảng ngay:
-`http://89.117.54.100:30080` hoặc `http://144.91.106.154:30080` (xoá file này sau khi ingress chạy).
+Đường vào mặc định của nền tảng **không dùng ingress controller** mà dùng HAProxy
+(`30-haproxy.yaml`): `http://89.117.54.100:30080` hoặc `http://144.91.106.154:30080`. Chỉ khi muốn
+thay HAProxy bằng ingress-nginx thì mới cài controller ở trên rồi dùng `30-ingress.yaml`.
 
 **Phân bố pod**: mỗi Deployment đã khai báo `topologySpreadConstraints` (maxSkew 1 theo
 `kubernetes.io/hostname`) nên 2 replica được đẩy sang 2 worker khác nhau. `whenUnsatisfiable:
