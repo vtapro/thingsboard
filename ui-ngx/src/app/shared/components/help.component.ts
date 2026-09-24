@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, DestroyRef, inject, Input, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HelpLinks } from '@shared/models/constants';
 import { WhiteLabelingService } from '@core/http/white-labeling.service';
 
@@ -15,11 +16,15 @@ export class HelpComponent implements OnInit {
 
   hidden = false;
 
+  private readonly destroyRef = inject(DestroyRef);
+
   constructor(private whiteLabelingService: WhiteLabelingService) {
   }
 
   ngOnInit(): void {
-    this.whiteLabelingService.settings$.subscribe(settings => {
+    this.whiteLabelingService.settings$.pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(settings => {
       this.hidden = settings.enabled && settings.hideHelpLinks;
     });
   }

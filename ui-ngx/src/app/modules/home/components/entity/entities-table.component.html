@@ -7,10 +7,10 @@
 @if (groupsTabEnabled()) {
   <div class="tb-entities-tabs">
     <button type="button" class="tb-entities-tab" [class.tb-active]="!groupsTab" (click)="groupsTab = false">
-      All
+      {{ 'entity-group.all' | translate }}
     </button>
     <button type="button" class="tb-entities-tab" [class.tb-active]="groupsTab" (click)="groupsTab = true">
-      Groups
+      {{ 'entity-group.groups' | translate }}
     </button>
   </div>
 }

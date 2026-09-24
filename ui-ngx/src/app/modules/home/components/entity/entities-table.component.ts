@@ -42,7 +42,7 @@ import {
   GroupActionDescriptor,
   HeaderActionDescriptor
 } from '@home/models/entity/entities-table-config.models';
-import { EntityTypeTranslation } from '@shared/models/entity-type.models';
+import { EntityType, EntityTypeTranslation } from '@shared/models/entity-type.models';
 import { DialogService } from '@core/services/dialog.service';
 import { AddEntityDialogComponent } from './add-entity-dialog.component';
 import { AddEntityDialogData, EntityAction } from '@home/models/entity/entity-component.models';
@@ -70,12 +70,12 @@ export class EntitiesTableComponent extends PageComponent implements IEntitiesTa
 
   groupsTab = false;
 
-  groupsEntityType(): string {
-    return (this.entitiesTableConfig as any)?.entityType;
+  groupsEntityType(): EntityType {
+    return this.entitiesTableConfig?.entityType;
   }
 
   groupsTabEnabled(): boolean {
-    return ['DEVICE', 'ASSET', 'ENTITY_VIEW'].includes(this.groupsEntityType());
+    return [EntityType.DEVICE, EntityType.ASSET, EntityType.ENTITY_VIEW].includes(this.groupsEntityType());
   }
 
   translations: EntityTypeTranslation;

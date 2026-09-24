@@ -10,8 +10,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
-import org.thingsboard.server.common.data.rbac.RbacRoleSettings;
 import org.thingsboard.server.common.data.rbac.RbacRole;
+import org.thingsboard.server.common.data.rbac.RbacRoleSettings;
 import org.thingsboard.server.config.annotations.ApiOperation;
 import org.thingsboard.server.dao.settings.RoleService;
 import org.thingsboard.server.queue.util.TbCoreComponent;
@@ -20,7 +20,6 @@ import org.thingsboard.server.service.security.permission.Resource;
 
 import static org.thingsboard.server.controller.ControllerConstants.TENANT_AUTHORITY_PARAGRAPH;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -51,19 +50,14 @@ public class RoleController extends BaseController {
     }
 
     @ApiOperation(value = "Get roles assigned to the current user (getCurrentUserRoles)",
-            notes = "Returns custom RBAC roles assigned to the current user. Available to any authenticated user, " +
-                    "so the application can build the menu according to the user permissions.")
+            notes = "Returns the custom RBAC roles that apply to the current user, including the roles the user " +
+                    "inherits from its user groups. Available to any authenticated user, so the application can " +
+                    "build the menu according to the user permissions.")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @GetMapping(value = "/api/user/roles")
     public List<RbacRole> getCurrentUserRoles() throws ThingsboardException {
         String userId = getCurrentUser().getId().getId().toString();
-        List<RbacRole> result = new ArrayList<>();
-        for (RbacRole role : roleService.getRoleSettings(getCurrentUser().getTenantId()).getRoles()) {
-            if (role.getUserIds() != null && role.getUserIds().contains(userId)) {
-                result.add(role);
-            }
-        }
-        return result;
+        return roleService.getEffectiveRoles(getCurrentUser().getTenantId(), userId);
     }
 
 }

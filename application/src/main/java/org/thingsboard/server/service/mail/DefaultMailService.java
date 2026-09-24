@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.util.concurrent.Futures;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
+import freemarker.core.TemplateClassResolver;
+import freemarker.template.TemplateExceptionHandler;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.mail.internet.MimeMessage;
@@ -64,8 +66,20 @@ public class DefaultMailService implements MailService {
     private static final String TARGET_EMAIL = "targetEmail";
     private static final String UTF_8 = "UTF-8";
     private static final long DEFAULT_TIMEOUT = 10_000;
+    /**
+     * Maximum size of a mail template body edited by a tenant administrator. Larger bodies are ignored and the
+     * platform template is used, so that a tenant can not exhaust the memory of the mail service.
+     */
+    private static final int MAX_CUSTOM_TEMPLATE_LENGTH = 256 * 1024;
 
     private final ScheduledExecutorService timeoutScheduler = ThingsBoardExecutors.newSingleThreadScheduledExecutor("mail-service-watchdog");
+
+    /**
+     * Restricted FreeMarker configuration used to render the mail template bodies edited by tenant administrators.
+     * Unlike the platform configuration it does not allow the templates to instantiate classes or to reach the
+     * Java API, which would allow a tenant administrator to execute code on the server.
+     */
+    private Configuration customTemplateConfig;
 
     private final MessageSource messages;
     private final Configuration freemarkerConfig;
@@ -91,12 +105,22 @@ public class DefaultMailService implements MailService {
 
     @PostConstruct
     private void init() {
+        this.customTemplateConfig = createCustomTemplateConfig();
         updateMailConfiguration();
     }
 
     @PreDestroy
     public void destroy() {
         timeoutScheduler.shutdownNow();
+    }
+
+    private Configuration createCustomTemplateConfig() {
+        Configuration configuration = new Configuration(freemarkerConfig.getIncompatibleImprovements());
+        configuration.setNewBuiltinClassResolver(TemplateClassResolver.ALLOWS_NOTHING_RESOLVER);
+        configuration.setAPIBuiltinEnabled(false);
+        configuration.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
+        configuration.setLogTemplateExceptions(false);
+        return configuration;
     }
 
     @Override
@@ -469,10 +493,10 @@ public class DefaultMailService implements MailService {
                                            Map<String, Object> model) throws ThingsboardException {
         try {
             Map<String, Object> templateModel = new HashMap<>(model);
-            addWhiteLabelingModel(templateModel);
+            addWhiteLabelingModel(templateModel, tenantId);
             String customBody = getCustomTemplateBody(tenantId, templateLocation);
             if (customBody != null) {
-                Template customTemplate = new Template(templateLocation, new StringReader(customBody), freemarkerConfig);
+                Template customTemplate = new Template(templateLocation, new StringReader(customBody), customTemplateConfig);
                 return FreeMarkerTemplateUtils.processTemplateIntoString(customTemplate, templateModel);
             }
             Template template = freemarkerConfig.getTemplate(templateLocation);
@@ -489,6 +513,10 @@ public class DefaultMailService implements MailService {
         }
         MailTemplateSettings.MailTemplate template = getCustomMailTemplate(tenantId, templateLocation);
         if (template == null || template.getBody() == null || template.getBody().isBlank()) {
+            return null;
+        }
+        if (template.getBody().length() > MAX_CUSTOM_TEMPLATE_LENGTH) {
+            log.warn("Custom mail template [{}] of tenant [{}] is too large and is ignored", templateLocation, tenantId);
             return null;
         }
         return template.getBody();
@@ -518,9 +546,11 @@ public class DefaultMailService implements MailService {
         }
     }
 
-    private void addWhiteLabelingModel(Map<String, Object> model) {
+    private void addWhiteLabelingModel(Map<String, Object> model, TenantId tenantId) {
         try {
-            WhiteLabelingSettings whiteLabelingSettings = whiteLabelingService.getWhiteLabelingSettings();
+            WhiteLabelingSettings whiteLabelingSettings = tenantId != null
+                    ? whiteLabelingService.getWhiteLabelingSettings(tenantId)
+                    : whiteLabelingService.getWhiteLabelingSettings();
             if (whiteLabelingSettings != null && whiteLabelingSettings.isEnabled()) {
                 if (whiteLabelingSettings.getAppTitle() != null && !whiteLabelingSettings.getAppTitle().isBlank()) {
                     model.put("appTitle", whiteLabelingSettings.getAppTitle());

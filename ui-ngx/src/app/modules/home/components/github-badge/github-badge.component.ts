@@ -40,7 +40,9 @@ export class GithubBadgeComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.hide = this.localStorageService.getItem(SETTINGS_KEY) ?? false;
 
-    this.whiteLabelingService.settings$.subscribe(settings => {
+    this.whiteLabelingService.settings$.pipe(
+      takeUntil(this.stopWatch$)
+    ).subscribe(settings => {
       if (settings.enabled && settings.hideVendorPromotion && !this.hide) {
         this.hideBadge();
       }

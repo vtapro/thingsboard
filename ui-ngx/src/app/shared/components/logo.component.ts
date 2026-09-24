@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, DestroyRef, inject, Input, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@core/auth/auth.service';
 import { AppState } from '@core/core.state';
 import { Store } from '@ngrx/store';
@@ -36,6 +37,8 @@ export class LogoComponent implements OnInit {
 
   logoHeightPx: number;
 
+  private readonly destroyRef = inject(DestroyRef);
+
   isExternal = false;
 
   constructor(private authService: AuthService,
@@ -48,7 +51,9 @@ export class LogoComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.whiteLabelingService.settings$.subscribe(settings => {
+    this.whiteLabelingService.settings$.pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(settings => {
       this.customLogoSrc = this.resolveCustomLogoSrc(settings);
       this.logoHeightPx = settings.enabled ? settings.logoHeight : null;
     });

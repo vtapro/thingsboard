@@ -44,7 +44,7 @@ public class JpaDomainDao extends JpaAbstractDao<DomainEntity, Domain> implement
 
     @Override
     public Domain findByDomain(String domain) {
-        return DaoUtil.getData(domainRepository.findByName(domain));
+        return DaoUtil.getData(domainRepository.findFirstByName(domain));
     }
 
     @Override

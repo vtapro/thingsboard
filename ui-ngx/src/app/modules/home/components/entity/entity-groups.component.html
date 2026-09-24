@@ -11,14 +11,15 @@
   @if (isTenantAdmin()) {
     <mat-card appearance="outlined" class="tb-entity-groups-card">
       <div class="tb-entity-groups-header">
-        <span class="tb-entity-groups-title">{{ groupTitle() }}</span>
+        <span class="tb-entity-groups-title">{{ groupTitle() | translate }}</span>
         <span class="flex-1"></span>
-        <button mat-icon-button type="button" (click)="load()" matTooltip="Refresh">
+        <button mat-icon-button type="button" (click)="load()"
+                [matTooltip]="'entity-group.refresh' | translate">
           <mat-icon>refresh</mat-icon>
         </button>
         <button mat-raised-button color="primary" type="button" (click)="openGroupDialog()">
           <mat-icon>add</mat-icon>
-          Add entity group
+          {{ 'entity-group.add' | translate }}
         </button>
       </div>
     <table mat-table [dataSource]="displayedGroups" class="mat-elevation-z0 tb-entity-groups-table">
@@ -31,42 +32,46 @@
         </td>
       </ng-container>
       <ng-container matColumnDef="createdTime">
-        <th mat-header-cell *matHeaderCellDef>Created time</th>
-        <td mat-cell *matCellDef="let group">{{ group.createdTime }}</td>
+        <th mat-header-cell *matHeaderCellDef>{{ 'entity-group.created-time' | translate }}</th>
+        <td mat-cell *matCellDef="let group">
+          {{ group.createdTime ? (group.createdTime | date: 'yyyy-MM-dd HH:mm:ss') : '' }}
+        </td>
       </ng-container>
       <ng-container matColumnDef="name">
-        <th mat-header-cell *matHeaderCellDef>Name</th>
+        <th mat-header-cell *matHeaderCellDef>{{ 'entity-group.name' | translate }}</th>
         <td mat-cell *matCellDef="let group">{{ group.name }}</td>
       </ng-container>
       <ng-container matColumnDef="description">
-        <th mat-header-cell *matHeaderCellDef>Description</th>
+        <th mat-header-cell *matHeaderCellDef>{{ 'entity-group.description' | translate }}</th>
         <td mat-cell *matCellDef="let group">{{ group.description }}</td>
       </ng-container>
       <ng-container matColumnDef="publicGroup">
-        <th mat-header-cell *matHeaderCellDef>Public</th>
+        <th mat-header-cell *matHeaderCellDef>{{ 'entity-group.public' | translate }}</th>
         <td mat-cell *matCellDef="let group">
           <mat-checkbox [checked]="group.publicGroup" disabled></mat-checkbox>
         </td>
       </ng-container>
       <ng-container matColumnDef="members">
-        <th mat-header-cell *matHeaderCellDef>Members</th>
+        <th mat-header-cell *matHeaderCellDef>{{ 'entity-group.members' | translate }}</th>
         <td mat-cell *matCellDef="let group">{{ group.entityIds?.length || 0 }}</td>
       </ng-container>
       <ng-container matColumnDef="actions">
         <th mat-header-cell *matHeaderCellDef></th>
         <td mat-cell *matCellDef="let group">
           <button mat-icon-button type="button" (click)="togglePublic(group)"
-                  matTooltip="{{ group.publicGroup ? 'Make private' : 'Make public' }}">
+                  [matTooltip]="(group.publicGroup ? 'entity-group.make-private' : 'entity-group.make-public') | translate">
             <mat-icon>{{ group.publicGroup ? 'lock_open' : 'lock' }}</mat-icon>
           </button>
           <button mat-icon-button type="button" (click)="addMembers(group)"
-                  matTooltip="Add entities">
+                  [matTooltip]="'entity-group.add-members' | translate">
             <mat-icon>playlist_add</mat-icon>
           </button>
-          <button mat-icon-button type="button" (click)="openGroupDialog(group)" matTooltip="Edit">
+          <button mat-icon-button type="button" (click)="openGroupDialog(group)"
+                  [matTooltip]="'entity-group.edit' | translate">
             <mat-icon>edit</mat-icon>
           </button>
-          <button mat-icon-button type="button" (click)="removeGroup(group)">
+          <button mat-icon-button type="button" (click)="removeGroup(group)"
+                  [matTooltip]="'entity-group.delete' | translate">
             <mat-icon>delete</mat-icon>
           </button>
         </td>
@@ -75,7 +80,7 @@
       <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
     </table>
     @if (!groups.length) {
-      <div class="tb-entity-groups-empty">No entity groups found</div>
+      <div class="tb-entity-groups-empty">{{ 'entity-group.no-groups' | translate }}</div>
     }
     <mat-paginator [length]="groups.length"
                    [pageIndex]="page"

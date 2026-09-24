@@ -11,13 +11,16 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.domain.Domain;
 import org.thingsboard.server.common.data.domain.DomainInfo;
 import org.thingsboard.server.common.data.id.DomainId;
+import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.config.annotations.ApiOperation;
 import org.thingsboard.server.dao.domain.DomainService;
+import org.thingsboard.server.dao.exception.IncorrectParameterException;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.entitiy.domain.TbDomainService;
 
@@ -53,7 +56,14 @@ public class TenantDomainController extends BaseController {
     public Domain saveTenantDomain(
             @Parameter(description = "A JSON value representing the domain.")
             @RequestBody Domain domain) throws Exception {
-        domain.setTenantId(getCurrentUser().getTenantId());
+        TenantId tenantId = getCurrentUser().getTenantId();
+        domain.setTenantId(tenantId);
+        if (StringUtils.isNotBlank(domain.getName())) {
+            Domain existingDomain = domainService.findDomainByName(domain.getName().trim());
+            if (existingDomain != null && !tenantId.equals(existingDomain.getTenantId())) {
+                throw new IncorrectParameterException("Domain name is already registered by another tenant");
+            }
+        }
         return tbDomainService.save(domain, Collections.emptyList(), getCurrentUser());
     }
 

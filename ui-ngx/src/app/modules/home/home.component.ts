@@ -83,7 +83,9 @@ export class HomeComponent extends PageComponent implements AfterViewInit, OnIni
 
   ngOnInit() {
 
-    this.whiteLabelingService.settings$.subscribe(settings => {
+    this.whiteLabelingService.settings$.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(settings => {
       if (settings.enabled && settings.logoImageUrl) {
         this.logo = settings.logoImageUrl;
         this.collapsedLogo = settings.logoImageUrl;

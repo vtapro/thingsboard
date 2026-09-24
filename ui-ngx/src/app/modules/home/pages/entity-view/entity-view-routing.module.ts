@@ -4,7 +4,6 @@ import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 
 import { EntitiesTableComponent } from '../../components/entity/entities-table.component';
-import { EntityGroupsPageComponent } from '../../components/entity/entity-groups-page.component';
 import { Authority } from '@shared/models/authority.enum';
 import { EntityViewsTableConfigResolver } from '@modules/home/pages/entity-view/entity-views-table-config.resolver';
 import { EntityDetailsPageComponent } from '@home/components/entity/entity-details-page.component';
@@ -26,7 +25,6 @@ export const entityViewRoutes: Routes = [
         path: '',
         component: EntitiesTableComponent,
         data: {
-          entityType: 'ENTITY_VIEW',
           auth: [Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
           title: 'entity-view.entity-views',
           entityViewsType: 'tenant'

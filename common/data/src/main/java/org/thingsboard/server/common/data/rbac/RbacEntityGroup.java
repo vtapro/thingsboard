@@ -35,4 +35,7 @@ public class RbacEntityGroup implements Serializable {
     @Schema(description = "Ids of the entities that belong to the group")
     private List<String> entityIds = new ArrayList<>();
 
+    @Schema(description = "Creation time of the group, in milliseconds")
+    private long createdTime;
+
 }

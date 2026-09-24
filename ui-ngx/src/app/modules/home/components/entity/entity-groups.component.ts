@@ -5,11 +5,13 @@ import { HttpClient } from '@angular/common/http';
 import { FormControl } from '@angular/forms';
 import { Store } from '@ngrx/store';
 import { MatDialog } from '@angular/material/dialog';
+import { TranslateService } from '@ngx-translate/core';
 import { AddEntitiesDialogComponent } from '@home/components/entity/add-entities-dialog.component';
 import { EntityGroupDialogComponent } from '@home/components/entity/entity-group-dialog.component';
 
 import { AppState } from '@core/core.state';
 import { getCurrentAuthState } from '@core/auth/auth.selectors';
+import { DialogService } from '@core/services/dialog.service';
 import { Authority } from '@shared/models/authority.enum';
 import { defaultHttpOptionsFromConfig } from '@core/http/http-utils';
 import { PageComponent } from '@shared/components/page.component';
@@ -49,7 +51,9 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
 
   constructor(protected store: Store<AppState>,
               private http: HttpClient,
-              private dialog: MatDialog) {
+              private dialog: MatDialog,
+              private dialogService: DialogService,
+              private translate: TranslateService) {
     super();
   }
 
@@ -114,11 +118,11 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
   groupTitle(): string {
     switch (this.entityType) {
       case 'ASSET':
-        return 'Asset groups';
+        return 'entity-group.asset-groups';
       case 'ENTITY_VIEW':
-        return 'Entity view groups';
+        return 'entity-group.entity-view-groups';
       default:
-        return 'Device groups';
+        return 'entity-group.device-groups';
     }
   }
 
@@ -164,8 +168,18 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
   }
 
   removeGroup(group: EntityGroup) {
-    this.groups = this.groups.filter(g => g.id !== group.id);
-    this.persist();
+    this.dialogService.confirm(
+      this.translate.instant('entity-group.delete-title', {name: group.name}),
+      this.translate.instant('entity-group.delete-text'),
+      this.translate.instant('action.no'),
+      this.translate.instant('action.yes'),
+      true
+    ).subscribe((result) => {
+      if (result) {
+        this.groups = this.groups.filter(g => g.id !== group.id);
+        this.persist();
+      }
+    });
   }
 
   togglePublic(group: EntityGroup) {

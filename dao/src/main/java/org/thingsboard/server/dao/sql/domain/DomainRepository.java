@@ -22,7 +22,7 @@ public interface DomainRepository extends JpaRepository<DomainEntity, UUID> {
                                       @Param("searchText") String searchText,
                                       Pageable pageable);
 
-    Optional<DomainEntity> findByName(String name);
+    Optional<DomainEntity> findFirstByName(String name);
 
     @Transactional
     @Modifying

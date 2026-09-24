@@ -7,36 +7,43 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
+import org.thingsboard.server.common.data.HasCustomerId;
 import org.thingsboard.server.common.data.HasTenantId;
 import org.thingsboard.server.common.data.exception.ThingsboardErrorCode;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
-import org.thingsboard.server.common.data.rbac.RbacRole;
-import org.thingsboard.server.dao.settings.RoleService;
-import org.thingsboard.server.dao.settings.EntityGroupService;
-import org.thingsboard.server.dao.settings.UserGroupService;
-import org.thingsboard.server.dao.settings.CustomerHierarchyService;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroup;
-import org.thingsboard.server.common.data.rbac.RbacUserGroup;
-import org.thingsboard.server.common.data.HasCustomerId;
+import org.thingsboard.server.common.data.rbac.RbacRole;
+import org.thingsboard.server.dao.settings.CustomerHierarchyService;
+import org.thingsboard.server.dao.settings.EntityGroupService;
+import org.thingsboard.server.dao.settings.RoleService;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
 import java.util.List;
 import java.util.Map;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 import static org.thingsboard.server.common.data.security.Authority.SYS_ADMIN;
 
 /**
  * Custom RBAC enforcement, disabled by default.
  *
- * When {@code security.rbac.enabled=true}:
- *   - user is assigned to one of the tenant custom roles -> permissions of that role are enforced;
- *   - user has no custom role (or anything fails) -> the platform default permission matrix is used.
+ * <p>When {@code security.rbac.enabled=true}:
+ * <ul>
+ *   <li>a user that is assigned to one of the tenant custom roles gets the permissions of the effective role;
+ *   <li>a user without a custom role (or a user for which the settings can not be read) keeps the platform
+ *       default permission matrix, so the platform behaviour is unchanged;
+ *   <li>custom roles may only <b>narrow</b> the access, never widen it across tenants or customers. The only
+ *       exception is a customer user with a role that enables {@code ownCustomerOnly}: the user may then also
+ *       access the sub-customers configured by the tenant administrator in the customer hierarchy.
+ * </ul>
  *
- * When the flag is off this bean is not created at all, so the platform behaviour is unchanged.
+ * <p>When the flag is off this bean is not created at all, so the platform behaviour is unchanged.
+ * Removing the custom RBAC is a matter of deleting this class together with the {@code rbac} data classes,
+ * the {@code *Service} settings classes and the related controllers.
  */
 @Slf4j
 @Service
@@ -47,11 +54,20 @@ public class TbRbacAccessControlService implements AccessControlService {
 
     private static final String PERMISSION_DENIED_MESSAGE = "You don't have permission to perform this operation!";
 
+    /**
+     * Tenant RBAC settings are stored as JSON documents; the short-lived cache keeps the permission check of the
+     * request hot path off the database. Set the TTL to 0 to disable the cache.
+     */
+    private static final long CACHE_TTL_MS = 10_000;
+    private static final int CACHE_MAX_ENTRIES = 2_048;
+
     private final DefaultAccessControlService defaultAccessControlService;
     private final RoleService roleService;
     private final EntityGroupService entityGroupService;
-    private final UserGroupService userGroupService;
     private final CustomerHierarchyService customerHierarchyService;
+
+    private final Map<String, CacheEntry<Optional<RbacRole>>> effectiveRoleCache = new ConcurrentHashMap<>();
+    private final Map<TenantId, CacheEntry<Optional<List<RbacEntityGroup>>>> entityGroupCache = new ConcurrentHashMap<>();
 
     @Override
     public boolean hasPermission(SecurityUser user, Resource resource, Operation operation) throws ThingsboardException {
@@ -59,7 +75,8 @@ public class TbRbacAccessControlService implements AccessControlService {
         if (role == null) {
             return defaultAccessControlService.hasPermission(user, resource, operation);
         }
-        return hasGlobalOperation(role, resource, operation);
+        return hasGlobalOperation(role, resource, operation)
+                && defaultAccessControlService.hasPermission(user, resource, operation);
     }
 
     @Override
@@ -71,97 +88,71 @@ public class TbRbacAccessControlService implements AccessControlService {
 
     @Override
     public <I extends EntityId, T extends HasTenantId> boolean hasPermission(SecurityUser user, Resource resource, Operation operation,
-                                                                             I entityId, T entity) throws ThingsboardException {
+                                                                            I entityId, T entity) throws ThingsboardException {
         RbacRole role = getEffectiveRole(user);
         if (role == null) {
             return defaultAccessControlService.hasPermission(user, resource, operation, entityId, entity);
         }
-        if (role.isOwnCustomerOnly()) {
-            return userBelongsToCustomerSubtree(user, entity);
+        if (user.getCustomerId() != null) {
+            return hasCustomerUserPermission(user, resource, operation, entityId, entity, role);
         }
-        if (hasGlobalOperation(role, resource, operation)) {
-            return true;
+        if (entity != null && !user.getTenantId().equals(entity.getTenantId())) {
+            return false;
         }
-        List<String> scopedGroups = getScopedGroups(role, resource, operation);
-        if (scopedGroups == null || scopedGroups.isEmpty()) {
-            return hasCustomerHierarchyAccess(user, entity, role, resource, operation);
-        }
-        return entityBelongsToGroups(user.getTenantId(), entityId, scopedGroups)
-                || hasCustomerHierarchyAccess(user, entity, role, resource, operation);
+        return hasOperationGrant(user.getTenantId(), role, resource, operation, entityId);
     }
 
     @Override
     public <I extends EntityId, T extends HasTenantId> void checkPermission(SecurityUser user, Resource resource, Operation operation,
-                                                                            I entityId, T entity) throws ThingsboardException {
+                                                                           I entityId, T entity) throws ThingsboardException {
         if (!hasPermission(user, resource, operation, entityId, entity)) {
             permissionDenied();
         }
+    }
+
+    /**
+     * Customer users keep the platform customer isolation: the custom role may extend the operations of the user,
+     * but never grant access to entities of another customer.
+     */
+    private <I extends EntityId, T extends HasTenantId> boolean hasCustomerUserPermission(SecurityUser user, Resource resource,
+                                                                                         Operation operation, I entityId, T entity,
+                                                                                         RbacRole role) throws ThingsboardException {
+        if (defaultAccessControlService.hasPermission(user, resource, operation, entityId, entity)) {
+            return true;
+        }
+        if (!role.isOwnCustomerOnly() || !hasOperationGrant(user.getTenantId(), role, resource, operation, entityId)) {
+            return false;
+        }
+        return userBelongsToCustomerSubtree(user, entity);
     }
 
     private RbacRole getEffectiveRole(SecurityUser user) {
         if (user == null || user.getId() == null || user.getTenantId() == null || SYS_ADMIN.equals(user.getAuthority())) {
             return null;
         }
+        String userId = user.getId().getId().toString();
+        String cacheKey = user.getTenantId().getId() + ":" + userId;
         try {
-            String userId = user.getId().getId().toString();
-            List<RbacRole> roles = roleService.getRoleSettings(user.getTenantId()).getRoles();
-            Set<String> roleIds = new HashSet<>();
-            for (RbacRole role : roles) {
-                if (role.getUserIds() != null && role.getUserIds().contains(userId)) {
-                    roleIds.add(role.getId());
-                }
-            }
-            for (RbacUserGroup group : userGroupService.getUserGroupSettings(user.getTenantId()).getGroups()) {
-                if (group.getRoleIds() != null && group.getUserIds() != null && group.getUserIds().contains(userId)) {
-                    roleIds.addAll(group.getRoleIds());
-                }
-            }
-            if (roleIds.isEmpty()) {
-                return null;
-            }
-            RbacRole effective = new RbacRole();
-            effective.setId("effective");
-            effective.setName("effective");
-            for (RbacRole role : roles) {
-                if (roleIds.contains(role.getId())) {
-                    mergePermissions(role, effective);
-                    if (role.isOwnCustomerOnly()) {
-                        effective.setOwnCustomerOnly(true);
-                    }
-                }
-            }
-            return effective;
+            return cached(effectiveRoleCache, cacheKey,
+                    () -> Optional.ofNullable(roleService.getEffectiveRole(user.getTenantId(), userId))).orElse(null);
         } catch (Exception e) {
             log.warn("Failed to load RBAC roles for user [{}], falling back to default permissions: {}",
-                    user.getId(), e.getMessage());
+                    user.getId(), e.getMessage(), e);
         }
         return null;
     }
 
-    private void mergePermissions(RbacRole source, RbacRole target) {
-        if (source.getPermissions() != null) {
-            source.getPermissions().forEach((resource, operations) -> {
-                List<String> merged = target.getPermissions().computeIfAbsent(resource, r -> new java.util.ArrayList<>());
-                for (String operation : operations) {
-                    if (!merged.contains(operation)) {
-                        merged.add(operation);
-                    }
-                }
-            });
+    /**
+     * The role grants the operation when the operation is granted globally, or when the operation is granted
+     * on one of the entity groups the entity belongs to.
+     */
+    private boolean hasOperationGrant(TenantId tenantId, RbacRole role, Resource resource, Operation operation, EntityId entityId) {
+        if (hasGlobalOperation(role, resource, operation)) {
+            return true;
         }
-        if (source.getScopedPermissions() != null) {
-            source.getScopedPermissions().forEach((resource, byOperation) ->
-                byOperation.forEach((operation, groupIds) -> {
-                    List<String> merged = target.getScopedPermissions()
-                        .computeIfAbsent(resource, r -> new java.util.HashMap<>())
-                        .computeIfAbsent(operation, o -> new java.util.ArrayList<>());
-                    for (String groupId : groupIds) {
-                        if (!merged.contains(groupId)) {
-                            merged.add(groupId);
-                        }
-                    }
-                }));
-        }
+        List<String> scopedGroups = getScopedGroups(role, resource, operation);
+        return entityId != null && scopedGroups != null && !scopedGroups.isEmpty()
+                && entityBelongsToGroups(tenantId, entityId, scopedGroups);
     }
 
     private boolean hasGlobalOperation(RbacRole role, Resource resource, Operation operation) {
@@ -185,7 +176,7 @@ public class TbRbacAccessControlService implements AccessControlService {
     private boolean entityBelongsToGroups(TenantId tenantId, EntityId entityId, List<String> groupIds) {
         try {
             String id = entityId.getId().toString();
-            for (RbacEntityGroup group : entityGroupService.getEntityGroupSettings(tenantId).getGroups()) {
+            for (RbacEntityGroup group : getEntityGroups(tenantId)) {
                 if (groupIds.contains(group.getId()) && group.getEntityIds() != null && group.getEntityIds().contains(id)) {
                     return true;
                 }
@@ -196,19 +187,10 @@ public class TbRbacAccessControlService implements AccessControlService {
         return false;
     }
 
-    /**
-     * A customer user with a role granting the operation may access entities that belong to its sub-customers
-     * (customer hierarchy configured by the tenant administrator).
-     */
-    private boolean hasCustomerHierarchyAccess(SecurityUser user, HasTenantId entity,
-                                               RbacRole role, Resource resource, Operation operation) {
-        if (user.getCustomerId() == null || !(entity instanceof HasCustomerId)) {
-            return false;
-        }
-        if (!hasGlobalOperation(role, resource, operation)) {
-            return false;
-        }
-        return userBelongsToCustomerSubtree(user, entity);
+    private List<RbacEntityGroup> getEntityGroups(TenantId tenantId) {
+        return cached(entityGroupCache, tenantId,
+                () -> Optional.ofNullable(entityGroupService.getEntityGroupSettings(tenantId).getGroups()))
+                .orElse(List.of());
     }
 
     /**
@@ -223,7 +205,7 @@ public class TbRbacAccessControlService implements AccessControlService {
             if (entityCustomerId == null || entityCustomerId.getId() == null) {
                 return false;
             }
-            Set<String> subtree = customerHierarchyService.getCustomerSubtree(user.getTenantId(),
+            var subtree = customerHierarchyService.getCustomerSubtree(user.getTenantId(),
                     user.getCustomerId().getId().toString());
             return subtree.contains(entityCustomerId.getId().toString());
         } catch (Exception e) {
@@ -232,9 +214,30 @@ public class TbRbacAccessControlService implements AccessControlService {
         }
     }
 
+    private <K, V> Optional<V> cached(Map<K, CacheEntry<Optional<V>>> cache, K key, Supplier<Optional<V>> loader) {
+        long now = System.currentTimeMillis();
+        if (CACHE_TTL_MS > 0) {
+            CacheEntry<Optional<V>> entry = cache.get(key);
+            if (entry != null && entry.expiresAt() > now) {
+                return entry.value();
+            }
+            if (cache.size() >= CACHE_MAX_ENTRIES) {
+                cache.values().removeIf(stale -> stale.expiresAt() <= now);
+            }
+        }
+        Optional<V> value = loader.get();
+        if (CACHE_TTL_MS > 0) {
+            cache.put(key, new CacheEntry<>(value, now + CACHE_TTL_MS));
+        }
+        return value;
+    }
+
     private void permissionDenied() throws ThingsboardException {
         throw new ThingsboardException(PERMISSION_DENIED_MESSAGE,
                 ThingsboardErrorCode.PERMISSION_DENIED);
+    }
+
+    private record CacheEntry<T>(T value, long expiresAt) {
     }
 
 }
