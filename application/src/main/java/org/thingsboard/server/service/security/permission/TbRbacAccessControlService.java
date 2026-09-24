@@ -76,6 +76,9 @@ public class TbRbacAccessControlService implements AccessControlService {
         if (role == null) {
             return defaultAccessControlService.hasPermission(user, resource, operation, entityId, entity);
         }
+        if (role.isOwnCustomerOnly()) {
+            return userBelongsToCustomerSubtree(user, entity);
+        }
         if (hasGlobalOperation(role, resource, operation)) {
             return true;
         }
@@ -202,6 +205,16 @@ public class TbRbacAccessControlService implements AccessControlService {
         if (!hasGlobalOperation(role, resource, operation)) {
             return false;
         }
+        return userBelongsToCustomerSubtree(user, entity);
+    }
+
+    /**
+     * True when the entity belongs to the customer of the user or to any of its sub-customers.
+     */
+    private boolean userBelongsToCustomerSubtree(SecurityUser user, HasTenantId entity) {
+        if (user.getCustomerId() == null || !(entity instanceof HasCustomerId)) {
+            return false;
+        }
         try {
             var entityCustomerId = ((HasCustomerId) entity).getCustomerId();
             if (entityCustomerId == null || entityCustomerId.getId() == null) {
@@ -211,7 +224,7 @@ public class TbRbacAccessControlService implements AccessControlService {
                     user.getCustomerId().getId().toString());
             return subtree.contains(entityCustomerId.getId().toString());
         } catch (Exception e) {
-            log.warn("Failed to resolve customer hierarchy for user [{}]: {}", user.getId(), e.getMessage());
+            log.warn("Failed to resolve customer subtree for user [{}]: {}", user.getId(), e.getMessage());
             return false;
         }
     }

@@ -17,6 +17,7 @@ interface RbacRole {
   permissions: { [resource: string]: string[] };
   scopedPermissions?: { [resource: string]: { [operation: string]: string[] } };
   userIds: string[];
+  ownCustomerOnly?: boolean;
 }
 
 interface TenantUserInfo {
@@ -82,6 +83,7 @@ export class RolesComponent extends PageComponent implements OnInit {
   nameControl = new FormControl('');
   resourceControl = new FormControl('DEVICE');
   groupScopeControl = new FormControl<string[]>([]);
+  ownCustomerOnlyControl = new FormControl(false);
   operationControls: { [operation: string]: FormControl } = {
     READ: new FormControl(true),
     WRITE: new FormControl(false),
@@ -257,10 +259,12 @@ export class RolesComponent extends PageComponent implements OnInit {
       name,
       permissions,
       scopedPermissions,
-      userIds: []
+      userIds: [],
+      ownCustomerOnly: !!this.ownCustomerOnlyControl.value
     }];
     this.nameControl.setValue('');
     this.groupScopeControl.setValue([]);
+    this.ownCustomerOnlyControl.setValue(false);
   }
 
   removeRole(role: RbacRole) {
@@ -280,7 +284,8 @@ export class RolesComponent extends PageComponent implements OnInit {
       })
       .filter(part => !!part)
       .join(', ');
-    return [global, scoped].filter(part => !!part).join(', ');
+    const own = role.ownCustomerOnly ? 'own customer only' : '';
+    return [global, scoped, own].filter(part => !!part).join(', ');
   }
 
   save() {

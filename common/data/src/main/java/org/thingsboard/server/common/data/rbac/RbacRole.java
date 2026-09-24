@@ -35,4 +35,8 @@ public class RbacRole implements Serializable {
     @Schema(description = "Ids of users assigned to this role")
     private List<String> userIds = new ArrayList<>();
 
+    @Schema(description = "When enabled, a customer user may access entities of own customer and its sub-customers only. " +
+            "Use this instead of global permissions to keep the customer isolation of the platform.")
+    private boolean ownCustomerOnly;
+
 }

@@ -44,6 +44,9 @@
             }
           </mat-select>
         </mat-form-field>
+        <mat-checkbox class="tb-roles-public" [formControl]="ownCustomerOnlyControl">
+          Own customer only
+        </mat-checkbox>
         <button mat-stroked-button color="primary" type="button" (click)="addRole()">
           {{ 'admin.roles-add' | translate }}
         </button>
