@@ -41,7 +41,8 @@ data:
   # Managed PostgreSQL (external): entities, relations, alarms, users, admin settings.
   # sslmode=require is mandatory; switch to verify-full once the CA certificate is published.
   SPRING_DRIVER_CLASS_NAME: org.postgresql.Driver
-  SPRING_DATASOURCE_URL: jdbc:postgresql://postgresql-215231-0.cloudclusters.net:10012/thingsboard?sslmode=require
+  # database "greeniq" (created in the CloudClusters console), user in tb-secrets
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgresql-215231-0.cloudclusters.net:10012/greeniq?sslmode=require
   # note: spring.jpa.hibernate.ddl-auto is already "none" in thingsboard.yml; the schema is
   # created/upgraded by the tb-install job only.
   # Managed Cassandra (external): telemetry. TLS is enabled by default on the server, so the
@@ -50,7 +51,10 @@ data:
   DATABASE_TS_TYPE: cassandra
   DATABASE_TS_LATEST_TYPE: cassandra
   CASSANDRA_URL: cassandra-215233-0.cloudclusters.net:19948
-  CASSANDRA_KEYSPACE_NAME: thingsboard
+  # keyspace "greeniq" (already created in the CloudClusters console; the installer only runs
+  # CREATE KEYSPACE IF NOT EXISTS, so the replication settings of the existing keyspace stay)
+  CASSANDRA_KEYSPACE_NAME: greeniq
+  # must match the datacenter name of the Cassandra cluster — check with: DESCRIBE KEYSPACES / nodetool status
   CASSANDRA_LOCAL_DATACENTER: datacenter1
   CASSANDRA_USE_CREDENTIALS: "true"
   CASSANDRA_USE_SSL: "true"

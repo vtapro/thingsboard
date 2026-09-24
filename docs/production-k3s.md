@@ -175,8 +175,8 @@ PostgreSQL và Cassandra là **2 cluster managed, nằm ngoài k3s**, đều b�
 
 | | Endpoint | Port | Ghi chú |
 |---|---|---|---|
-| PostgreSQL | `postgresql-215231-0.cloudclusters.net` | `10012` | database riêng cho ThingsBoard, đặt trong `SPRING_DATASOURCE_URL` |
-| Cassandra | `cassandra-215233-0.cloudclusters.net` | `19948` | keyspace `thingsboard`, đặt trong `CASSANDRA_URL` |
+| PostgreSQL | `postgresql-215231-0.cloudclusters.net` | `10012` | database **`greeniq`**, user `vtheanh04@gmail.com` — đặt trong `SPRING_DATASOURCE_URL` |
+| Cassandra | `cassandra-215233-0.cloudclusters.net` | `19948` | keyspace **`greeniq`**, user `vtheanh04@gmail.com` — đặt trong `CASSANDRA_URL` / `CASSANDRA_KEYSPACE_NAME` |
 
 ```text
   k3s cluster (namespace thingsboard)              CloudClusters (ngoài cụm)
@@ -202,8 +202,16 @@ trong `CASSANDRA_URL`/JDBC URL khớp CN/SAN của cert).
 | Whitelist IP client | thêm IP 2 worker `89.117.54.100`, `144.91.106.154` vào allow-list của cluster | như Postgres (cùng danh sách) |
 | TLS | `sslmode=require` trong JDBC URL (nâng lên `verify-full` khi có CA của provider) | `CASSANDRA_USE_SSL=true` + `CASSANDRA_SSL_HOSTNAME_VALIDATION=true` |
 | Credentials | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` trong secret `tb-secrets` | `CASSANDRA_USERNAME` / `CASSANDRA_PASSWORD` trong secret `tb-secrets` |
-| Database/keyspace | tạo DB `thingsboard` (hoặc đổi tên trong `SPRING_DATASOURCE_URL`) | keyspace `thingsboard` do job install tạo |
+| Database/keyspace | DB `greeniq` đã tạo sẵn (đổi tên trong `SPRING_DATASOURCE_URL` nếu muốn khác) | keyspace `greeniq` đã tạo sẵn; job install chỉ chạy `CREATE KEYSPACE IF NOT EXISTS` nên **không ghi đè** replication của keyspace hiện có |
 | Data center | — | `CASSANDRA_LOCAL_DATACENTER` phải **khớp tên datacenter của cluster** (mặc định `datacenter1`); sai tên này là lỗi phổ biến nhất |
+
+Kiểm tra tên datacenter của Cassandra (mở Shell/SSH trong CloudClusters hoặc dùng `cqlsh`):
+
+```bash
+cqlsh --ssl cassandra-215233-0.cloudclusters.net 19948 -u vtheanh04@gmail.com -p '<password>' \
+  -e "SELECT data_center FROM system.local;"
+# đặt kết quả vào CASSANDRA_LOCAL_DATACENTER trong 01-config.yaml nếu khác 'datacenter1'
+```
 
 Tất cả biến trên đã khai báo sẵn trong `01-config.yaml`; chỉ cần điền user/password vào secret:
 
