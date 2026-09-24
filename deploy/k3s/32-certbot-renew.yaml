@@ -1,0 +1,128 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Automatic renewal of the Let's Encrypt certificate + reload of HAProxy.
+#
+# The CronJob runs on the 1st of every month at 03:17, asks certbot to renew (Let's Encrypt
+# certificates last 90 days, certbot only acts when fewer than 30 days are left) and, when the
+# certificate really changed, it patches the tb-haproxy-tls Secret through the Kubernetes API and
+# deletes the HAProxy pods so they load the new certificate.
+#
+# Test it manually:
+#   kubectl -n thingsboard create job tb-certbot-renew-manual --from=cronjob/tb-certbot-renew
+#   kubectl -n thingsboard logs job/tb-certbot-renew-manual
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tb-certbot
+  namespace: thingsboard
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tb-certbot
+  namespace: thingsboard
+rules:
+  # update the certificate secret
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["tb-haproxy-tls"]
+    verbs: ["get", "patch", "update"]
+  # list and restart the HAProxy pods
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tb-certbot
+  namespace: thingsboard
+subjects:
+  - kind: ServiceAccount
+    name: tb-certbot
+    namespace: thingsboard
+roleRef:
+  kind: Role
+  name: tb-certbot
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tb-certbot-renew
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  schedule: "17 3 1 * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          serviceAccountName: tb-certbot
+          restartPolicy: Never
+          containers:
+            - name: renew
+              image: alpine:3.20
+              env:
+                - name: ACME_DOMAIN
+                  value: app.greeniq.vn
+                - name: NAMESPACE
+                  value: thingsboard
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -e
+                  apk add --no-cache certbot curl jq openssl > /dev/null 2>&1
+
+                  echo "==> certbot renew"
+                  certbot renew \
+                    --webroot -w /webroot \
+                    --config-dir /webroot/le \
+                    --work-dir /webroot/le/work \
+                    --logs-dir /webroot/le/logs \
+                    --non-interactive --quiet
+
+                  CERT=/webroot/le/live/$ACME_DOMAIN
+                  if [ ! -f "$CERT/fullchain.pem" ]; then
+                    echo "Khong tim thay chung chi, bo qua"
+                    exit 0
+                  fi
+
+                  echo "==> cap nhat secret tb-haproxy-tls"
+                  TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+                  CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                  API=https://kubernetes.default.svc/api/v1/namespaces/$NAMESPACE
+                  PEM=$(cat "$CERT/fullchain.pem" "$CERT/privkey.pem" | base64 -w0)
+                  printf '{"data":{"tls.pem":"%s"}}' "$PEM" > /tmp/patch.json
+                  curl -sS --cacert $CACERT -H "Authorization: Bearer $TOKEN" \
+                    -H "Content-Type: application/merge-patch+json" \
+                    -X PATCH --data @/tmp/patch.json "$API/secrets/tb-haproxy-tls" > /dev/null
+
+                  echo "==> restart HAProxy de nap chung chi moi"
+                  PODS=$(curl -sS --cacert $CACERT -H "Authorization: Bearer $TOKEN" \
+                    "$API/pods?labelSelector=app.kubernetes.io/name%3Dtb-haproxy" \
+                    | jq -r '.items[].metadata.name')
+                  for pod in $PODS; do
+                    echo "  xoa pod $pod"
+                    curl -sS --cacert $CACERT -H "Authorization: Bearer $TOKEN" \
+                      -X DELETE "$API/pods/$pod" > /dev/null
+                  done
+
+                  openssl x509 -in "$CERT/fullchain.pem" -noout -issuer -subject -enddate || true
+                  echo "==> xong"
+              volumeMounts:
+                - name: webroot
+                  mountPath: /webroot
+          volumes:
+            - name: webroot
+              persistentVolumeClaim:
+                claimName: tb-acme-webroot

@@ -1,0 +1,68 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# One shot Job that asks Let's Encrypt for the certificate of app.greeniq.vn (HTTP-01 through
+# the webroot served by the tb-acme deployment) and writes it into the tb-acme-webroot PVC:
+#
+#   /webroot/le/live/app.greeniq.vn/{fullchain.pem,privkey.pem,chain.pem}
+#
+# Run it again (it is idempotent, certbot reuses the account) or change --force-renewal to renew
+# before the 90 days expire.
+#
+#   kubectl -n thingsboard delete job tb-certbot --ignore-not-found
+#   kubectl apply -f deploy/k3s/31-certbot-issue.yaml
+#   kubectl -n thingsboard logs job/tb-certbot -f
+#
+# Then create the HAProxy secret with scripts/use-letsencrypt-cert.ps1.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tb-certbot
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: certbot
+          image: certbot/certbot:latest
+          env:
+            - name: ACME_EMAIL
+              value: admin@greeniq.vn
+            - name: ACME_DOMAIN
+              value: app.greeniq.vn
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              mkdir -p /webroot/le /webroot/.well-known/acme-challenge
+              # the certificate files have to be reachable by the nginx pod, which runs as
+              # uid 101 (nginx), so relax the permissions of the private key directory
+              umask 022
+              certbot certonly \
+                --webroot -w /webroot \
+                --config-dir /webroot/le \
+                --work-dir /webroot/le/work \
+                --logs-dir /webroot/le/logs \
+                -d "$ACME_DOMAIN" \
+                --email "$ACME_EMAIL" \
+                --agree-tos --no-eff-email \
+                --non-interactive --keep-until-expiring
+              chmod -R a+rX /webroot/le
+              chmod a+r /webroot/le/live/$ACME_DOMAIN/privkey.pem
+              echo "--- ket qua ---"
+              ls -l /webroot/le/live/$ACME_DOMAIN/
+              openssl x509 -in /webroot/le/live/$ACME_DOMAIN/fullchain.pem -noout -issuer -subject -dates
+          volumeMounts:
+            - name: webroot
+              mountPath: /webroot
+      volumes:
+        - name: webroot
+          persistentVolumeClaim:
+            claimName: tb-acme-webroot

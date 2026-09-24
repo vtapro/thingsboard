@@ -60,11 +60,18 @@ data:
       acl transport_http_acl path_beg /api/v1/
       acl tb_images_api_acl path_beg /api/images/
       acl tb_api_acl path_beg /api/ /swagger /webjars /v2/ /v3/ /static/rulenode/ /oauth2/ /login/oauth2/ /static/widgets/ /.well-known/assetlinks.json /.well-known/apple-app-site-association
+      # Let's Encrypt HTTP-01 challenge, served by the tb-acme deployment (31-acme-webroot.yaml)
+      acl acme_acl path_beg /.well-known/acme-challenge/
 
+      use_backend tb_acme if acme_acl
       use_backend tb_http_transport if transport_http_acl
       use_backend tb_core if tb_images_api_acl
       use_backend tb_core if tb_api_acl
       default_backend tb_web_ui
+
+    backend tb_acme
+      mode http
+      server tb-acme tb-acme.thingsboard.svc.cluster.local:8080 check resolvers kube resolve-prefer ipv4
 
     backend tb_core
       mode http
@@ -85,17 +92,26 @@ data:
       server tb-web tb-web-ui.thingsboard.svc.cluster.local:8080 check resolvers kube resolve-prefer ipv4
 
     # ---- HTTPS ----------------------------------------------------------------------
-    # Create the certificate secret, then uncomment this frontend and the 8443 binding:
-    #   kubectl -n thingsboard create secret generic tb-haproxy-tls \
-    #     --from-file=tls.pem=fullchain-with-key.pem
-    #frontend https-in
-    #  bind *:8443 ssl crt /certs/tls.pem alpn h2,http/1.1
-    #  http-request set-header X-Forwarded-Proto https
-    #  acl transport_http_acl path_beg /api/v1/
-    #  acl tb_api_acl path_beg /api/ /swagger /webjars /v2/ /v3/ /static/rulenode/ /oauth2/ /login/oauth2/ /static/widgets/
-    #  use_backend tb_http_transport if transport_http_acl
-    #  use_backend tb_core if tb_api_acl
-    #  default_backend tb_web_ui
+    # The certificate is the Let's Encrypt one obtained by the tb-certbot job and copied into the
+    # tb-haproxy-tls Secret by scripts/use-letsencrypt-cert.ps1 (the file is mounted at
+    # /certs/tls.pem). Renewal: run the job again, then re-run that script.
+    frontend https-in
+      mode http
+      bind *:8443 ssl crt /certs/tls.pem alpn h2,http/1.1
+      option httplog
+      option forwardfor
+      http-request set-header X-Forwarded-Proto https
+
+      acl acme_acl path_beg /.well-known/acme-challenge/
+      acl transport_http_acl path_beg /api/v1/
+      acl tb_images_api_acl path_beg /api/images/
+      acl tb_api_acl path_beg /api/ /swagger /webjars /v2/ /v3/ /static/rulenode/ /oauth2/ /login/oauth2/ /static/widgets/ /.well-known/assetlinks.json /.well-known/apple-app-site-association
+
+      use_backend tb_acme if acme_acl
+      use_backend tb_http_transport if transport_http_acl
+      use_backend tb_core if tb_images_api_acl
+      use_backend tb_core if tb_api_acl
+      default_backend tb_web_ui
 
     # ---- MQTT for devices -----------------------------------------------------------
     frontend mqtt-in
@@ -113,20 +129,22 @@ data:
       server tb-mqtt tb-mqtt-transport.thingsboard.svc.cluster.local:1883 check resolvers kube resolve-prefer ipv4
 
     # ---- MQTT over SSL (8883) --------------------------------------------------------
-    # Reuses the same certificate secret as the HTTPS frontend; make sure the MQTT transport
-    # also has MQTT_SSL_ENABLED=true and the certificate mounted.
-    #frontend mqtts-in
-    #  bind *:8883
-    #  mode tcp
-    #  option clitcpka
-    #  timeout client 3h
-    #  timeout server 3h
-    #  default_backend tb_mqtts
+    # TLS is terminated here with the same Let's Encrypt certificate as the HTTPS frontend, so
+    # devices can connect to mqtts://app.greeniq.vn:8883 while the transport stays plain inside
+    # the cluster (set MQTT_SSL_ENABLED=true on the transport instead if you prefer end to end).
+    frontend mqtts-in
+      mode tcp
+      bind *:8883 ssl crt /certs/tls.pem
+      option tcplog
+      option clitcpka
+      timeout client 3h
+      default_backend tb_mqtts
 
-    #backend tb_mqtts
-    #  mode tcp
-    #  balance leastconn
-    #  server tb-mqtt tb-mqtt-transport.thingsboard.svc.cluster.local:8883 check resolvers kube resolve-prefer ipv4
+    backend tb_mqtts
+      mode tcp
+      balance leastconn
+      timeout server 3h
+      server tb-mqtt tb-mqtt-transport.thingsboard.svc.cluster.local:1883 check resolvers kube resolve-prefer ipv4
 
     # ---- Edge RPC (gRPC, 7070) -------------------------------------------------------
     # Edge instances connect here; keep it closed on the public interface if not needed.
@@ -167,10 +185,10 @@ spec:
     matchLabels:
       app.kubernetes.io/name: tb-haproxy
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+    # hostPort is exclusive per node and the pods are spread with a required anti-affinity, so a
+    # rolling update would need a third free node to place the new pod: replace the pods instead.
+    # Expect a few seconds without the edge while HAProxy restarts.
+    type: Recreate
   template:
     metadata:
       labels:

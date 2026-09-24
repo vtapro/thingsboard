@@ -311,39 +311,64 @@ PostgreSQL primary + standby — manifest của ThingsBoard **không phải sử
 
 Đây là danh sách cổng chính thức của ThingsBoard, đối chiếu với manifest trong `deploy/k3s/`:
 
-| Cổng | Protocol | Dịch vụ | Ai giữ cổng trong cụm này | Expose ra ngoài |
+| Cổng | Protocol | Dịch vụ | Ai giữ cổng | Địa chỉ truy cập |
 |---|---|---|---|---|
-| 8080 | TCP | Web UI + REST API | `tb-web-ui` (UI) và `tb-core` (API) — `tb-haproxy` nhận ở `:8080` | `http://<node-ip>:30080` (HAProxy) |
-| 1883 | TCP | MQTT | `tb-mqtt-transport` — `tb-haproxy` proxy TCP ở `:1883` | `mqtt://<node-ip>:31883` |
-| 8883 | TCP | MQTT over SSL | `tb-mqtt-transport` (bật `MQTT_SSL_ENABLED=true` + cert), HAProxy frontend `mqtts-in` | NodePort 30883 (bật cùng lúc) |
-| 5683 | UDP | CoAP | `tb-coap-transport` | NodePort 30683 (UDP) |
-| 5684 | UDP | CoAP over DTLS | `tb-coap-transport` (`COAP_DTLS_ENABLED=true` + cert) | NodePort 30684 (UDP) |
-| 5685 | UDP | LwM2M CoAP | `tb-lwm2m-transport` | NodePort 30685 (UDP) |
-| 5686 | UDP | LwM2M over DTLS | `tb-lwm2m-transport` + cert | NodePort 30686 (UDP) |
-| 5687 | UDP | LwM2M Bootstrap | `tb-lwm2m-transport` (`LWM2M_ENABLED_BS=true`) | NodePort 30687 (UDP) |
-| 5688 | UDP | LwM2M Bootstrap DTLS | `tb-lwm2m-transport` + cert | NodePort 30688 (UDP) |
-| 161 | UDP | SNMP | `tb-snmp-transport` (`SNMP_BIND_PORT=161`) | NodePort 30161 (UDP) |
-| 7070 | TCP | Edge RPC (gRPC) | `tb-core` — HAProxy frontend `edge-in` | NodePort 30707 |
+| 80 | TCP | Web UI + REST API (HTTP) | `tb-haproxy` (hostPort 80) | `http://app.greeniq.vn` |
+| 443 | TCP | Web UI + REST API (HTTPS, cert Let's Encrypt) | `tb-haproxy` (hostPort 443) | `https://app.greeniq.vn` |
+| 1883 | TCP | MQTT | `tb-haproxy` (hostPort 1883 → `tb-mqtt-transport`) | `mqtt://app.greeniq.vn:1883` |
+| 8883 | TCP | MQTT over SSL | `tb-haproxy` (TLS terminate, hostPort 8883) | `mqtts://app.greeniq.vn:8883` |
+| 5683 | UDP | CoAP | `tb-coap-transport` (hostPort 5683) | `<worker-ip>:5683` |
+| 5684 | UDP | CoAP over DTLS | `tb-coap-transport` (bật `COAP_DTLS_ENABLED=true` + cert) | `<worker-ip>:5684` |
+| 5685 | UDP | LwM2M CoAP | `tb-lwm2m-transport` (hostPort 5685) | `<worker-ip>:5685` |
+| 5686 | UDP | LwM2M over DTLS | `tb-lwm2m-transport` + cert | `<worker-ip>:5686` |
+| 5687 | UDP | LwM2M Bootstrap | `tb-lwm2m-transport` (hostPort 5687) | `<worker-ip>:5687` |
+| 5688 | UDP | LwM2M Bootstrap DTLS | `tb-lwm2m-transport` + cert | `<worker-ip>:5688` |
+| 161 | UDP | SNMP | `tb-snmp-transport` (hostPort 161) | `<worker-ip>:161` |
+| 7070 | TCP | Edge RPC (gRPC) | `tb-haproxy` (hostPort 7070 → `tb-core`) | `<worker-ip>:7070` |
 
-Hai lưu ý quan trọng:
+**HAProxy không hỗ trợ UDP**, nên CoAP/LwM2M/SNMP được phục vụ trực tiếp bằng `hostPort` trên
+transport (đúng số cổng chuẩn, không cần DNAT). Các cổng TCP đi qua HAProxy để có TLS và một điểm
+vào duy nhất; NodePort (30080/31883/30707) vẫn còn trong `Service` cho nhu cầu nội bộ.
 
-- **HAProxy không hỗ trợ UDP**, nên CoAP/LwM2M/SNMP phải expose trực tiếp bằng `NodePort` (đúng như
-  manifest 24-protocol-transports.yaml). Muốn đúng số cổng công khai (5683, 5685, 161...) thì cần
-  thêm rule DNAT trên firewall của 2 worker, hoặc dùng MetalLB/`hostNetwork`:
+Kiểm tra nhanh:
 
-  ```bash
-  # ví dụ DNAT trên worker (cần chạy với quyền root trên node)
-  # /etc/nftables.conf hoặc iptables:
-  #   udp dport 5683 dnat to <node-ip>:30683
-  #   udp dport 5685 dnat to <node-ip>:30685
-  #   udp dport 161  dnat to <node-ip>:30161
-  ```
+```bash
+kubectl -n thingsboard run portcheck --rm -i --restart=Never --image=busybox:1.37 -- \
+  sh -c 'for p in 80 443 1883 8883 7070; do printf "%-6s " $p; nc -z -w2 <worker-ip> $p && echo OPEN || echo closed; done'
+```
 
-- **Cổng NodePort phải nằm trong 30000–32767**, nên bảng trên dùng số chuyển tiếp; khách/thiết bị
-  chỉ cần cấu hình đúng số đó (hoặc rule DNAT ở trên nếu muốn số gốc).
+### 3.5. Chứng chỉ TLS (Let's Encrypt) và gia hạn tự động
 
-Firewall trên 2 worker cần mở (nếu expose công khai): `30080/tcp`, `31883/tcp`, `30707/tcp`,
-`30683-30688/udp`, `30161/udp`, và `30883/tcp` khi bật MQTT over SSL.
+HAProxy chỉ là proxy, **không phát hành chứng chỉ** — nó cần cert do CA cấp (giống bản docker chính
+thức của ThingsBoard ghép `haproxy + certbot`). Trong cụm này:
+
+| Thành phần | Vai trò |
+|---|---|
+| `31-acme-webroot.yaml` | Pod nginx + PVC `tb-acme-webroot`: nơi chứa challenge HTTP-01 |
+| `31-certbot-issue.yaml` | Job xin cert (chạy lại khi cần cấp mới/force) |
+| `32-certbot-renew.yaml` | CronJob ngày 1 mỗi tháng: renew + cập nhật secret + restart HAProxy |
+| `scripts/use-letsencrypt-cert.ps1` | Lấy cert từ PVC → secret `tb-haproxy-tls` → restart HAProxy |
+
+Cách hoạt động: HAProxy route `/.well-known/acme-challenge/` sang pod nginx, certbot (job) ghi
+challenge vào PVC dùng chung, nên Let's Encrypt kiểm tra được dù DNS trỏ vào worker nào trong 2
+worker.
+
+```bash
+# cap moi / gia han thu cong
+kubectl -n thingsboard delete job tb-certbot --ignore-not-found
+kubectl apply -f deploy/k3s/31-certbot-issue.yaml
+kubectl -n thingsboard logs job/tb-certbot -f
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\use-letsencrypt-cert.ps1
+
+# kiem tra gia han tu dong
+kubectl -n thingsboard get cronjob tb-certbot-renew
+kubectl -n thingsboard create job tb-certbot-renew-manual --from=cronjob/tb-certbot-renew
+kubectl -n thingsboard logs job/tb-certbot-renew-manual
+```
+
+> Lưu ý vận hành: **sửa ConfigMap `tb-haproxy-config` xong phải `kubectl rollout restart
+> deploy/tb-haproxy`** để HAProxy nạp lại cấu hình. Deployment dùng strategy `Recreate` (vì
+> `hostPort` chỉ cho 1 pod/node), nên có vài giây gián đoạn khi restart.
 
 ### 3.3. Cụm k3s thực tế (kiểm tra ngày 2026-09-24)
 

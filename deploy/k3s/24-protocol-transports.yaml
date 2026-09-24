@@ -77,9 +77,11 @@ spec:
           ports:
             - name: coap
               containerPort: 5683
+              hostPort: 5683
               protocol: UDP
             - name: coap-dtls
               containerPort: 5684
+              hostPort: 5684
               protocol: UDP
             - name: http
               containerPort: 8080
@@ -202,15 +204,19 @@ spec:
           ports:
             - name: lwm2m
               containerPort: 5685
+              hostPort: 5685
               protocol: UDP
             - name: lwm2m-dtls
               containerPort: 5686
+              hostPort: 5686
               protocol: UDP
             - name: lwm2m-bs
               containerPort: 5687
+              hostPort: 5687
               protocol: UDP
             - name: lwm2m-bs-dtls
               containerPort: 5688
+              hostPort: 5688
               protocol: UDP
             - name: http
               containerPort: 8080
@@ -329,6 +335,7 @@ spec:
           ports:
             - name: snmp
               containerPort: 161
+              hostPort: 161
               protocol: UDP
             - name: http
               containerPort: 8080
