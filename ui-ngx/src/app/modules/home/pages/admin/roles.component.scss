@@ -1,48 +1,39 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
-.tb-roles-add {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-  align-items: start;
-  margin-bottom: 12px;
-}
+@import '../../../../../scss/constants';
 
-.tb-roles-field {
-  min-width: 0;
-}
-
-.tb-roles-ops {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  padding-top: 8px;
-}
-
-.tb-roles-table {
+:host {
+  display: block;
   width: 100%;
+  height: 100%;
+  overflow: auto;
 }
 
-.tb-roles-users {
-  min-width: 260px;
-  width: 100%;
+.tb-roles-page {
+  padding: 16px;
+  max-width: 1440px;
+  margin: 0 auto;
 }
 
-.tb-roles-actions {
+.tb-roles-card {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 16px;
+  flex-direction: column;
 }
 
-.tb-roles-groups-title {
-  margin-bottom: 8px;
+.tb-roles-header {
+  padding: 16px 16px 8px;
+
+  .mat-card-title {
+    margin-bottom: 4px;
+  }
+
+  .mat-card-subtitle {
+    color: rgba(0, 0, 0, 0.6);
+  }
 }
 
-.tb-roles-public {
-  padding-top: 12px;
-  align-self: center;
+.tb-roles-content {
+  padding: 0 16px 16px;
 }
 
 .tb-roles-tabs {
@@ -51,32 +42,89 @@
   }
 }
 
-.tb-roles-tab-content {
-  padding-top: 8px;
+.tb-roles-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 8px;
+}
+
+.tb-roles-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.01);
+}
+
+.tb-roles-section-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.tb-roles-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .tb-roles-hint {
-  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 18px;
   color: rgba(0, 0, 0, 0.6);
+  max-width: 860px;
+}
+
+.tb-roles-create {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tb-roles-name {
+  min-width: 260px;
+  max-width: 360px;
+  flex: 1 1 260px;
+}
+
+.tb-roles-own-customer {
+  padding-bottom: 2px;
 }
 
 .tb-roles-resource-tabs {
-  margin-bottom: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: #fff;
 }
 
 .tb-roles-resource {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-top: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  padding: 12px 16px 16px;
+}
+
+.tb-roles-ops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
 }
 
 .tb-roles-scope {
-  max-width: 480px;
+  min-width: 260px;
+  max-width: 420px;
+  flex: 1 1 260px;
 }
 
 .tb-roles-resource-name {
-  margin-right: 8px;
+  margin-right: 6px;
+  font-weight: 500;
 }
 
 .tb-roles-resource-badge {
@@ -84,5 +132,102 @@
   border-radius: 8px;
   font-size: 11px;
   line-height: 18px;
-  background: rgba(0, 0, 0, 0.08);
+  background: rgba(48, 86, 128, 0.12);
+  color: #305680;
+}
+
+.tb-roles-table {
+  width: 100%;
+  background: transparent;
+}
+
+.tb-roles-users-select {
+  width: 100%;
+  min-width: 220px;
+  max-width: 360px;
+}
+
+.tb-roles-cell-strong {
+  font-weight: 500;
+}
+
+.tb-roles-cell-hint {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 320px;
+}
+
+.tb-roles-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0;
+}
+
+.tb-roles-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  line-height: 18px;
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.75);
+
+  &.tb-roles-chip-scoped {
+    background: rgba(48, 86, 128, 0.12);
+    color: #305680;
+  }
+}
+
+.tb-roles-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.tb-roles-public-icon {
+  opacity: 0.45;
+
+  &.tb-on {
+    opacity: 1;
+    color: #198038;
+  }
+}
+
+.tb-roles-empty {
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.5);
+  border: 1px dashed rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+}
+
+.tb-entity-group-dialog-hint {
+  margin-top: 8px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+@media #{$mat-xs} {
+  .tb-roles-page {
+    padding: 8px;
+  }
+
+  .tb-roles-name,
+  .tb-roles-scope,
+  .tb-roles-users-select {
+    min-width: 100%;
+    max-width: 100%;
+  }
 }

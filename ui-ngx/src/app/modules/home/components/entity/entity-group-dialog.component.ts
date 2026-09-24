@@ -8,6 +8,9 @@ export interface EntityGroupDialogData {
   name?: string;
   description?: string;
   publicGroup?: boolean;
+  entityType?: string;
+  /** When provided, the dialog lets the administrator choose the entity type of a new group. */
+  entityTypes?: string[];
 }
 
 @Component({
@@ -25,15 +28,21 @@ export class EntityGroupDialogComponent {
     this.groupForm = this.fb.group({
       name: [null, [Validators.required]],
       description: [null],
-      publicGroup: [false]
+      publicGroup: [false],
+      entityType: [data?.entityType || data?.entityTypes?.[0] || 'DEVICE']
     });
     if (data) {
       this.groupForm.patchValue({
         name: data.name,
         description: data.description,
-        publicGroup: !!data.publicGroup
+        publicGroup: !!data.publicGroup,
+        entityType: data.entityType || data.entityTypes?.[0] || 'DEVICE'
       });
     }
+  }
+
+  get entityTypes(): string[] {
+    return this.data?.entityTypes || [];
   }
 
   get isEdit(): boolean {
@@ -53,4 +62,3 @@ export class EntityGroupDialogComponent {
   }
 
 }
-

@@ -4,290 +4,354 @@
     SPDX-License-Identifier: Apache-2.0
 
 -->
-<div>
-  <mat-card appearance="outlined" class="settings-card">
-    <mat-card-header>
+<div class="tb-roles-page">
+  <mat-card appearance="outlined" class="settings-card tb-roles-card">
+    <mat-card-header class="tb-roles-header">
       <mat-card-title>
         <span class="mat-headline-5" translate>admin.roles</span>
       </mat-card-title>
+      <mat-card-subtitle translate>admin.roles-subtitle</mat-card-subtitle>
     </mat-card-header>
     @if (isLoading$ | async) {
       <mat-progress-bar color="warn" mode="indeterminate"></mat-progress-bar>
     }
-    @if (!(isLoading$ | async)) {
-      <div style="height: 4px;"></div>
-    }
-    <mat-card-content>
+    <mat-card-content class="tb-roles-content">
       <mat-tab-group class="tb-roles-tabs" mat-stretch-tabs="false" mat-align-tabs="start">
-        <mat-tab [label]="'admin.roles' | translate">
-          <div class="tb-roles-tab-content">
-            <div class="tb-roles-add">
-              <mat-form-field class="tb-roles-field" subscriptSizing="dynamic" appearance="outline">
-                <mat-label translate>admin.roles-name</mat-label>
-                <input matInput [formControl]="nameControl">
-              </mat-form-field>
-              <mat-checkbox class="tb-roles-public" [formControl]="ownCustomerOnlyControl">
-                {{ 'admin.roles-own-customer-only' | translate }}
-              </mat-checkbox>
-              <button mat-raised-button color="primary" type="button" (click)="addRole()">
-                {{ 'admin.roles-add' | translate }}
-              </button>
-            </div>
-            <div class="tb-small tb-roles-hint" translate>admin.roles-permissions-hint</div>
-            <mat-tab-group class="tb-roles-resource-tabs" mat-stretch-tabs="false" mat-align-tabs="start">
-              @for (resource of resources; track resource) {
-                <mat-tab>
-                  <ng-template mat-tab-label>
-                    <span class="tb-roles-resource-name">{{ resource }}</span>
-                    @if (resourceGrantSummary(resource)) {
-                      <span class="tb-roles-resource-badge">{{ resourceGrantSummary(resource) }}</span>
-                    }
-                  </ng-template>
-                  <div class="tb-roles-resource">
-                    <div class="tb-roles-ops">
-                      @for (operation of operations; track operation) {
-                        <mat-checkbox [checked]="isOperationGranted(resource, operation)"
-                                      (change)="toggleOperation(resource, operation)">
-                          {{ operation }}
-                        </mat-checkbox>
+
+        <!-- ------------------------------------------------------------------ roles -->
+        <mat-tab [label]="'admin.roles-tab-roles' | translate">
+          <div class="tb-roles-tab">
+            <section class="tb-roles-section">
+              <div class="tb-roles-section-title" translate>admin.roles-create</div>
+              <div class="tb-roles-create">
+                <mat-form-field class="tb-roles-name" subscriptSizing="dynamic" appearance="outline">
+                  <mat-label translate>admin.roles-name</mat-label>
+                  <input matInput [formControl]="nameControl">
+                </mat-form-field>
+                <mat-checkbox class="tb-roles-own-customer" [formControl]="ownCustomerOnlyControl">
+                  {{ 'admin.roles-own-customer-only' | translate }}
+                </mat-checkbox>
+                <span class="flex-1"></span>
+                <button mat-flat-button color="primary" type="button" (click)="addRole()">
+                  <mat-icon>add</mat-icon>
+                  {{ 'admin.roles-add' | translate }}
+                </button>
+              </div>
+              <div class="tb-roles-hint" translate>admin.roles-permissions-hint</div>
+              <mat-tab-group class="tb-roles-resource-tabs" mat-stretch-tabs="false" mat-align-tabs="start">
+                @for (resource of resources; track resource) {
+                  <mat-tab>
+                    <ng-template mat-tab-label>
+                      <span class="tb-roles-resource-name">{{ resource }}</span>
+                      @if (resourceGrantSummary(resource)) {
+                        <span class="tb-roles-resource-badge">{{ resourceGrantSummary(resource) }}</span>
                       }
-                    </div>
-                    <mat-form-field class="tb-roles-scope" subscriptSizing="dynamic" appearance="outline">
-                      <mat-label translate>admin.roles-scope-groups</mat-label>
-                      <mat-select multiple
-                                  [disabled]="!hasAnyOperation(resource) || !canScopeToGroups(resource)"
-                                  [value]="groupsFor(resource)"
-                                  (selectionChange)="setGroups(resource, $event.value)">
-                        @for (group of groups; track group.id) {
-                          <mat-option [value]="group.id">{{ group.name }}</mat-option>
+                    </ng-template>
+                    <div class="tb-roles-resource">
+                      <div class="tb-roles-ops">
+                        @for (operation of operations; track operation) {
+                          <mat-checkbox [checked]="isOperationGranted(resource, operation)"
+                                        (change)="toggleOperation(resource, operation)">
+                            {{ operation }}
+                          </mat-checkbox>
                         }
-                      </mat-select>
-                      @if (!canScopeToGroups(resource)) {
-                        <mat-hint>{{ 'admin.roles-scope-not-supported' | translate: {resource} }}</mat-hint>
-                      }
-                    </mat-form-field>
-                  </div>
-                </mat-tab>
+                      </div>
+                      <mat-form-field class="tb-roles-scope" subscriptSizing="dynamic" appearance="outline">
+                        <mat-label translate>admin.roles-scope-groups</mat-label>
+                        <mat-select multiple
+                                    [disabled]="!hasAnyOperation(resource) || !canScopeToGroups(resource)"
+                                    [value]="groupsFor(resource)"
+                                    (selectionChange)="setGroups(resource, $event.value)">
+                          @for (group of groups; track group.id) {
+                            <mat-option [value]="group.id">{{ group.name }}</mat-option>
+                          }
+                        </mat-select>
+                        @if (!canScopeToGroups(resource)) {
+                          <mat-hint>{{ 'admin.roles-scope-not-supported' | translate: {resource} }}</mat-hint>
+                        }
+                      </mat-form-field>
+                    </div>
+                  </mat-tab>
+                }
+              </mat-tab-group>
+            </section>
+
+            <section class="tb-roles-section">
+              <div class="tb-roles-section-bar">
+                <div class="tb-roles-section-title" translate>admin.roles-list</div>
+                <span class="flex-1"></span>
+                <button mat-flat-button color="primary" type="button" (click)="save()" [disabled]="!roles.length">
+                  <mat-icon>save</mat-icon>
+                  {{ 'action.save' | translate }}
+                </button>
+              </div>
+              @if (!roles.length) {
+                <div class="tb-roles-empty" translate>admin.roles-empty</div>
+              } @else {
+                <table mat-table [dataSource]="roles" class="tb-roles-table">
+                  <ng-container matColumnDef="name">
+                    <th mat-header-cell *matHeaderCellDef translate>admin.roles-name</th>
+                    <td mat-cell *matCellDef="let role">
+                      <div class="tb-roles-cell-strong">{{ role.name }}</div>
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="permissions">
+                    <th mat-header-cell *matHeaderCellDef translate>admin.roles-permissions</th>
+                    <td mat-cell *matCellDef="let role">
+                      <div class="tb-roles-chips">
+                        @for (chip of permissionChips(role); track chip.label) {
+                          <span class="tb-roles-chip" [class.tb-roles-chip-scoped]="chip.scoped">{{ chip.label }}</span>
+                        }
+                      </div>
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="users">
+                    <th mat-header-cell *matHeaderCellDef translate>admin.roles-users</th>
+                    <td mat-cell *matCellDef="let role">
+                      <div class="tb-roles-cell-hint">{{ roleUsersLabel(role) }}</div>
+                      <mat-form-field class="tb-roles-users-select" subscriptSizing="dynamic" appearance="outline">
+                        <mat-select multiple placeholder="{{ 'admin.roles-assign-users' | translate }}"
+                                    [value]="role.userIds || []"
+                                    (selectionChange)="setRoleUsers(role, $event.value)">
+                          @for (user of users; track user.id.id) {
+                            <mat-option [value]="user.id.id">{{ userLabel(user) }}</mat-option>
+                          }
+                        </mat-select>
+                      </mat-form-field>
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="actions">
+                    <th mat-header-cell *matHeaderCellDef></th>
+                    <td mat-cell *matCellDef="let role">
+                      <button mat-icon-button type="button" (click)="removeRole(role)"
+                              [matTooltip]="'admin.roles-delete-title' | translate: {name: role.name}">
+                        <mat-icon>delete_outline</mat-icon>
+                      </button>
+                    </td>
+                  </ng-container>
+                  <tr mat-header-row *matHeaderRowDef="roleColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: roleColumns;"></tr>
+                </table>
               }
-            </mat-tab-group>
-            <table mat-table [dataSource]="roles" class="mat-elevation-z0 tb-roles-table">
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef translate>admin.roles-name</th>
-                <td mat-cell *matCellDef="let role">{{ role.name }}</td>
-              </ng-container>
-              <ng-container matColumnDef="permissions">
-                <th mat-header-cell *matHeaderCellDef translate>admin.roles-permissions</th>
-                <td mat-cell *matCellDef="let role">{{ permissionSummary(role) }}</td>
-              </ng-container>
-              <ng-container matColumnDef="users">
-                <th mat-header-cell *matHeaderCellDef translate>admin.roles-users</th>
-                <td mat-cell *matCellDef="let role">
-                  <mat-form-field subscriptSizing="dynamic" appearance="outline" class="tb-roles-users">
-                    <mat-select multiple
-                                [value]="role.userIds || []"
-                                (selectionChange)="setRoleUsers(role, $event.value)">
-                      @for (user of users; track user.id.id) {
-                        <mat-option [value]="user.id.id">{{ userLabel(user) }}</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
-                </td>
-              </ng-container>
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let role">
-                  <button mat-icon-button type="button" (click)="removeRole(role)">
-                    <mat-icon>delete</mat-icon>
-                  </button>
-                </td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-            </table>
-            <div class="tb-roles-actions">
-              <span class="flex-1"></span>
-              <button mat-raised-button color="primary" type="button" (click)="save()">
-                {{ 'action.save' | translate }}
-              </button>
-            </div>
+            </section>
           </div>
         </mat-tab>
-        <mat-tab [label]="'admin.roles-entity-groups' | translate">
-          <div class="tb-roles-tab-content">
-            <div class="tb-roles-add">
-              <mat-form-field class="tb-roles-field" subscriptSizing="dynamic" appearance="outline">
-                <mat-label translate>admin.roles-name</mat-label>
-                <input matInput [formControl]="groupNameControl">
-              </mat-form-field>
-              <mat-form-field class="tb-roles-field" subscriptSizing="dynamic" appearance="outline">
-                <mat-label translate>admin.roles-entity-type</mat-label>
-                <mat-select [formControl]="groupTypeControl">
-                  @for (entityType of entityTypes; track entityType) {
-                    <mat-option [value]="entityType">{{ entityType }}</mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-              <mat-form-field class="tb-roles-field" subscriptSizing="dynamic" appearance="outline">
-                <mat-label translate>admin.roles-entity-ids</mat-label>
-                <input matInput [formControl]="groupIdsControl">
-              </mat-form-field>
-              <mat-form-field class="tb-roles-field" subscriptSizing="dynamic" appearance="outline">
-                <mat-label translate>admin.roles-description</mat-label>
-                <input matInput [formControl]="groupDescriptionControl">
-              </mat-form-field>
-              <mat-checkbox class="tb-roles-public" [formControl]="groupPublicControl">
-                {{ 'admin.roles-public' | translate }}
-              </mat-checkbox>
-              <button mat-stroked-button color="primary" type="button" (click)="addGroup()">
-                {{ 'admin.roles-add-group' | translate }}
-              </button>
-            </div>
-            <table mat-table [dataSource]="groups" class="mat-elevation-z0 tb-roles-table">
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef translate>admin.roles-name</th>
-                <td mat-cell *matCellDef="let group">{{ group.name }}</td>
-              </ng-container>
-              <ng-container matColumnDef="entityType">
-                <th mat-header-cell *matHeaderCellDef translate>admin.roles-entity-type</th>
-                <td mat-cell *matCellDef="let group">{{ group.entityType }}</td>
-              </ng-container>
-              <ng-container matColumnDef="members">
-                <th mat-header-cell *matHeaderCellDef translate>admin.roles-members</th>
-                <td mat-cell *matCellDef="let group">{{ group.entityIds?.length || 0 }}</td>
-              </ng-container>
-              <ng-container matColumnDef="description">
-                <th mat-header-cell *matHeaderCellDef translate>admin.roles-description</th>
-                <td mat-cell *matCellDef="let group">{{ group.description }}</td>
-              </ng-container>
-              <ng-container matColumnDef="publicGroup">
-                <th mat-header-cell *matHeaderCellDef translate>admin.roles-public</th>
-                <td mat-cell *matCellDef="let group">
-                  <mat-checkbox [checked]="group.publicGroup" disabled></mat-checkbox>
-                </td>
-              </ng-container>
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let group">
-                  <button mat-icon-button type="button" (click)="removeGroup(group)">
-                    <mat-icon>delete</mat-icon>
-                  </button>
-                </td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="groupColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: groupColumns;"></tr>
-            </table>
-            <div class="tb-roles-actions">
-              <span class="flex-1"></span>
-              <button mat-raised-button color="primary" type="button" (click)="saveGroups()">
-                {{ 'action.save' | translate }}
-              </button>
-            </div>
+
+        <!-- ---------------------------------------------------------- entity groups -->
+        <mat-tab [label]="'admin.roles-tab-entity-groups' | translate">
+          <div class="tb-roles-tab">
+            <section class="tb-roles-section">
+              <div class="tb-roles-section-bar">
+                <div>
+                  <div class="tb-roles-section-title" translate>admin.roles-entity-groups</div>
+                  <div class="tb-roles-hint" translate>admin.roles-entity-groups-hint</div>
+                </div>
+                <span class="flex-1"></span>
+                <button mat-flat-button color="primary" type="button" (click)="addGroup()">
+                  <mat-icon>add</mat-icon>
+                  {{ 'admin.roles-add-group' | translate }}
+                </button>
+              </div>
+              @if (!groups.length) {
+                <div class="tb-roles-empty" translate>admin.roles-entity-groups-empty</div>
+              } @else {
+                <table mat-table [dataSource]="groups" class="tb-roles-table">
+                  <ng-container matColumnDef="name">
+                    <th mat-header-cell *matHeaderCellDef translate>admin.roles-name</th>
+                    <td mat-cell *matCellDef="let group">
+                      <div class="tb-roles-cell-strong">{{ group.name }}</div>
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="entityType">
+                    <th mat-header-cell *matHeaderCellDef translate>admin.roles-entity-type</th>
+                    <td mat-cell *matCellDef="let group">
+                      <span class="tb-roles-chip">{{ group.entityType }}</span>
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="description">
+                    <th mat-header-cell *matHeaderCellDef translate>admin.roles-description</th>
+                    <td mat-cell *matCellDef="let group">
+                      <div class="tb-roles-cell-hint">{{ group.description || '—' }}</div>
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="public">
+                    <th mat-header-cell *matHeaderCellDef translate>admin.roles-public</th>
+                    <td mat-cell *matCellDef="let group">
+                      <mat-icon class="tb-roles-public-icon" [class.tb-on]="group.publicGroup">
+                        {{ group.publicGroup ? 'public' : 'lock_outline' }}
+                      </mat-icon>
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="members">
+                    <th mat-header-cell *matHeaderCellDef translate>admin.roles-members</th>
+                    <td mat-cell *matCellDef="let group">
+                      <span class="tb-roles-badge">{{ membersLabel(group) }}</span>
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="actions">
+                    <th mat-header-cell *matHeaderCellDef></th>
+                    <td mat-cell *matCellDef="let group">
+                      <button mat-icon-button type="button" (click)="addGroupMembers(group)"
+                              [matTooltip]="'entity-group.add-members' | translate">
+                        <mat-icon>playlist_add</mat-icon>
+                      </button>
+                      <button mat-icon-button type="button" (click)="editGroup(group)"
+                              [matTooltip]="'action.edit' | translate">
+                        <mat-icon>edit_outlined</mat-icon>
+                      </button>
+                      <button mat-icon-button type="button" (click)="removeGroup(group)"
+                              [matTooltip]="'entity-group.delete' | translate">
+                        <mat-icon>delete_outline</mat-icon>
+                      </button>
+                    </td>
+                  </ng-container>
+                  <tr mat-header-row *matHeaderRowDef="groupColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: groupColumns;"></tr>
+                </table>
+              }
+            </section>
           </div>
         </mat-tab>
-        <mat-tab [label]="'admin.roles-user-groups' | translate">
-          <div class="tb-roles-tab-content">
-            <div class="tb-roles-add">
-              <mat-form-field class="tb-roles-field" subscriptSizing="dynamic" appearance="outline">
-                <mat-label translate>admin.roles-name</mat-label>
-                <input matInput [formControl]="userGroupNameControl">
-              </mat-form-field>
-              <button mat-stroked-button color="primary" type="button" (click)="addUserGroup()">
-                {{ 'admin.roles-add-user-group' | translate }}
-              </button>
-            </div>
-            <table mat-table [dataSource]="userGroups" class="mat-elevation-z0 tb-roles-table">
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef translate>admin.roles-name</th>
-                <td mat-cell *matCellDef="let group">{{ group.name }}</td>
-              </ng-container>
-              <ng-container matColumnDef="userIds">
-                <th mat-header-cell *matHeaderCellDef translate>admin.roles-users</th>
-                <td mat-cell *matCellDef="let group">
-                  <mat-form-field subscriptSizing="dynamic" appearance="outline" class="tb-roles-users">
-                    <mat-select multiple [value]="group.userIds || []"
-                                (selectionChange)="setUserGroupUsers(group, $event.value)">
-                      @for (user of users; track user.id.id) {
-                        <mat-option [value]="user.id.id">{{ userLabel(user) }}</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
-                </td>
-              </ng-container>
-              <ng-container matColumnDef="roleIds">
-                <th mat-header-cell *matHeaderCellDef translate>admin.roles-role</th>
-                <td mat-cell *matCellDef="let group">
-                  <mat-form-field subscriptSizing="dynamic" appearance="outline" class="tb-roles-users">
-                    <mat-select multiple [value]="group.roleIds || []"
-                                (selectionChange)="setUserGroupRoles(group, $event.value)">
-                      @for (role of roles; track role.id) {
-                        <mat-option [value]="role.id">{{ role.name }}</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
-                </td>
-              </ng-container>
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let group">
-                  <button mat-icon-button type="button" (click)="removeUserGroup(group)">
-                    <mat-icon>delete</mat-icon>
-                  </button>
-                </td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="userGroupColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: userGroupColumns;"></tr>
-            </table>
-            <div class="tb-roles-actions">
-              <span class="flex-1"></span>
-              <button mat-raised-button color="primary" type="button" (click)="saveUserGroups()">
-                {{ 'action.save' | translate }}
-              </button>
-            </div>
+
+        <!-- ------------------------------------------------------------ user groups -->
+        <mat-tab [label]="'admin.roles-tab-user-groups' | translate">
+          <div class="tb-roles-tab">
+            <section class="tb-roles-section">
+              <div class="tb-roles-section-bar">
+                <div>
+                  <div class="tb-roles-section-title" translate>admin.roles-user-groups</div>
+                  <div class="tb-roles-hint" translate>admin.roles-user-groups-hint</div>
+                </div>
+                <span class="flex-1"></span>
+                <button mat-flat-button color="primary" type="button" (click)="saveUserGroups()">
+                  <mat-icon>save</mat-icon>
+                  {{ 'action.save' | translate }}
+                </button>
+              </div>
+              <div class="tb-roles-create">
+                <mat-form-field class="tb-roles-name" subscriptSizing="dynamic" appearance="outline">
+                  <mat-label translate>admin.roles-name</mat-label>
+                  <input matInput [formControl]="userGroupNameControl">
+                </mat-form-field>
+                <span class="flex-1"></span>
+                <button mat-stroked-button color="primary" type="button" (click)="addUserGroup()">
+                  <mat-icon>add</mat-icon>
+                  {{ 'admin.roles-add-user-group' | translate }}
+                </button>
+              </div>
+              @if (!userGroups.length) {
+                <div class="tb-roles-empty" translate>admin.roles-user-groups-empty</div>
+              } @else {
+                <table mat-table [dataSource]="userGroups" class="tb-roles-table">
+                  <ng-container matColumnDef="name">
+                    <th mat-header-cell *matHeaderCellDef translate>admin.roles-name</th>
+                    <td mat-cell *matCellDef="let group">
+                      <div class="tb-roles-cell-strong">{{ group.name }}</div>
+                      <div class="tb-roles-cell-hint">{{ userGroupUsersLabel(group) }}</div>
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="userIds">
+                    <th mat-header-cell *matHeaderCellDef translate>admin.roles-users</th>
+                    <td mat-cell *matCellDef="let group">
+                      <mat-form-field class="tb-roles-users-select" subscriptSizing="dynamic" appearance="outline">
+                        <mat-select multiple [value]="group.userIds || []"
+                                    (selectionChange)="setUserGroupUsers(group, $event.value)">
+                          @for (user of users; track user.id.id) {
+                            <mat-option [value]="user.id.id">{{ userLabel(user) }}</mat-option>
+                          }
+                        </mat-select>
+                      </mat-form-field>
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="roleIds">
+                    <th mat-header-cell *matHeaderCellDef translate>admin.roles-role</th>
+                    <td mat-cell *matCellDef="let group">
+                      <mat-form-field class="tb-roles-users-select" subscriptSizing="dynamic" appearance="outline">
+                        <mat-select multiple [value]="group.roleIds || []"
+                                    (selectionChange)="setUserGroupRoles(group, $event.value)">
+                          @for (role of roles; track role.id) {
+                            <mat-option [value]="role.id">{{ role.name }}</mat-option>
+                          }
+                        </mat-select>
+                      </mat-form-field>
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="actions">
+                    <th mat-header-cell *matHeaderCellDef></th>
+                    <td mat-cell *matCellDef="let group">
+                      <button mat-icon-button type="button" (click)="removeUserGroup(group)">
+                        <mat-icon>delete_outline</mat-icon>
+                      </button>
+                    </td>
+                  </ng-container>
+                  <tr mat-header-row *matHeaderRowDef="userGroupColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: userGroupColumns;"></tr>
+                </table>
+              }
+            </section>
           </div>
         </mat-tab>
-        <mat-tab [label]="'admin.roles-customer-hierarchy' | translate">
-          <div class="tb-roles-tab-content">
-            <div class="tb-roles-add">
-              <mat-form-field class="tb-roles-field" subscriptSizing="dynamic" appearance="outline">
-                <mat-label translate>admin.roles-child-customer</mat-label>
-                <mat-select [formControl]="childCustomerControl">
-                  @for (customer of customers; track customer.id.id) {
-                    <mat-option [value]="customer.id.id">{{ customer.title }}</mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-              <mat-form-field class="tb-roles-field" subscriptSizing="dynamic" appearance="outline">
-                <mat-label translate>admin.roles-parent-customer</mat-label>
-                <mat-select [formControl]="parentCustomerControl">
-                  @for (customer of customers; track customer.id.id) {
-                    <mat-option [value]="customer.id.id">{{ customer.title }}</mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-              <button mat-stroked-button color="primary" type="button" (click)="addHierarchyRow()">
-                {{ 'admin.roles-add-relation' | translate }}
-              </button>
-            </div>
-            <table mat-table [dataSource]="hierarchyRows" class="mat-elevation-z0 tb-roles-table">
-              <ng-container matColumnDef="child">
-                <th mat-header-cell *matHeaderCellDef translate>admin.roles-child-customer</th>
-                <td mat-cell *matCellDef="let row">{{ customerLabel(row.childId) }}</td>
-              </ng-container>
-              <ng-container matColumnDef="parent">
-                <th mat-header-cell *matHeaderCellDef translate>admin.roles-parent-customer</th>
-                <td mat-cell *matCellDef="let row">{{ customerLabel(row.parentId) }}</td>
-              </ng-container>
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let row">
-                  <button mat-icon-button type="button" (click)="removeHierarchyRow(row)">
-                    <mat-icon>delete</mat-icon>
-                  </button>
-                </td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="hierarchyColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: hierarchyColumns;"></tr>
-            </table>
+
+        <!-- ------------------------------------------------------ customer hierarchy -->
+        <mat-tab [label]="'admin.roles-tab-customer-hierarchy' | translate">
+          <div class="tb-roles-tab">
+            <section class="tb-roles-section">
+              <div class="tb-roles-section-bar">
+                <div>
+                  <div class="tb-roles-section-title" translate>admin.roles-customer-hierarchy</div>
+                  <div class="tb-roles-hint" translate>admin.roles-customer-hierarchy-hint</div>
+                </div>
+              </div>
+              <div class="tb-roles-create">
+                <mat-form-field class="tb-roles-name" subscriptSizing="dynamic" appearance="outline">
+                  <mat-label translate>admin.roles-child-customer</mat-label>
+                  <mat-select [formControl]="childCustomerControl">
+                    @for (customer of customers; track customer.id.id) {
+                      <mat-option [value]="customer.id.id">{{ customer.title }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field class="tb-roles-name" subscriptSizing="dynamic" appearance="outline">
+                  <mat-label translate>admin.roles-parent-customer</mat-label>
+                  <mat-select [formControl]="parentCustomerControl">
+                    @for (customer of customers; track customer.id.id) {
+                      <mat-option [value]="customer.id.id">{{ customer.title }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <span class="flex-1"></span>
+                <button mat-stroked-button color="primary" type="button" (click)="addHierarchyRow()">
+                  <mat-icon>add</mat-icon>
+                  {{ 'admin.roles-add-relation' | translate }}
+                </button>
+              </div>
+              @if (!hierarchyRows.length) {
+                <div class="tb-roles-empty" translate>admin.roles-hierarchy-empty</div>
+              } @else {
+                <table mat-table [dataSource]="hierarchyRows" class="tb-roles-table">
+                  <ng-container matColumnDef="child">
+                    <th mat-header-cell *matHeaderCellDef translate>admin.roles-child-customer</th>
+                    <td mat-cell *matCellDef="let row">
+                      <div class="tb-roles-cell-strong">{{ customerLabel(row.childId) }}</div>
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="parent">
+                    <th mat-header-cell *matHeaderCellDef translate>admin.roles-parent-customer</th>
+                    <td mat-cell *matCellDef="let row">{{ customerLabel(row.parentId) }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="actions">
+                    <th mat-header-cell *matHeaderCellDef></th>
+                    <td mat-cell *matCellDef="let row">
+                      <button mat-icon-button type="button" (click)="removeHierarchyRow(row)">
+                        <mat-icon>delete_outline</mat-icon>
+                      </button>
+                    </td>
+                  </ng-container>
+                  <tr mat-header-row *matHeaderRowDef="hierarchyColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: hierarchyColumns;"></tr>
+                </table>
+              }
+            </section>
           </div>
         </mat-tab>
       </mat-tab-group>

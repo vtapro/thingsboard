@@ -4,28 +4,40 @@
     SPDX-License-Identifier: Apache-2.0
 
 -->
-<h2 mat-dialog-title>{{ isEdit ? 'Edit entity group' : 'Add entity group' }}</h2>
+<h2 mat-dialog-title>
+  {{ (isEdit ? 'entity-group.edit' : 'entity-group.add') | translate }}
+</h2>
 <mat-dialog-content class="tb-entity-group-dialog-content">
   <form [formGroup]="groupForm" class="flex flex-col">
     <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
-      <mat-label>Name</mat-label>
+      <mat-label translate>entity-group.name</mat-label>
       <input matInput formControlName="name" required>
       @if (groupForm.get('name').hasError('required')) {
-        <mat-error>Name is required</mat-error>
+        <mat-error>{{ 'entity-group.name-required' | translate }}</mat-error>
       }
     </mat-form-field>
+    @if (entityTypes.length) {
+      <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>entity-group.entity-type</mat-label>
+        <mat-select formControlName="entityType" [disabled]="isEdit">
+          @for (type of entityTypes; track type) {
+            <mat-option [value]="type">{{ type }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
     <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
-      <mat-label>Description</mat-label>
+      <mat-label translate>entity-group.description</mat-label>
       <textarea matInput rows="3" formControlName="description"></textarea>
     </mat-form-field>
-    <mat-checkbox formControlName="publicGroup">Public</mat-checkbox>
+    <mat-checkbox formControlName="publicGroup">{{ 'entity-group.public' | translate }}</mat-checkbox>
+    <div class="tb-small tb-entity-group-dialog-hint" translate>entity-group.public-hint</div>
   </form>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
-  <button mat-button type="button" (click)="cancel()">Cancel</button>
+  <button mat-button type="button" (click)="cancel()">{{ 'action.cancel' | translate }}</button>
   <button mat-raised-button color="primary" type="button" (click)="save()"
           [disabled]="groupForm.invalid">
-    {{ isEdit ? 'Save' : 'Add' }}
+    {{ (isEdit ? 'action.save' : 'action.add') | translate }}
   </button>
 </mat-dialog-actions>
-

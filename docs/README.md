@@ -12,12 +12,16 @@ SPDX-License-Identifier: Apache-2.0
 
 | Tài liệu | Nội dung |
 |---|---|
-| [local-build-and-run.md](local-build-and-run.md) | Build image và chạy ThingsBoard local bằng Docker, danh sách lệnh, xử lý sự cố |
-| [white-labeling.md](white-labeling.md) | Tính năng white labeling (2 cấp: system và tenant), API, cách cấu hình |
+| [local-dev.md](local-dev.md) | Cài đặt và chạy local trên Windows (PostgreSQL, backend Java, UI dev server), tài khoản mặc định, xử lý sự cố |
+| [white-labeling.md](white-labeling.md) | Tính năng white labeling (system + tenant), API, cách cấu hình |
+| [white-labeling-roadmap.md](white-labeling-roadmap.md) | Lộ trình các phần white labeling còn lại |
+| [access-control-roadmap.md](access-control-roadmap.md) | Lộ trình RBAC (roles, entity groups, user groups, customer hierarchy) |
+| [implementation-status.md](implementation-status.md) | Trạng thái từng tính năng và môi trường chạy local |
+| [code-audit.md](code-audit.md) | Kết quả audit toàn bộ code tự thêm so với ThingsBoard CE, bằng chứng kiểm chứng |
 
 ## Nguyên tắc khi phát triển trên fork
 
 1. Không xoá/đổi header license và không xoá `LICENSE`. File mới phải thêm đúng 2 dòng SPDX ở đầu file.
 2. Ưu tiên module/cấu hình riêng thay vì sửa file core ThingsBoard, để giảm conflict khi merge upstream.
-3. Sau khi thêm file mới, chạy `mvn license:check` (hoặc build image) để chắc chắn không vi phạm check license.
-
+3. Khi thêm file mới, chạy `mvn license:check` để chắc chắn không vi phạm check license.
+4. Môi trường dev hiện tại chạy native trên Windows (xem [local-dev.md](local-dev.md)); không dùng Docker.

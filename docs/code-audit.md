@@ -12,7 +12,7 @@ giữ được license của ThingsBoard và dễ tháo gỡ khi cần.
 | Backend Java (sửa) | 12 | chỉ thêm tham số `tenantId` cho mail service, thêm `findDomainByName`, bổ sung nhánh mặc định trong interface |
 | Frontend Angular (thêm mới) | 45 | service, model, component, dialog, scss |
 | Frontend Angular (sửa) | 25 | menu, title, logo, entity table, admin routing/module, locale, environment |
-| Docker/docs | 11 | `docker/tb-custom/*`, `.dockerignore`, `docs/*` |
+| Docs | 6 | `docs/*` |
 | **Database** | **0** | RBAC và white labeling lưu trong `admin_settings` (JSON) — không đổi schema |
 
 Tổng: 141 file, ~6.2k dòng thêm.
@@ -25,7 +25,7 @@ Tổng: 141 file, ~6.2k dòng thêm.
 | Header trong file gốc bị sửa (`index.html`, `entities-table.component.html`, template mail `.ftl`) | ✅ không đổi | `git diff` chỉ thay nội dung bên trong, khối comment SPDX còn nguyên |
 | `LICENSE` (Apache-2.0) | ✅ còn nguyên, không bị sửa | `git status` |
 | Nội dung "Copyright © ... The ThingsBoard Authors / Licensed under the Apache License, Version 2.0" | ✅ giữ nguyên | `ui-ngx/src/index.html`, `pom.xml`, README |
-| `pom.xml` chỉ thêm 1 dòng loại trừ license-check cho `Dockerfile` | ✅ chấp nhận được | `pom.xml:947` |
+| `pom.xml` chỉ thêm 1 dòng loại trừ license-check (trước đây cho `Dockerfile`) | ✅ chấp nhận được | `pom.xml:947` |
 
 ## 3. Thiết kế tổng thể
 
@@ -64,7 +64,7 @@ AdminSettings (JSON, 1 bản ghi / tenant)
 | H1 | `/api/user/roles` chỉ trả role gán trực tiếp, không gồm role kế thừa từ user group → menu chặn/nhả sai so với quyền thật ở server. | `RoleController.getCurrentUserRoles` (code cũ) tự lọc `role.getUserIds()` | ✅ đã sửa — dùng chung `RoleService.getEffectiveRole(s)` (một nguồn sự thật) |
 | H2 | Mọi lần kiểm tra quyền đều đọc & parse JSON `admin_settings` (roles, userGroups, entityGroups) → thêm 2–3 truy vấn DB cho mỗi request API khi bật RBAC. | `getEffectiveRole`, `entityBelongsToGroups` (code cũ) | ✅ đã sửa — cache TTL 10s theo user/tenant, tự dọn entry hết hạn (đặt `CACHE_TTL_MS = 0` để tắt) |
 | H4 | Không có test tự động nào cho phần mới (RBAC, groups, white labeling, mail template). | `git diff --name-status` không có file trong `*/src/test/*` | ✅ đã thêm `TbRbacAccessControlServiceTest` (12 ca, gồm 2 lỗi C1/C2) và `MailTemplateSecurityTest` (4 ca) |
-| H5 | Build test của module `application` fail: `NotificationApiClientTest` gọi `client.markAllNotificationsAsRead(null)` bị ambiguous giữa overload `Args` và `String` của client sinh tự động. | log build `#16 [ERROR] ... reference to markAllNotificationsAsRead is ambiguous` | ✅ đã sửa — truyền `(String) null` rõ ràng; Dockerfile có thêm `--build-arg TEST_CLASSES=...` để CI compile test + chạy test trọng yếu |
+| H5 | Build test của module `application` fail: `NotificationApiClientTest` gọi `client.markAllNotificationsAsRead(null)` bị ambiguous giữa overload `Args` và `String` của client sinh tự động. | log build cũ: `reference to markAllNotificationsAsRead is ambiguous` | ✅ đã sửa — truyền `(String) null` rõ ràng |
 
 ### MEDIUM
 
@@ -93,9 +93,9 @@ AdminSettings (JSON, 1 bản ghi / tenant)
 | L4 | Cột "Created time" của group hiển thị số epoch thô, và model không lưu `createdTime`. | ✅ đã sửa — thêm `RbacEntityGroup.createdTime` + pipe `date` |
 | L5 | Xoá entity group không có xác nhận. | ✅ đã sửa — thêm dialog xác nhận (`DialogService`) |
 | L6 | Nhiều nhãn tiếng Anh hard-code trong `entity-groups.component.html`. | ✅ đã sửa — dùng khoá i18n `entity-group.*` |
-| L7 | `docker/tb-custom/docker-compose.yml` là stack dev: mật khẩu `postgres/postgres`, publish nhiều cổng, `SECURITY_RBAC_ENABLED: "true"`, không có TLS/healthcheck cho `tb-node`. | ⏳ còn lại — trước khi lên production cần bản compose riêng (TLS, secret, healthcheck, backup) |
-| L8 | `.dockerignore` chưa loại `.idea`, `.github`, `docs` → build context lớn hơn cần thiết (không ảnh hưởng image cuối vì dùng multi-stage). | ✅ đã bổ sung (giữ `.git` vì `git-commit-id-plugin` cần để lấy commit id) |
-| L11 | `docker/tb-custom` chỉ có stack dev và `entrypoint.sh` che lỗi install (`|| echo ...`) → không phù hợp production. | ✅ đã thêm `docker-compose.prod.yml` (không publish DB, secret qua env, healthcheck, log rotation, install chạy 1 lần) và entrypoint fail rõ ràng khi `RUN_INSTALL_ONLY=true` |
+| L7 | (đã bỏ) Stack Docker dùng cho dev trước đây đã được thay bằng môi trường native trên Windows. | ✅ môi trường dev hiện tại: PostgreSQL native + backend Java + UI dev server, xem [local-dev.md](local-dev.md) |
+| L8 | (đã bỏ cùng stack Docker) `.dockerignore` không còn là một phần của quy trình dev. | ✅ |
+| L11 | (đã bỏ cùng stack Docker) `entrypoint.sh` từng che lỗi install — nay installer chạy trực tiếp bằng Java nên lỗi hiện rõ. | ✅ |
 | L12 | `/api/tenant/whiteLabeling` (POST) thiếu `checkPermission(ADMIN_SETTINGS, WRITE)`. | ✅ đã thêm; đồng thời bổ sung `ADMIN_SETTINGS`/`USER` vào danh sách resource gán được ở trang Roles |
 | L13 | `roles.component` chỉ tải 100 user đầu (`pageSize=100`) → tenant lớn không gán được role. | ✅ đã sửa — tải hết theo trang (giới hạn an toàn 50 trang) |
 | L9 | `$primary-hue-3` trong `scss/constants.scss` bị đổi thành trắng (ảnh hưởng theme toàn hệ thống, không chỉ white labeling). | ⏳ nên đưa về biến mặc định của CE, phần đổi màu để white labeling lo |
@@ -151,7 +151,7 @@ nhánh mặc định đó.
 2. Bổ sung API test (integration) cho groups/white labeling; unit test cho RBAC và bảo mật template đã có.
 3. Trả `$primary-hue-3` về mặc định CE (L9) nếu muốn theme giống CE gốc; hiện giữ theo yêu cầu giao diện.
 4. Thêm phiên bản (`version`) cho `admin_settings` nếu có nhiều admin sửa cùng lúc (M6).
-5. TLS/backup: dùng `docker-compose.prod.yml` kèm reverse proxy TLS và backup định kỳ cho volume Postgres.
+5. Backup: chạy `pg_dump` định kỳ cho DB PostgreSQL (môi trường dev hiện dùng PostgreSQL native).
 
 ## 7. Trạng thái sau khi sửa
 
@@ -161,16 +161,16 @@ nhánh mặc định đó.
 | H1 (effective roles), H2 (cache), H3 (domain trùng) | đã sửa trong code, đã build |
 | M3 (subscription leak ở `help`, `logo`, `github-badge`, `home`) | đã sửa — dùng `takeUntilDestroyed`/`takeUntil` sẵn có |
 | L1–L6 (dead code, i18n, ngày tạo group, xác nhận xoá) | đã sửa |
-| H4, H5 (test + build test) | đã sửa — 16 unit test mới chạy xanh trong Docker build, toàn bộ test source module `application` compile được |
+| H4, H5 (test + build test) | đã sửa — 16 unit test chạy xanh, toàn bộ test source module `application` compile được |
 | M7, M8, M11, M12 (tuỳ chọn white labeling, footer, custom menu url, tương thích JSON cũ) | đã sửa |
-| L8, L11, L12, L13 (dockerignore, compose production, quyền white labeling, tải user) | đã sửa |
+| L12, L13 (quyền white labeling, tải user theo trang) | đã sửa |
 
 ### Cách chạy test trong CI
 
-```bash
+```powershell
 # compile toàn bộ test source của module application và chạy các test trọng yếu
-docker compose -f docker/tb-custom/docker-compose.yml build \
-  --build-arg TEST_CLASSES=TbRbacAccessControlServiceTest,MailTemplateSecurityTest tb-node
+mvn -B -pl application test "-Dtest=TbRbacAccessControlServiceTest,MailTemplateSecurityTest" `
+    "-DfailIfNoSpecifiedTests=false" "-Dskip.ui.build=true"
 ```
 
 Kết quả lần chạy gần nhất:
@@ -181,9 +181,9 @@ Tests run: 11, Failures: 0, Errors: 0 -- TbRbacAccessControlServiceTest
 Tests run: 16, Failures: 0, Errors: 0
 ```
 
-## 8. Bằng chứng kiểm chứng trên môi trường local (image `sha256:aacb8fb09c3e`)
+## 8. Bằng chứng kiểm chứng trên môi trường local
 
-Kiểm chứng bằng API thật trên stack `docker/tb-custom` sau khi recreate container (digest image khớp bản build mới):
+Kiểm chứng bằng API thật trên backend đang chạy (`http://localhost:8080`), sau khi build và chạy lại tiến trình Java:
 
 | # | Kịch bản | Kết quả |
 |---|---|---|
@@ -198,9 +198,8 @@ Dữ liệu test (device `parent-device`, 2 domain test, mail template độc h�
 
 ## 9. Việc cần làm ngay khi sang bản thương mại
 
-1. Dùng `docker/tb-custom/docker-compose.prod.yml` (không publish DB, secret qua env, install chạy 1 lần) và khai báo
-   `SECURITY_RBAC_ENABLED` tường minh.
-2. Chạy test trong CI bằng `--build-arg TEST_CLASSES=...` trước mỗi lần phát hành.
+1. Bật RBAC tường minh (`-Dsecurity.rbac.enabled=true`) và chạy test trước mỗi lần phát hành.
+2. Chạy test trước mỗi lần phát hành (xem mục "Cách chạy test trong CI").
 3. Đăng ký domain thật của khách cho tenant (tab Login) — branding của trang login được resolve theo tên miền;
    nếu truy cập bằng IP/localhost mà chưa đăng ký domain thì trang login dùng branding của hệ thống.
 
@@ -246,7 +245,7 @@ Kiểm chứng đã chạy: TCP tới `127.0.0.1:1883`, `::1:1883`, `localhost:1
 Trong lúc kiểm thử vòng này, lỗi "thay thế toàn bộ danh sách nhóm" đã **xoá danh sách entity group trong DB local**
 (trước đó có 12 nhóm: *Nhóm 1..7* cho DEVICE và *Building 1..5* cho ASSET, tất cả đều 0 thành viên vì lỗi dialog).
 Đây là dữ liệu local, không có bản sao lưu. Khuyến nghị chạy `pg_dump` định kỳ (ví dụ đưa vào cron) và dùng
-`docker-compose.prod.yml` có volume riêng cho Postgres.
+Khuyến nghị chạy `pg_dump` định kỳ cho PostgreSQL của môi trường dev.
 
 ## 12. Quyền theo entity group đã được enforce trên API danh sách (M2)
 
