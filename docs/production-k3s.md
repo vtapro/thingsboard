@@ -60,6 +60,13 @@ cluster. Nếu muốn id ổn định qua các lần restart, dùng `StatefulSet
 Workflow [`.github/workflows/publish-images.yml`](../.github/workflows/publish-images.yml) build
 `docker/tb-custom/Dockerfile` và push lên GHCR mỗi khi push branch hoặc tag `v*`:
 
+> Lưu ý: GitHub **chặn push** file nằm trong `.github/workflows/` nếu token/credential đang dùng
+> không có scope `workflow`. Nếu gặp lỗi
+> `refusing to allow an OAuth App to create or update workflow ... without workflow scope`, chạy
+> `gh auth refresh -h github.com -s workflow` (hoặc tạo PAT có scope `workflow`) rồi push lại file đó.
+> Trong lúc chờ, vẫn build image bằng tay: `docker build -f docker/tb-custom/Dockerfile -t ... .`
+> và `docker push` lên GHCR.
+
 ```text
 ghcr.io/<owner>/<repo>:<branch>      # ví dụ ghcr.io/vtapro/thingsboard:RBAC-full-groups-tabs
 ghcr.io/<owner>/<repo>:sha-<short>
