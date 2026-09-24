@@ -282,8 +282,11 @@ public class CassandraBaseTimeseriesLatestDao extends AbstractCassandraBaseTimes
 
     private PreparedStatement getFindAllKeysStmt() {
         if (findAllKeysStmt == null) {
+            // Không dùng SELECT DISTINCT: Cassandra 3.11 chỉ cho DISTINCT trên cột partition key.
+            // Bảng ts_kv_latest_cf có PRIMARY KEY ((entity_type, entity_id), key) nên mỗi key chỉ
+            // xuất hiện một lần cho mỗi entity, không cần DISTINCT.
             findAllKeysStmt = prepare(SELECT_PREFIX +
-                    "DISTINCT " + ModelConstants.KEY_COLUMN + " " +
+                    ModelConstants.KEY_COLUMN + " " +
                     "FROM " + ModelConstants.TS_KV_LATEST_CF + " " +
                     "WHERE " + ModelConstants.ENTITY_TYPE_COLUMN + EQUALS_PARAM +
                     "AND " + ModelConstants.ENTITY_ID_COLUMN + EQUALS_PARAM);
