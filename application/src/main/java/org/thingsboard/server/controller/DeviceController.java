@@ -72,6 +72,7 @@ import org.thingsboard.server.service.security.permission.Resource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -395,7 +396,10 @@ public class DeviceController extends BaseController {
         } else if (deviceProfileId != null && deviceProfileId.length() > 0) {
             filter.deviceProfileId(new DeviceProfileId(toUUID(deviceProfileId)));
         }
-        return checkNotNull(deviceService.findDeviceInfosByFilter(filter.build(), pageLink));
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.DEVICE, Operation.READ);
+        PageData<DeviceInfo> pageData = deviceService.findDeviceInfosByFilter(filter.build(),
+                scopedPageLink(allowedEntityIds, pageLink));
+        return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, pageData, DeviceInfo::getId));
     }
 
     @Hidden
@@ -488,7 +492,15 @@ public class DeviceController extends BaseController {
         } else if (deviceProfileId != null && deviceProfileId.length() > 0) {
             filter.deviceProfileId(new DeviceProfileId(toUUID(deviceProfileId)));
         }
-        return checkNotNull(deviceService.findDeviceInfosByFilter(filter.build(), pageLink));
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.DEVICE, Operation.READ);
+        if (allowedEntityIds != null) {
+            // The devices of the groups granted to the role may not be assigned to this customer: search the whole
+            // tenant and keep only the allowed devices below.
+            filter.customerId(null);
+        }
+        PageData<DeviceInfo> pageData = deviceService.findDeviceInfosByFilter(filter.build(),
+                scopedPageLink(allowedEntityIds, pageLink));
+        return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, pageData, DeviceInfo::getId));
     }
 
     @ApiOperation(value = "Get Devices By Ids (getDevicesByIds)",

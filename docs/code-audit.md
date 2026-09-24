@@ -247,3 +247,29 @@ Trong lúc kiểm thử vòng này, lỗi "thay thế toàn bộ danh sách nhó
 (trước đó có 12 nhóm: *Nhóm 1..7* cho DEVICE và *Building 1..5* cho ASSET, tất cả đều 0 thành viên vì lỗi dialog).
 Đây là dữ liệu local, không có bản sao lưu. Khuyến nghị chạy `pg_dump` định kỳ (ví dụ đưa vào cron) và dùng
 `docker-compose.prod.yml` có volume riêng cho Postgres.
+
+## 12. Quyền theo entity group đã được enforce trên API danh sách (M2)
+
+Trước đây quyền theo nhóm chỉ có tác dụng với các API theo từng entity: quyền global bị chặn nhưng quyền theo nhóm
+**không lọc** kết quả danh sách, nên người dùng hoặc không thấy gì, hoặc thấy nhiều hơn phạm vi được cấp.
+
+Cách làm mới (theo hướng của PE):
+
+| Thành phần | Thay đổi |
+|---|---|
+| `AccessControlService` | thêm `getAllowedEntityIds(user, resource, operation)`: trả về danh sách id được phép khi role cấp quyền theo nhóm, `null` khi không giới hạn (impl mặc định của CE trả `null`) |
+| `TbRbacAccessControlService` | trả về union `entityIds` của các nhóm trong scope; cho phép gọi API danh sách khi role có scope theo nhóm; entity thuộc nhóm được cấp thì được truy cập (kể cả khi không thuộc customer của user — tương đương nhóm **Public** của PE), vẫn giữ ràng buộc cùng tenant |
+| `BaseController` | thêm `scopedPageLink(...)` + `applyEntityScope(...)`: khi có scope thì lấy tối đa 1000 entity rồi lọc theo id được phép và trả về đúng trang yêu cầu |
+| Devices / Assets / Entity views | áp dụng cho cả endpoint `tenant/*Infos` và `customer/{id}/*Infos`; với customer user có scope thì tìm trong toàn tenant rồi lọc theo nhóm |
+
+Kiểm chứng (customer user thuộc customer DN1, role cấp DEVICE READ/WRITE/DELETE theo 2 nhóm, 1 nhóm ASSET rỗng):
+
+```text
+/api/customer/DN1/deviceInfos  -> 200, đúng 2 thiết bị (child-device, GW1), totalElements=2
+UI trang Devices của user đó   -> tiêu đề "DN1: Devices", hiển thị đúng 2 thiết bị
+GET /api/device/{id ngoài nhóm} -> 403 (thiết bị mới tạo, không nằm trong nhóm)
+/api/customer/DN1/assetInfos   -> 0 (nhóm ASSET rỗng, không lộ toàn bộ asset của tenant)
+```
+
+Hạn chế đã biết: khi có scope, việc lọc được thực hiện trong bộ nhớ với tối đa 1000 entity đầu tiên
+(`SCOPED_FETCH_SIZE_LIMIT`); tenant lớn hơn cần chuyển sang lọc ở tầng query như PE.

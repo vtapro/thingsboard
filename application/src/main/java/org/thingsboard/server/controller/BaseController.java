@@ -105,6 +105,7 @@ import org.thingsboard.server.common.data.mobile.bundle.MobileAppBundle;
 import org.thingsboard.server.common.data.notification.targets.NotificationTarget;
 import org.thingsboard.server.common.data.oauth2.OAuth2Client;
 import org.thingsboard.server.common.data.page.PageLink;
+import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.SortOrder;
 import org.thingsboard.server.common.data.page.TimePageLink;
 import org.thingsboard.server.common.data.pat.ApiKey;
@@ -560,6 +561,49 @@ public abstract class BaseController {
                                     String sortProperty, String sortOrder, Long startTime, Long endTime) throws ThingsboardException {
         PageLink pageLink = this.createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         return new TimePageLink(pageLink, startTime, endTime);
+    }
+
+    /**
+     * Maximal number of entities that is fetched when the result has to be filtered by the entity groups of the
+     * role of the user. It keeps the memory usage bounded on huge tenants.
+     */
+    private static final int SCOPED_FETCH_SIZE_LIMIT = 1000;
+
+    /**
+     * The entities the user may see are limited by the entity groups of its role, so the list has to be filtered
+     * in memory. The requested page is fetched with an enlarged page size to keep the pagination of the result
+     * meaningful (up to {@link #SCOPED_FETCH_SIZE_LIMIT} entities).
+     */
+    PageLink scopedPageLink(Set<UUID> allowedEntityIds, PageLink pageLink) {
+        if (allowedEntityIds == null) {
+            return pageLink;
+        }
+        int fetchSize = Math.min(SCOPED_FETCH_SIZE_LIMIT, Math.max(pageLink.getPageSize(), 1) * 10);
+        return new PageLink(fetchSize, 0, pageLink.getTextSearch(), pageLink.getSortOrder());
+    }
+
+    /**
+     * Filters the entities of the fetched page by the ids allowed by the entity groups of the role of the user and
+     * returns the requested page of the filtered result.
+     */
+    <T> PageData<T> applyEntityScope(Set<UUID> allowedEntityIds, PageLink requestedPageLink, PageData<T> fetchedPage,
+                                     Function<T, EntityId> idExtractor) {
+        if (allowedEntityIds == null || fetchedPage == null) {
+            return fetchedPage;
+        }
+        List<T> filtered = new ArrayList<>();
+        for (T entity : fetchedPage.getData()) {
+            EntityId entityId = idExtractor.apply(entity);
+            if (entityId != null && allowedEntityIds.contains(entityId.getId())) {
+                filtered.add(entity);
+            }
+        }
+        int pageSize = Math.max(requestedPageLink.getPageSize(), 1);
+        int from = requestedPageLink.getPage() * pageSize;
+        int to = Math.min(filtered.size(), from + pageSize);
+        List<T> content = from >= filtered.size() ? Collections.emptyList() : filtered.subList(from, to);
+        int totalPages = (int) Math.ceil((double) filtered.size() / pageSize);
+        return new PageData<>(content, totalPages, filtered.size(), to < filtered.size());
     }
 
     protected SecurityUser getCurrentUser() throws ThingsboardException {

@@ -53,6 +53,8 @@ import org.thingsboard.server.service.security.permission.Resource;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -251,13 +253,18 @@ public class AssetController extends BaseController {
             @RequestParam(required = false) String sortOrder) throws ThingsboardException {
         TenantId tenantId = getCurrentUser().getTenantId();
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ASSET, Operation.READ);
+        PageLink fetchLink = scopedPageLink(allowedEntityIds, pageLink);
         if (type != null && type.trim().length() > 0) {
-            return checkNotNull(assetService.findAssetInfosByTenantIdAndType(tenantId, type, pageLink));
+            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink,
+                    assetService.findAssetInfosByTenantIdAndType(tenantId, type, fetchLink), AssetInfo::getId));
         } else if (assetProfileId != null && assetProfileId.length() > 0) {
             AssetProfileId profileId = new AssetProfileId(toUUID(assetProfileId));
-            return checkNotNull(assetService.findAssetInfosByTenantIdAndAssetProfileId(tenantId, profileId, pageLink));
+            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink,
+                    assetService.findAssetInfosByTenantIdAndAssetProfileId(tenantId, profileId, fetchLink), AssetInfo::getId));
         } else {
-            return checkNotNull(assetService.findAssetInfosByTenantId(tenantId, pageLink));
+            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink,
+                    assetService.findAssetInfosByTenantId(tenantId, fetchLink), AssetInfo::getId));
         }
     }
 
@@ -339,13 +346,25 @@ public class AssetController extends BaseController {
         CustomerId customerId = new CustomerId(toUUID(strCustomerId));
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ASSET, Operation.READ);
+        PageLink fetchLink = scopedPageLink(allowedEntityIds, pageLink);
+        boolean tenantWide = allowedEntityIds != null;
         if (type != null && type.trim().length() > 0) {
-            return checkNotNull(assetService.findAssetInfosByTenantIdAndCustomerIdAndType(tenantId, customerId, type, pageLink));
+            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? assetService.findAssetInfosByTenantIdAndType(tenantId, type, fetchLink)
+                    : assetService.findAssetInfosByTenantIdAndCustomerIdAndType(tenantId, customerId, type, fetchLink),
+                    AssetInfo::getId));
         } else if (assetProfileId != null && assetProfileId.length() > 0) {
             AssetProfileId profileId = new AssetProfileId(toUUID(assetProfileId));
-            return checkNotNull(assetService.findAssetInfosByTenantIdAndCustomerIdAndAssetProfileId(tenantId, customerId, profileId, pageLink));
+            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? assetService.findAssetInfosByTenantIdAndAssetProfileId(tenantId, profileId, fetchLink)
+                    : assetService.findAssetInfosByTenantIdAndCustomerIdAndAssetProfileId(tenantId, customerId, profileId, fetchLink),
+                    AssetInfo::getId));
         } else {
-            return checkNotNull(assetService.findAssetInfosByTenantIdAndCustomerId(tenantId, customerId, pageLink));
+            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? assetService.findAssetInfosByTenantId(tenantId, fetchLink)
+                    : assetService.findAssetInfosByTenantIdAndCustomerId(tenantId, customerId, fetchLink),
+                    AssetInfo::getId));
         }
     }
 

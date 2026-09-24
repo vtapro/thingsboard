@@ -23,6 +23,9 @@ import org.thingsboard.server.service.security.model.SecurityUser;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
@@ -75,8 +78,37 @@ public class TbRbacAccessControlService implements AccessControlService {
         if (role == null) {
             return defaultAccessControlService.hasPermission(user, resource, operation);
         }
-        return hasGlobalOperation(role, resource, operation)
+        return (hasGlobalOperation(role, resource, operation) || hasScopedOperation(role, resource, operation))
                 && defaultAccessControlService.hasPermission(user, resource, operation);
+    }
+
+    @Override
+    public Set<UUID> getAllowedEntityIds(SecurityUser user, Resource resource, Operation operation) {
+        RbacRole role = getEffectiveRole(user);
+        if (role == null || hasGlobalOperation(role, resource, operation)) {
+            return null;
+        }
+        List<String> scopedGroups = getScopedGroups(role, resource, operation);
+        if (scopedGroups == null || scopedGroups.isEmpty()) {
+            return null;
+        }
+        Set<UUID> allowedIds = new HashSet<>();
+        try {
+            for (RbacEntityGroup group : getEntityGroups(user.getTenantId())) {
+                if (scopedGroups.contains(group.getId()) && group.getEntityIds() != null) {
+                    for (String entityId : group.getEntityIds()) {
+                        try {
+                            allowedIds.add(UUID.fromString(entityId));
+                        } catch (IllegalArgumentException e) {
+                            log.warn("Entity group [{}] contains an invalid entity id [{}]", group.getId(), entityId);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to resolve the entity groups of user [{}]: {}", user.getId(), e.getMessage());
+        }
+        return allowedIds;
     }
 
     @Override
@@ -117,6 +149,12 @@ public class TbRbacAccessControlService implements AccessControlService {
     private <I extends EntityId, T extends HasTenantId> boolean hasCustomerUserPermission(SecurityUser user, Resource resource,
                                                                                          Operation operation, I entityId, T entity,
                                                                                          RbacRole role) throws ThingsboardException {
+        // An entity that the administrator explicitly put into a group granted to this role is accessible even when
+        // it is not assigned to the customer of the user (the same way the public entity groups of PE work).
+        Set<UUID> allowedEntityIds = getAllowedEntityIds(user, resource, operation);
+        if (entityId != null && allowedEntityIds != null && allowedEntityIds.contains(entityId.getId())) {
+            return entity != null && user.getTenantId().equals(entity.getTenantId());
+        }
         if (defaultAccessControlService.hasPermission(user, resource, operation, entityId, entity)) {
             return true;
         }
@@ -124,6 +162,11 @@ public class TbRbacAccessControlService implements AccessControlService {
             return false;
         }
         return userBelongsToCustomerSubtree(user, entity);
+    }
+
+    private boolean hasScopedOperation(RbacRole role, Resource resource, Operation operation) {
+        List<String> scopedGroups = getScopedGroups(role, resource, operation);
+        return scopedGroups != null && !scopedGroups.isEmpty();
     }
 
     private RbacRole getEffectiveRole(SecurityUser user) {

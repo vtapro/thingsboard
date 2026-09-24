@@ -270,10 +270,19 @@ public class EntityViewController extends BaseController {
         CustomerId customerId = new CustomerId(toUUID(strCustomerId));
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ENTITY_VIEW, Operation.READ);
+        PageLink fetchLink = scopedPageLink(allowedEntityIds, pageLink);
+        boolean tenantWide = allowedEntityIds != null;
         if (type != null && !type.trim().isEmpty()) {
-            return checkNotNull(entityViewService.findEntityViewInfosByTenantIdAndCustomerIdAndType(tenantId, customerId, type, pageLink));
+            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? entityViewService.findEntityViewInfosByTenantIdAndType(tenantId, type, fetchLink)
+                    : entityViewService.findEntityViewInfosByTenantIdAndCustomerIdAndType(tenantId, customerId, type, fetchLink),
+                    EntityViewInfo::getId));
         } else {
-            return checkNotNull(entityViewService.findEntityViewInfosByTenantIdAndCustomerId(tenantId, customerId, pageLink));
+            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? entityViewService.findEntityViewInfosByTenantId(tenantId, fetchLink)
+                    : entityViewService.findEntityViewInfosByTenantIdAndCustomerId(tenantId, customerId, fetchLink),
+                    EntityViewInfo::getId));
         }
     }
 
@@ -325,10 +334,14 @@ public class EntityViewController extends BaseController {
             @RequestParam(required = false) String sortOrder) throws ThingsboardException {
         TenantId tenantId = getCurrentUser().getTenantId();
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ENTITY_VIEW, Operation.READ);
+        PageLink fetchLink = scopedPageLink(allowedEntityIds, pageLink);
         if (type != null && !type.trim().isEmpty()) {
-            return checkNotNull(entityViewService.findEntityViewInfosByTenantIdAndType(tenantId, type, pageLink));
+            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink,
+                    entityViewService.findEntityViewInfosByTenantIdAndType(tenantId, type, fetchLink), EntityViewInfo::getId));
         } else {
-            return checkNotNull(entityViewService.findEntityViewInfosByTenantId(tenantId, pageLink));
+            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink,
+                    entityViewService.findEntityViewInfosByTenantId(tenantId, fetchLink), EntityViewInfo::getId));
         }
     }
 
