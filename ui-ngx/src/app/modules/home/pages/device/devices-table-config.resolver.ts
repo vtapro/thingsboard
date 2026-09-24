@@ -14,6 +14,7 @@ import {
 } from '@home/models/entity/entities-table-config.models';
 import { TranslateService } from '@ngx-translate/core';
 import { DatePipe } from '@angular/common';
+import { WhiteLabelingService } from '@core/http/white-labeling.service';
 import { EntityType, entityTypeResources, entityTypeTranslations } from '@shared/models/entity-type.models';
 import { AddEntityDialogData, EntityAction } from '@home/models/entity/entity-component.models';
 import {
@@ -96,7 +97,8 @@ export class DevicesTableConfigResolver  {
               private datePipe: DatePipe,
               private router: Router,
               private dialog: MatDialog,
-              private iotHubActions: IotHubActionsService) {
+              private iotHubActions: IotHubActionsService,
+              private whiteLabelingService: WhiteLabelingService) {
 
     this.config.entityType = EntityType.DEVICE;
     this.config.entityComponent = DeviceComponent;
@@ -727,6 +729,9 @@ export class DevicesTableConfigResolver  {
   checkConnectivity($event: Event, deviceId: EntityId, afterAdd = false) {
     if ($event) {
       $event.stopPropagation();
+    }
+    if (this.whiteLabelingService.settings.enabled && this.whiteLabelingService.settings.hideConnectivityDialog) {
+      return;
     }
     this.dialog.open<DeviceCheckConnectivityDialogComponent, DeviceCheckConnectivityDialogData>
       (DeviceCheckConnectivityDialogComponent, {

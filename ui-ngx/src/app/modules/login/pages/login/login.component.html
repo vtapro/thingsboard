@@ -10,6 +10,9 @@
       <form class="tb-login-form flex flex-col" [formGroup]="loginFormGroup" (ngSubmit)="login()">
         <div class="flex flex-col items-center justify-start" style="padding: 16px 0;">
           <tb-logo [darkBackground]="true" class="login-logo"></tb-logo>
+          @if (platformNameVersion) {
+            <span class="tb-login-platform-name">{{ platformNameVersion }}</span>
+          }
         </div>
         @if (isLoading || (isLoading$ | async)) {
           <mat-progress-bar color="warn" mode="indeterminate">

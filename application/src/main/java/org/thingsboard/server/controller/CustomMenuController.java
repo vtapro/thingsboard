@@ -10,12 +10,18 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
+import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.menu.CustomMenuSettings;
+import org.thingsboard.server.common.data.menu.CustomMenuItem;
 import org.thingsboard.server.config.annotations.ApiOperation;
 import org.thingsboard.server.dao.settings.CustomMenuService;
+import org.thingsboard.server.dao.exception.IncorrectParameterException;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.security.permission.Operation;
 import org.thingsboard.server.service.security.permission.Resource;
+
+import java.util.Locale;
+import java.util.UUID;
 
 import static org.thingsboard.server.controller.ControllerConstants.TENANT_AUTHORITY_PARAGRAPH;
 
@@ -52,7 +58,41 @@ public class CustomMenuController extends BaseController {
             @Parameter(description = "A JSON value representing the custom menu settings.")
             @RequestBody CustomMenuSettings customMenuSettings) throws ThingsboardException {
         accessControlService.checkPermission(getCurrentUser(), Resource.ADMIN_SETTINGS, Operation.WRITE);
+        validateCustomMenu(customMenuSettings);
         return customMenuService.saveCustomMenuSettings(getCurrentUser().getTenantId(), customMenuSettings);
+    }
+
+    /**
+     * The custom menu items are rendered by the browser, therefore only the dashboard links and the http(s) urls
+     * are accepted. This blocks {@code javascript:} and other unsafe url schemes.
+     */
+    private void validateCustomMenu(CustomMenuSettings settings) {
+        if (settings == null || settings.getItems() == null) {
+            return;
+        }
+        for (CustomMenuItem item : settings.getItems()) {
+            if (StringUtils.isBlank(item.getName()) || StringUtils.isBlank(item.getTarget())) {
+                throw new IncorrectParameterException("Custom menu item name and target are required");
+            }
+            if (!"dashboard".equals(item.getType()) && !"url".equals(item.getType())) {
+                throw new IncorrectParameterException("Custom menu item type must be 'dashboard' or 'url'");
+            }
+            if ("dashboard".equals(item.getType())) {
+                try {
+                    UUID.fromString(item.getTarget().trim());
+                } catch (IllegalArgumentException e) {
+                    throw new IncorrectParameterException("Custom menu item of type 'dashboard' must reference a dashboard id");
+                }
+            }
+            if ("url".equals(item.getType()) && !isSafeUrl(item.getTarget())) {
+                throw new IncorrectParameterException("Custom menu item url must use the http or https scheme");
+            }
+        }
+    }
+
+    private boolean isSafeUrl(String target) {
+        String url = target.trim().toLowerCase(Locale.ROOT);
+        return url.startsWith("https://") || url.startsWith("http://");
     }
 
 }

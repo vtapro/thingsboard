@@ -30,7 +30,7 @@ public class DefaultSecuritySettingsService implements SecuritySettingsService {
         SecuritySettings securitySettings;
         if (adminSettings != null) {
             try {
-                securitySettings = JacksonUtil.convertValue(adminSettings.getJsonValue(), SecuritySettings.class);
+                securitySettings = JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(adminSettings.getJsonValue(), SecuritySettings.class);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to load security settings!", e);
             }
@@ -59,7 +59,7 @@ public class DefaultSecuritySettingsService implements SecuritySettingsService {
         adminSettings.setJsonValue(JacksonUtil.valueToTree(securitySettings));
         AdminSettings savedAdminSettings = adminSettingsService.saveAdminSettings(TenantId.SYS_TENANT_ID, adminSettings);
         try {
-            return JacksonUtil.convertValue(savedAdminSettings.getJsonValue(), SecuritySettings.class);
+            return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(savedAdminSettings.getJsonValue(), SecuritySettings.class);
         } catch (Exception e) {
             throw new RuntimeException("Failed to load security settings!", e);
         }

@@ -414,9 +414,13 @@
             </button>
           </section>
         }
-        @if (!embedded) {
+        @if (!embedded && poweredBy) {
           <section data-html2canvas-ignore class="tb-powered-by-footer" [style.color]="dashboard.configuration.settings.titleColor">
-            <span>Powered by <a href="https://thingsboard.io" target="_blank">Green IQ v.{{ thingsboardVersion }}</a></span>
+            @if (poweredBy.url) {
+              <span>Powered by <a [href]="poweredBy.url" target="_blank" rel="noopener noreferrer">{{ poweredBy.label }} v.{{ thingsboardVersion }}</a></span>
+            } @else {
+              <span>{{ poweredBy.label }} v.{{ thingsboardVersion }}</span>
+            }
           </section>
         }
       </mat-drawer-content>

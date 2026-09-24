@@ -38,7 +38,7 @@ public class DefaultWhiteLabelingService implements WhiteLabelingService {
             return null;
         }
         try {
-            return JacksonUtil.convertValue(adminSettings.getJsonValue(), WhiteLabelingSettings.class);
+            return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(adminSettings.getJsonValue(), WhiteLabelingSettings.class);
         } catch (Exception e) {
             throw new RuntimeException("Failed to load white labeling settings!", e);
         }
@@ -60,7 +60,7 @@ public class DefaultWhiteLabelingService implements WhiteLabelingService {
         }
         adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
         AdminSettings savedAdminSettings = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
-        return JacksonUtil.convertValue(savedAdminSettings.getJsonValue(), WhiteLabelingSettings.class);
+        return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(savedAdminSettings.getJsonValue(), WhiteLabelingSettings.class);
     }
 
 }

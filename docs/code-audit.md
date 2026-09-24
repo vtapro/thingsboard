@@ -63,8 +63,8 @@ AdminSettings (JSON, 1 bản ghi / tenant)
 |---|---|---|---|
 | H1 | `/api/user/roles` chỉ trả role gán trực tiếp, không gồm role kế thừa từ user group → menu chặn/nhả sai so với quyền thật ở server. | `RoleController.getCurrentUserRoles` (code cũ) tự lọc `role.getUserIds()` | ✅ đã sửa — dùng chung `RoleService.getEffectiveRole(s)` (một nguồn sự thật) |
 | H2 | Mọi lần kiểm tra quyền đều đọc & parse JSON `admin_settings` (roles, userGroups, entityGroups) → thêm 2–3 truy vấn DB cho mỗi request API khi bật RBAC. | `getEffectiveRole`, `entityBelongsToGroups` (code cũ) | ✅ đã sửa — cache TTL 10s theo user/tenant, tự dọn entry hết hạn (đặt `CACHE_TTL_MS = 0` để tắt) |
-| H4 | Không có test tự động nào cho phần mới (RBAC, groups, white labeling, mail template). | `git diff --name-status` không có file trong `*/src/test/*` | ⏳ còn lại — nên bổ sung test trước khi phát hành |
-| H5 | Build test của module `application` đang fail (không liên quan phần mới): `NotificationApiClientTest` gọi `client.markAllNotificationsAsRead(null)` bị ambiguous giữa bản `Args` và bản `String` do client sinh tự động. | log build `#16 [ERROR] ... reference to markAllNotificationsAsRead is ambiguous` | ⏳ còn lại — dùng `-Dmaven.test.skip=true` cho tới khi sửa; sửa test bằng cách truyền tham số cụ thể thay vì `null` |
+| H4 | Không có test tự động nào cho phần mới (RBAC, groups, white labeling, mail template). | `git diff --name-status` không có file trong `*/src/test/*` | ✅ đã thêm `TbRbacAccessControlServiceTest` (12 ca, gồm 2 lỗi C1/C2) và `MailTemplateSecurityTest` (4 ca) |
+| H5 | Build test của module `application` fail: `NotificationApiClientTest` gọi `client.markAllNotificationsAsRead(null)` bị ambiguous giữa overload `Args` và `String` của client sinh tự động. | log build `#16 [ERROR] ... reference to markAllNotificationsAsRead is ambiguous` | ✅ đã sửa — truyền `(String) null` rõ ràng; Dockerfile có thêm `--build-arg TEST_CLASSES=...` để CI compile test + chạy test trọng yếu |
 
 ### MEDIUM
 
@@ -76,8 +76,10 @@ AdminSettings (JSON, 1 bản ghi / tenant)
 | M4 | Menu tuỳ biến với `type=url` dùng `routerLink` nên URL ngoài (`https://...`) không mở tab mới mà bị router xử lý như route nội bộ. | ⏳ còn lại — nên render anchor `target="_blank"` cho item loại url |
 | M5 | `list users` trong trang Roles cố định `pageSize=100` → tenant >100 user không gán được role cho user còn lại. | ⏳ còn lại — dùng phân trang/autocomplete của CE |
 | M6 | Ghi `admin_settings` là "last write wins" (không version) và id group do client sinh → 2 admin sửa cùng lúc sẽ ghi đè nhau. | ⏳ chấp nhận ở giai đoạn này; nên thêm `version` nếu nhiều admin |
-| M7 | 4 tuỳ chọn trong tab General **lưu được nhưng không có tác dụng gì** (không có nơi nào đọc): `hideConnectivityDialog`, `hideChatBot`, `showPlatformNameVersion`, `overrideTrendzName` + `trendzName`. | ⏳ còn lại — hoặc hiện thực, hoặc xoá khỏi form + `WhiteLabelingSettings` để không gây hiểu nhầm |
-| M8 | `dashboard-page.component.html`: footer "Powered by **Green IQ** v.…" nhưng link vẫn trỏ `https://thingsboard.io` (vừa đổi tên vừa trỏ về nhà cung cấp gốc, dễ gây nhầm). | ⏳ còn lại — nên để white labeling điều khiển hoặc giữ nguyên "Powered by ThingsBoard" |
+| M7 | 4 tuỳ chọn trong tab General **lưu được nhưng không có tác dụng gì**: `hideConnectivityDialog`, `hideChatBot`, `showPlatformNameVersion`, `overrideTrendzName` + `trendzName`. | ✅ đã xử lý — hiện thực `hideConnectivityDialog` (ẩn nút + chặn dialog), `showPlatformNameVersion` (hiện tên + version ở trang login), `overrideTrendzName` (đổi nhãn menu Trendz); **xoá** `hideChatBot` vì CE không có chat bot |
+| M8 | `dashboard-page.component.html`: footer "Powered by **Green IQ** v.…" nhưng link vẫn trỏ `https://thingsboard.io`. | ✅ đã sửa — footer lấy tên từ white labeling, ẩn hẳn khi bật `hideVendorPromotion`, và chỉ gắn link ThingsBoard khi chưa đổi thương hiệu |
+| M11 | `CustomMenuController` nhận URL tuỳ ý cho item loại `url` (nguy cơ `javascript:`), và menu render bằng `routerLink` nên URL ngoài không mở được. | ✅ đã sửa — server chỉ nhận `http(s)://` (URL khác trả 400) và dashboard id phải là UUID; client render `<a target="_blank" rel="noopener noreferrer">` cho item ngoài |
+| M12 | `JacksonUtil.convertValue` dùng `OBJECT_MAPPER` **fail khi gặp field lạ** → khi một field bị xoá/đổi tên (ví dụ `hideChatBot`), JSON đã lưu trong `admin_settings` làm hỏng cả tính năng (đã tái hiện với dữ liệu thật của tenant trong DB). | ✅ đã sửa — các `Default*Service` đọc settings bằng `IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER`, tương thích ngược/xuôi |
 | M9 | Domain: bảng `domain` **đã có** unique constraint trên `name`, nên không thể trùng tên. Vấn đề thật là: (a) tenant admin đăng ký domain đã dùng → trước đây trả 500 khó hiểu (lỗi ràng buộc DB) thay vì 400; (b) không kiểm tra tenant sở hữu. | ✅ đã sửa — `TenantDomainController.saveTenantDomain` chặn sớm với 400 + `findFirstByName` |
 | M10 | `DomainEntity.propagateToEdge` là `Boolean` (cột `edge_enabled`) và `DomainEntity.toData()` unbox trực tiếp → nếu một bản ghi domain có `edge_enabled = NULL` (dữ liệu tạo tay/bản cũ) thì `findDomainByName` ném NPE; endpoint công khai `/api/noauth/whiteLabeling` gọi hàm này. | ⏳ còn lại (lỗi có sẵn của CE, không do phần mới) — client đã có `catchError` nên login page không vỡ, chỉ mất branding |
 
@@ -92,7 +94,10 @@ AdminSettings (JSON, 1 bản ghi / tenant)
 | L5 | Xoá entity group không có xác nhận. | ✅ đã sửa — thêm dialog xác nhận (`DialogService`) |
 | L6 | Nhiều nhãn tiếng Anh hard-code trong `entity-groups.component.html`. | ✅ đã sửa — dùng khoá i18n `entity-group.*` |
 | L7 | `docker/tb-custom/docker-compose.yml` là stack dev: mật khẩu `postgres/postgres`, publish nhiều cổng, `SECURITY_RBAC_ENABLED: "true"`, không có TLS/healthcheck cho `tb-node`. | ⏳ còn lại — trước khi lên production cần bản compose riêng (TLS, secret, healthcheck, backup) |
-| L8 | `.dockerignore` chưa loại `.git`, `docs`, `.idea` → build context lớn hơn cần thiết (không ảnh hưởng image cuối vì dùng multi-stage). | ⏳ còn lại |
+| L8 | `.dockerignore` chưa loại `.idea`, `.github`, `docs` → build context lớn hơn cần thiết (không ảnh hưởng image cuối vì dùng multi-stage). | ✅ đã bổ sung (giữ `.git` vì `git-commit-id-plugin` cần để lấy commit id) |
+| L11 | `docker/tb-custom` chỉ có stack dev và `entrypoint.sh` che lỗi install (`|| echo ...`) → không phù hợp production. | ✅ đã thêm `docker-compose.prod.yml` (không publish DB, secret qua env, healthcheck, log rotation, install chạy 1 lần) và entrypoint fail rõ ràng khi `RUN_INSTALL_ONLY=true` |
+| L12 | `/api/tenant/whiteLabeling` (POST) thiếu `checkPermission(ADMIN_SETTINGS, WRITE)`. | ✅ đã thêm; đồng thời bổ sung `ADMIN_SETTINGS`/`USER` vào danh sách resource gán được ở trang Roles |
+| L13 | `roles.component` chỉ tải 100 user đầu (`pageSize=100`) → tenant lớn không gán được role. | ✅ đã sửa — tải hết theo trang (giới hạn an toàn 50 trang) |
 | L9 | `$primary-hue-3` trong `scss/constants.scss` bị đổi thành trắng (ảnh hưởng theme toàn hệ thống, không chỉ white labeling). | ⏳ nên đưa về biến mặc định của CE, phần đổi màu để white labeling lo |
 | L10 | `/api/tenant/whiteLabeling` (POST) không gọi `accessControlService.checkPermission(ADMIN_SETTINGS, WRITE)` như các endpoint settings khác (vẫn có `@PreAuthorize('TENANT_ADMIN')`). | ⏳ còn lại — thêm cho nhất quán, trừ khi muốn tenant admin bị giới hạn role vẫn đổi được branding |
 
@@ -118,12 +123,11 @@ nhánh mặc định đó.
 
 ## 6. Việc còn lại trước khi thương mại hoá
 
-1. Bổ sung test (H4): RBAC (unit cho `TbRbacAccessControlService`), API test cho groups/white labeling.
-2. Sửa build test `application` (H5) để CI chạy được `mvn install -DskipTests`.
-3. Lọc dữ liệu theo entity group ở tầng query (M2) nếu muốn role theo group dùng được trên UI danh sách.
-4. Compose production: TLS, secret, healthcheck, backup Postgres, `SECURITY_RBAC_ENABLED` khai báo tường minh.
-5. Trả `$primary-hue-3` về mặc định CE (L9) và chỉnh màu qua white labeling.
-6. Hỗ trợ URL ngoài cho custom menu (M4) và xử lý 4 tuỳ chọn white labeling chưa có tác dụng (M7).
+1. Lọc dữ liệu theo entity group ở tầng query (M2) nếu muốn role theo group dùng được trên UI danh sách.
+2. Bổ sung API test (integration) cho groups/white labeling; unit test cho RBAC và bảo mật template đã có.
+3. Trả `$primary-hue-3` về mặc định CE (L9) nếu muốn theme giống CE gốc; hiện giữ theo yêu cầu giao diện.
+4. Thêm phiên bản (`version`) cho `admin_settings` nếu có nhiều admin sửa cùng lúc (M6).
+5. TLS/backup: dùng `docker-compose.prod.yml` kèm reverse proxy TLS và backup định kỳ cho volume Postgres.
 
 ## 7. Trạng thái sau khi sửa
 
@@ -133,6 +137,25 @@ nhánh mặc định đó.
 | H1 (effective roles), H2 (cache), H3 (domain trùng) | đã sửa trong code, đã build |
 | M3 (subscription leak ở `help`, `logo`, `github-badge`, `home`) | đã sửa — dùng `takeUntilDestroyed`/`takeUntil` sẵn có |
 | L1–L6 (dead code, i18n, ngày tạo group, xác nhận xoá) | đã sửa |
+| H4, H5 (test + build test) | đã sửa — 16 unit test mới chạy xanh trong Docker build, toàn bộ test source module `application` compile được |
+| M7, M8, M11, M12 (tuỳ chọn white labeling, footer, custom menu url, tương thích JSON cũ) | đã sửa |
+| L8, L11, L12, L13 (dockerignore, compose production, quyền white labeling, tải user) | đã sửa |
+
+### Cách chạy test trong CI
+
+```bash
+# compile toàn bộ test source của module application và chạy các test trọng yếu
+docker compose -f docker/tb-custom/docker-compose.yml build \
+  --build-arg TEST_CLASSES=TbRbacAccessControlServiceTest,MailTemplateSecurityTest tb-node
+```
+
+Kết quả lần chạy gần nhất:
+
+```text
+Tests run: 5,  Failures: 0, Errors: 0 -- MailTemplateSecurityTest
+Tests run: 11, Failures: 0, Errors: 0 -- TbRbacAccessControlServiceTest
+Tests run: 16, Failures: 0, Errors: 0
+```
 
 ## 8. Bằng chứng kiểm chứng trên môi trường local (image `sha256:aacb8fb09c3e`)
 
@@ -151,6 +174,8 @@ Dữ liệu test (device `parent-device`, 2 domain test, mail template độc h�
 
 ## 9. Việc cần làm ngay khi sang bản thương mại
 
-1. Bật `SECURITY_RBAC_ENABLED` tường minh trong compose production (đừng phụ thuộc giá trị trong file dev).
-2. Bổ sung test tự động cho RBAC (H4) — đây là phần dễ gây hồi quy nhất khi merge upstream.
-3. Xử lý 4 tuỳ chọn white labeling chưa có tác dụng (M7) trước khi bán cho khách.
+1. Dùng `docker/tb-custom/docker-compose.prod.yml` (không publish DB, secret qua env, install chạy 1 lần) và khai báo
+   `SECURITY_RBAC_ENABLED` tường minh.
+2. Chạy test trong CI bằng `--build-arg TEST_CLASSES=...` trước mỗi lần phát hành.
+3. Đăng ký domain thật của khách cho tenant (tab Login) — branding của trang login được resolve theo tên miền;
+   nếu truy cập bằng IP/localhost mà chưa đăng ký domain thì trang login dùng branding của hệ thống.

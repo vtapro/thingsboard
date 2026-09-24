@@ -17,7 +17,6 @@ export interface WhiteLabelingSettings {
   hideConnectivityDialog?: boolean;
   overrideTrendzName?: boolean;
   trendzName?: string;
-  hideChatBot?: boolean;
   showPlatformNameVersion?: boolean;
 }
 

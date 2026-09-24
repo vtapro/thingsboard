@@ -12,6 +12,7 @@ import {
   defaultWhiteLabelingSettings,
   WhiteLabelingSettings
 } from '@shared/models/white-labeling.models';
+import { MenuId, setMenuSectionLabel } from '@core/services/menu.models';
 
 @Injectable({
   providedIn: 'root'
@@ -24,7 +25,16 @@ export class WhiteLabelingService {
 
   private request$: Observable<WhiteLabelingSettings>;
 
+  private currentSettings: WhiteLabelingSettings = {...defaultWhiteLabelingSettings};
+
   public readonly settings$: Observable<WhiteLabelingSettings> = this.settingsSubject.asObservable();
+
+  /**
+   * Last applied settings, allows synchronous checks (menu, entity actions) without an extra subscription.
+   */
+  public get settings(): WhiteLabelingSettings {
+    return this.currentSettings;
+  }
 
   constructor(private http: HttpClient,
               private imageService: ImageService,
@@ -102,9 +112,16 @@ export class WhiteLabelingService {
         logoImageUrlDark: images.logoImageUrlDark,
         faviconUrl: images.faviconUrl
       };
+      this.currentSettings = displaySettings;
       this.settingsSubject.next(displaySettings);
       this.applyTheme(displaySettings);
+      this.applyTrendzName(displaySettings);
     });
+  }
+
+  private applyTrendzName(settings: WhiteLabelingSettings) {
+    setMenuSectionLabel(MenuId.trendz_settings,
+      settings.enabled && settings.overrideTrendzName && settings.trendzName ? settings.trendzName : null);
   }
 
   private resolveImage(url: string): Observable<string> {

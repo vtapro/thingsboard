@@ -24,7 +24,7 @@ public class DefaultUserGroupService implements UserGroupService {
             return new RbacUserGroupSettings();
         }
         try {
-            return JacksonUtil.convertValue(adminSettings.getJsonValue(), RbacUserGroupSettings.class);
+            return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(adminSettings.getJsonValue(), RbacUserGroupSettings.class);
         } catch (Exception e) {
             throw new RuntimeException("Failed to load user group settings!", e);
         }
@@ -40,7 +40,7 @@ public class DefaultUserGroupService implements UserGroupService {
         }
         adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
         AdminSettings saved = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
-        return JacksonUtil.convertValue(saved.getJsonValue(), RbacUserGroupSettings.class);
+        return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), RbacUserGroupSettings.class);
     }
 
 }

@@ -35,7 +35,7 @@ public class DefaultRoleService implements RoleService {
             return new RbacRoleSettings();
         }
         try {
-            return JacksonUtil.convertValue(adminSettings.getJsonValue(), RbacRoleSettings.class);
+            return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(adminSettings.getJsonValue(), RbacRoleSettings.class);
         } catch (Exception e) {
             throw new RuntimeException("Failed to load roles settings!", e);
         }
@@ -51,7 +51,7 @@ public class DefaultRoleService implements RoleService {
         }
         adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
         AdminSettings saved = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
-        return JacksonUtil.convertValue(saved.getJsonValue(), RbacRoleSettings.class);
+        return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), RbacRoleSettings.class);
     }
 
     @Override

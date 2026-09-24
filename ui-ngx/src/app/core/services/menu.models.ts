@@ -18,6 +18,7 @@ export interface MenuSection {
   rootOnly?: boolean;
   isNew?: boolean;
   customTranslate?: boolean;
+  external?: boolean;
   active?: boolean;
 }
 
@@ -1098,6 +1099,26 @@ export const setRbacPermissions = (permissions: { [resource: string]: string[] }
   rbacPermissions = permissions;
 };
 
+/**
+ * Overrides the label of a menu section, used by the white labeling to rename add-ons (e.g. Trendz).
+ * Passing {@code null} restores the original label.
+ */
+export const setMenuSectionLabel = (id: MenuId, label: string | null): void => {
+  const section = menuSectionMap.get(id);
+  if (!section) {
+    return;
+  }
+  let original = originalMenuLabels.get(id);
+  if (!original) {
+    original = {name: section.name, customTranslate: section.customTranslate};
+    originalMenuLabels.set(id, original);
+  }
+  section.name = label === null ? original.name : label;
+  section.customTranslate = label === null ? original.customTranslate : true;
+};
+
+const originalMenuLabels = new Map<MenuId, {name: string; customTranslate?: boolean}>();
+
 const menuSectionResource: { [id: string]: string } = {
   devices: 'DEVICE',
   device_profiles: 'DEVICE',
@@ -1133,14 +1154,18 @@ const buildCustomMenuSections = (authState: AuthState): Array<MenuSection> => {
   return (customMenuItems || [])
     .filter(item => !item.assigneeType || item.assigneeType === authority)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    .map(item => ({
-      id: item.id,
-      name: item.name,
-      type: 'link' as MenuSectionType,
-      path: item.type === 'url' ? item.target : `/dashboards/${item.target}`,
-      icon: item.icon || 'mdi:link-variant',
-      customTranslate: true
-    }));
+    .map(item => {
+      const external = item.type === 'url';
+      return {
+        id: item.id,
+        name: item.name,
+        type: 'link' as MenuSectionType,
+        path: external ? item.target : `/dashboards/${item.target}`,
+        icon: item.icon || 'mdi:link-variant',
+        customTranslate: true,
+        external
+      };
+    });
 };
 
 export const buildUserHome = (currentMenuSections: MenuSection[]): Array<HomeSection> => {

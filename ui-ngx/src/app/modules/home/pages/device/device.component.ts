@@ -23,6 +23,7 @@ import { Subject } from 'rxjs';
 import { OtaUpdateType } from '@shared/models/ota-package.models';
 import { distinctUntilChanged } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { WhiteLabelingService } from '@core/http/white-labeling.service';
 
 @Component({
     selector: 'tb-device',
@@ -40,14 +41,22 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> {
 
   otaUpdateType = OtaUpdateType;
 
+  hideConnectivityDialog = false;
+
   constructor(protected store: Store<AppState>,
               protected translate: TranslateService,
               @Inject('entity') protected entityValue: DeviceInfo,
               @Inject('entitiesTableConfig') protected entitiesTableConfigValue: EntityTableConfig<DeviceInfo>,
               public fb: UntypedFormBuilder,
               protected cd: ChangeDetectorRef,
-              private destroyRef: DestroyRef) {
+              private destroyRef: DestroyRef,
+              private whiteLabelingService: WhiteLabelingService) {
     super(store, fb, entityValue, entitiesTableConfigValue, cd);
+    this.whiteLabelingService.settings$.pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(settings => {
+      this.hideConnectivityDialog = settings.enabled && settings.hideConnectivityDialog;
+    });
   }
 
   ngOnInit() {

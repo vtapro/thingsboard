@@ -136,6 +136,8 @@ import {
 } from '@home/components/dashboard-page/layout/move-widgets-dialog.component';
 import { HttpStatusCode } from '@angular/common/http';
 import { HomeService } from '@core/services/home.service';
+import { WhiteLabelingService } from '@core/http/white-labeling.service';
+import { WhiteLabelingSettings } from '@shared/models/white-labeling.models';
 
 // @dynamic
 @Component({
@@ -313,6 +315,12 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
 
   private rxSubscriptions = new Array<Subscription>();
 
+  /**
+   * Footer attribution of the dashboard. The white labeling may replace the product name, or hide the footer
+   * completely when the vendor promotion is disabled.
+   */
+  poweredBy: {label: string; url?: string} = {label: 'ThingsBoard', url: 'https://thingsboard.io'};
+
   get toolbarOpened(): boolean {
     return !this.widgetEditMode && !this.hideToolbar &&
       (this.toolbarAlwaysOpen() || this.isToolbarOpened || this.isEdit || this.showRightLayoutSwitch());
@@ -365,7 +373,8 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
               private cd: ChangeDetectorRef,
               public elRef: ElementRef,
               private injector: Injector,
-              public homeService: HomeService) {
+              public homeService: HomeService,
+              private whiteLabelingService: WhiteLabelingService) {
     super(store);
     if (isDefinedAndNotNull(this.embeddedValue)) {
       this.embedded = this.embeddedValue;
@@ -376,6 +385,11 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
     if (this.hideMainToolbar) {
       this.homeService.setHideMainToolbar(true);
     }
+    this.rxSubscriptions.push(
+      this.whiteLabelingService.settings$.subscribe(settings => {
+        this.poweredBy = this.resolvePoweredBy(settings);
+      })
+    );
     this.rxSubscriptions.push(this.route.data.subscribe(
       (data) => {
         let dashboardPageInitData: DashboardPageInitData;
@@ -583,7 +597,17 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
 
     this.setStateDashboardId = false;
 
-    this.dashboardCtx.state = null;
+   this.dashboardCtx.state = null;
+ }
+
+  private resolvePoweredBy(settings: WhiteLabelingSettings): {label: string; url?: string} {
+    if (settings.enabled && settings.hideVendorPromotion) {
+      return null;
+    }
+    if (settings.enabled && settings.appTitle) {
+      return {label: settings.appTitle};
+    }
+    return {label: 'ThingsBoard', url: 'https://thingsboard.io'};
   }
 
   ngOnDestroy(): void {

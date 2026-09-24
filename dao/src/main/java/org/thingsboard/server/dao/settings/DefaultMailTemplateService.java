@@ -24,7 +24,7 @@ public class DefaultMailTemplateService implements MailTemplateService {
             return new MailTemplateSettings();
         }
         try {
-            return JacksonUtil.convertValue(adminSettings.getJsonValue(), MailTemplateSettings.class);
+            return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(adminSettings.getJsonValue(), MailTemplateSettings.class);
         } catch (Exception e) {
             throw new RuntimeException("Failed to load mail template settings!", e);
         }
@@ -40,7 +40,7 @@ public class DefaultMailTemplateService implements MailTemplateService {
         }
         adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
         AdminSettings savedAdminSettings = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
-        return JacksonUtil.convertValue(savedAdminSettings.getJsonValue(), MailTemplateSettings.class);
+        return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(savedAdminSettings.getJsonValue(), MailTemplateSettings.class);
     }
 
 }

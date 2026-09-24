@@ -21,11 +21,20 @@ echo "Using jar file: ${JAR_FILE}"
 
 if [ "${RUN_INSTALL:-true}" = "true" ]; then
     echo "Installing/upgrading ThingsBoard database schema..."
-    java -cp "${JAR_FILE}" \
+    if ! java -cp "${JAR_FILE}" \
         -Dloader.main=org.thingsboard.server.ThingsboardInstallApplication \
-        org.springframework.boot.loader.launch.PropertiesLauncher \
-        || echo "Install step did not complete, continuing with server startup"
+        org.springframework.boot.loader.launch.PropertiesLauncher; then
+        if [ "${RUN_INSTALL_ONLY:-false}" = "true" ]; then
+            echo "Install step failed" >&2
+            exit 1
+        fi
+        echo "Install step did not complete, continuing with server startup" >&2
+    fi
+fi
+
+if [ "${RUN_INSTALL_ONLY:-false}" = "true" ]; then
+    echo "Install only run completed, the server is not started"
+    exit 0
 fi
 
 exec java ${JAVA_OPTS} -jar "${JAR_FILE}"
-

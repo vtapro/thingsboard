@@ -23,6 +23,16 @@ COPY . .
 # Build all modules without packaging (deb/rpm/zip/bootjar are not needed for the docker image)
 RUN --mount=type=cache,target=/root/.m2 mvn -B -T 1C clean install -Dmaven.test.skip=true -Dpkg.skip=true
 
+# Optional: compile the test sources and run the given test classes.
+# Usage: docker compose -f docker/tb-custom/docker-compose.yml build --build-arg TEST_CLASSES=... tb-node
+ARG TEST_CLASSES=""
+RUN --mount=type=cache,target=/root/.m2 if [ -n "${TEST_CLASSES}" ]; then \
+      mvn -B -pl application -Dtest="${TEST_CLASSES}" -DfailIfNoSpecifiedTests=false \
+        -Dskip.ui.build=true test; \
+    else \
+      echo "TEST_CLASSES is not set, skipping the test run"; \
+    fi
+
 # Produce the executable Spring Boot jar of the application module
 RUN --mount=type=cache,target=/root/.m2 mvn -B -pl application package \
  -Dmaven.test.skip=true \
@@ -33,6 +43,11 @@ RUN --mount=type=cache,target=/root/.m2 mvn -B -pl application package \
 FROM eclipse-temurin:25-jre
 
 WORKDIR /app
+
+# curl is used by the container health check of the production compose file
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /build/application/target/thingsboard-*.jar /app/
 COPY --from=builder /build/application/src/main/data /app/data

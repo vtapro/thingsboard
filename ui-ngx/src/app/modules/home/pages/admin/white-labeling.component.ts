@@ -73,7 +73,6 @@ export class WhiteLabelingComponent extends PageComponent implements OnInit, Has
       hideConnectivityDialog: [false],
       overrideTrendzName: [false],
       trendzName: [null],
-      hideChatBot: [false],
       showPlatformNameVersion: [false]
     });
 
@@ -104,7 +103,6 @@ export class WhiteLabelingComponent extends PageComponent implements OnInit, Has
       hideConnectivityDialog: settings?.hideConnectivityDialog ?? false,
       overrideTrendzName: settings?.overrideTrendzName ?? false,
       trendzName: settings?.trendzName ?? null,
-      hideChatBot: settings?.hideChatBot ?? false,
       showPlatformNameVersion: settings?.showPlatformNameVersion ?? false
     });
     this.primaryPalette = this.paletteNameByColor(settings?.primaryColor);

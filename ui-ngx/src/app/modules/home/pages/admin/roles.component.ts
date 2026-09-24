@@ -48,6 +48,8 @@ interface TenantCustomerInfo {
   title: string;
 }
 
+const MAX_USER_PAGES = 50;
+
 @Component({
     selector: 'tb-roles',
     templateUrl: './roles.component.html',
@@ -56,7 +58,8 @@ interface TenantCustomerInfo {
 })
 export class RolesComponent extends PageComponent implements OnInit {
 
-  readonly resources = ['DEVICE', 'ASSET', 'DASHBOARD', 'ALARM', 'CUSTOMER', 'ENTITY_VIEW', 'RULE_CHAIN'];
+  readonly resources = ['DEVICE', 'ASSET', 'DASHBOARD', 'ALARM', 'CUSTOMER', 'ENTITY_VIEW', 'RULE_CHAIN',
+    'ADMIN_SETTINGS', 'USER'];
   readonly operations = ['READ', 'WRITE', 'DELETE'];
   readonly displayedColumns = ['name', 'permissions', 'users', 'actions'];
 
@@ -106,8 +109,23 @@ export class RolesComponent extends PageComponent implements OnInit {
   }
 
   loadUsers() {
-    this.http.get<{data: TenantUserInfo[]}>('/api/users?pageSize=100&page=0',
-      defaultHttpOptionsFromConfig(undefined)).subscribe(page => this.users = page?.data || []);
+    this.loadUsersPage(0, [], 0);
+  }
+
+  /**
+   * Loads every user of the tenant page by page, so that the role can be assigned to any user.
+   */
+  private loadUsersPage(page: number, users: TenantUserInfo[], loadedPages: number) {
+    this.http.get<{data: TenantUserInfo[]; hasNext: boolean}>(
+      `/api/users?pageSize=100&page=${page}`, defaultHttpOptionsFromConfig(undefined))
+      .subscribe(data => {
+        const loaded = users.concat(data?.data || []);
+        if (data?.hasNext && loadedPages < MAX_USER_PAGES) {
+          this.loadUsersPage(page + 1, loaded, loadedPages + 1);
+        } else {
+          this.users = loaded;
+        }
+      });
   }
 
   loadGroups() {

@@ -4,3 +4,11 @@
 **/.gradle
 **/*.log
 **/*.log.*
+
+# IDE and VCS metadata of the developer machines.
+# Note: .git is intentionally kept in the context, the maven build reads the commit id from it.
+.idea
+.vscode
+.github
+**/.DS_Store
+docs

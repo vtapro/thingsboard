@@ -24,7 +24,7 @@ public class DefaultCustomMenuService implements CustomMenuService {
             return new CustomMenuSettings();
         }
         try {
-            return JacksonUtil.convertValue(adminSettings.getJsonValue(), CustomMenuSettings.class);
+            return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(adminSettings.getJsonValue(), CustomMenuSettings.class);
         } catch (Exception e) {
             throw new RuntimeException("Failed to load custom menu settings!", e);
         }
@@ -40,7 +40,7 @@ public class DefaultCustomMenuService implements CustomMenuService {
         }
         adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
         AdminSettings saved = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
-        return JacksonUtil.convertValue(saved.getJsonValue(), CustomMenuSettings.class);
+        return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), CustomMenuSettings.class);
     }
 
 }

@@ -1,0 +1,97 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Production oriented stack.
+#
+# Differences with docker-compose.yml (local development):
+#   * no port is published for the database, the database is not reachable from the host;
+#   * every secret is provided through the environment (.env file or the orchestrator), no default value;
+#   * health checks, log rotation and memory limits are configured;
+#   * the schema installation is a separate one shot service, so the node starts fast and never
+#     runs a migration implicitly on restart.
+#
+# Usage:
+#   export POSTGRES_PASSWORD='...' TB_JAVA_OPTS='-Xmx4G -Xms1G'
+#   docker compose -f docker/tb-custom/docker-compose.prod.yml up -d
+#
+# TLS is terminated by the reverse proxy in front of the tb-node (nginx, traefik, an ALB...): expose 8080
+# and the MQTT port to the proxy network only, never directly to the internet.
+
+services:
+  postgres:
+    restart: unless-stopped
+    image: "postgres:16"
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-thingsboard}"
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+    volumes:
+      - tb-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-thingsboard}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # Runs the database schema installation/upgrade once and exits.
+  tb-install:
+    build:
+      context: "../.."
+      dockerfile: "docker/tb-custom/Dockerfile"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-thingsboard}"
+      SPRING_DATASOURCE_USERNAME: "${POSTGRES_USER:-postgres}"
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+      TB_QUEUE_TYPE: "${TB_QUEUE_TYPE:-in-memory}"
+      INSTALL_DATA_DIR: "/app/data"
+      RUN_INSTALL: "true"
+      RUN_INSTALL_ONLY: "true"
+
+  tb-node:
+    restart: unless-stopped
+    build:
+      context: "../.."
+      dockerfile: "docker/tb-custom/Dockerfile"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      tb-install:
+        condition: service_completed_successfully
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-thingsboard}"
+      SPRING_DATASOURCE_USERNAME: "${POSTGRES_USER:-postgres}"
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+      TB_QUEUE_TYPE: "${TB_QUEUE_TYPE:-in-memory}"
+      INSTALL_DATA_DIR: "/app/data"
+      # Keep the custom RBAC explicitly configured, the value in the development stack must not be reused.
+      SECURITY_RBAC_ENABLED: "${SECURITY_RBAC_ENABLED:-false}"
+      RUN_INSTALL: "false"
+      JAVA_OPTS: "${TB_JAVA_OPTS:--Xmx2G -Xms512M}"
+    ports:
+      - "${TB_HTTP_BIND:-127.0.0.1}:8080:8080"
+      - "${TB_MQTT_BIND:-127.0.0.1}:1883:1883"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/login || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+volumes:
+  tb-postgres-data:

@@ -5,6 +5,7 @@ package org.thingsboard.server.controller;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +23,7 @@ import org.thingsboard.server.service.security.permission.Resource;
 
 import static org.thingsboard.server.controller.ControllerConstants.SYSTEM_AUTHORITY_PARAGRAPH;
 
+@Slf4j
 @RequiredArgsConstructor
 @RestController
 @TbCoreComponent
@@ -37,9 +39,15 @@ public class WhiteLabelingController extends BaseController {
     public WhiteLabelingSettings getWhiteLabelingSettings(HttpServletRequest request) {
         String host = request.getServerName();
         if (host != null && !host.isBlank()) {
-            Domain domain = domainService.findDomainByName(host);
-            if (domain != null && domain.getTenantId() != null) {
-                return whiteLabelingService.getWhiteLabelingSettings(domain.getTenantId());
+            try {
+                Domain domain = domainService.findDomainByName(host);
+                if (domain != null && domain.getTenantId() != null) {
+                    return whiteLabelingService.getWhiteLabelingSettings(domain.getTenantId());
+                }
+            } catch (Exception e) {
+                // The unauthenticated login page must always be served, even when a domain entry is broken.
+                log.warn("Failed to resolve the domain [{}] of the request, the platform branding is used: {}",
+                        host, e.getMessage());
             }
         }
         return whiteLabelingService.getWhiteLabelingSettings();
@@ -71,6 +79,7 @@ public class WhiteLabelingController extends BaseController {
     public WhiteLabelingSettings saveTenantWhiteLabelingSettings(
             @Parameter(description = "A JSON value representing the white labeling settings.")
             @RequestBody WhiteLabelingSettings whiteLabelingSettings) throws ThingsboardException {
+        accessControlService.checkPermission(getCurrentUser(), Resource.ADMIN_SETTINGS, Operation.WRITE);
         return whiteLabelingService.saveWhiteLabelingSettings(getCurrentUser().getTenantId(), whiteLabelingSettings);
     }
 

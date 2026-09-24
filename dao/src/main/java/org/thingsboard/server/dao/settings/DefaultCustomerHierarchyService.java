@@ -28,7 +28,7 @@ public class DefaultCustomerHierarchyService implements CustomerHierarchyService
             return new RbacCustomerHierarchy();
         }
         try {
-            return JacksonUtil.convertValue(adminSettings.getJsonValue(), RbacCustomerHierarchy.class);
+            return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(adminSettings.getJsonValue(), RbacCustomerHierarchy.class);
         } catch (Exception e) {
             throw new RuntimeException("Failed to load customer hierarchy!", e);
         }
@@ -44,7 +44,7 @@ public class DefaultCustomerHierarchyService implements CustomerHierarchyService
         }
         adminSettings.setJsonValue(JacksonUtil.valueToTree(hierarchy));
         AdminSettings saved = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
-        return JacksonUtil.convertValue(saved.getJsonValue(), RbacCustomerHierarchy.class);
+        return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), RbacCustomerHierarchy.class);
     }
 
     @Override

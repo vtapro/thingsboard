@@ -24,7 +24,7 @@ public class DefaultEntityGroupService implements EntityGroupService {
             return new RbacEntityGroupSettings();
         }
         try {
-            return JacksonUtil.convertValue(adminSettings.getJsonValue(), RbacEntityGroupSettings.class);
+            return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(adminSettings.getJsonValue(), RbacEntityGroupSettings.class);
         } catch (Exception e) {
             throw new RuntimeException("Failed to load entity group settings!", e);
         }
@@ -40,7 +40,7 @@ public class DefaultEntityGroupService implements EntityGroupService {
         }
         adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
         AdminSettings saved = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
-        return JacksonUtil.convertValue(saved.getJsonValue(), RbacEntityGroupSettings.class);
+        return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), RbacEntityGroupSettings.class);
     }
 
 }

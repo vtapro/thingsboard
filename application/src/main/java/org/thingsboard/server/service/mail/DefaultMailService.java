@@ -115,7 +115,15 @@ public class DefaultMailService implements MailService {
     }
 
     private Configuration createCustomTemplateConfig() {
-        Configuration configuration = new Configuration(freemarkerConfig.getIncompatibleImprovements());
+        return createCustomTemplateConfig(freemarkerConfig);
+    }
+
+    /**
+     * Builds the restricted FreeMarker configuration used for the mail template bodies edited by tenant
+     * administrators. Package private for the tests.
+     */
+    static Configuration createCustomTemplateConfig(Configuration baseConfig) {
+        Configuration configuration = new Configuration(baseConfig.getIncompatibleImprovements());
         configuration.setNewBuiltinClassResolver(TemplateClassResolver.ALLOWS_NOTHING_RESOLVER);
         configuration.setAPIBuiltinEnabled(false);
         configuration.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);

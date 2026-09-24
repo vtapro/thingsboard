@@ -27,7 +27,7 @@ public class DefaultCustomTranslationService implements CustomTranslationService
             return new HashMap<>();
         }
         try {
-            CustomTranslationSettings settings = JacksonUtil.convertValue(adminSettings.getJsonValue(), CustomTranslationSettings.class);
+            CustomTranslationSettings settings = JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(adminSettings.getJsonValue(), CustomTranslationSettings.class);
             return settings.getTranslations() != null ? settings.getTranslations() : new HashMap<>();
         } catch (Exception e) {
             throw new RuntimeException("Failed to load custom translations!", e);
@@ -68,7 +68,7 @@ public class DefaultCustomTranslationService implements CustomTranslationService
         }
         adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
         AdminSettings saved = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
-        return JacksonUtil.convertValue(saved.getJsonValue(), CustomTranslationSettings.class).getTranslations();
+        return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), CustomTranslationSettings.class).getTranslations();
     }
 
 }

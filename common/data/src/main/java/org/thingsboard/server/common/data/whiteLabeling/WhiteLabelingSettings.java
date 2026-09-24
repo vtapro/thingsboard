@@ -60,9 +60,6 @@ public class WhiteLabelingSettings implements Serializable {
     @Schema(description = "Custom name of the Trendz analytics add-on.")
     private String trendzName;
 
-    @Schema(description = "When enabled, hides the chat bot.")
-    private boolean hideChatBot;
-
     @Schema(description = "When enabled, shows the platform name and version on the login page.")
     private boolean showPlatformNameVersion;
 
