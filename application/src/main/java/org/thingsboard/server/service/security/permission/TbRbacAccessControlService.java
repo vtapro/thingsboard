@@ -125,6 +125,9 @@ public class TbRbacAccessControlService implements AccessControlService {
             for (RbacRole role : roles) {
                 if (roleIds.contains(role.getId())) {
                     mergePermissions(role, effective);
+                    if (role.isOwnCustomerOnly()) {
+                        effective.setOwnCustomerOnly(true);
+                    }
                 }
             }
             return effective;
