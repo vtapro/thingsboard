@@ -75,20 +75,22 @@ public class TbRbacAccessControlService implements AccessControlService {
     @Override
     public boolean hasPermission(SecurityUser user, Resource resource, Operation operation) throws ThingsboardException {
         RbacRole role = getEffectiveRole(user);
-        if (role == null) {
+        if (role == null || !isResourceManagedByRole(role, resource)) {
             return defaultAccessControlService.hasPermission(user, resource, operation);
         }
-        return (hasGlobalOperation(role, resource, operation) || hasScopedOperation(role, resource, operation))
+        return (hasGlobalOperation(role, resource, grantedOperation(operation))
+                || hasScopedOperation(role, resource, grantedOperation(operation)))
                 && defaultAccessControlService.hasPermission(user, resource, operation);
     }
 
     @Override
     public Set<UUID> getAllowedEntityIds(SecurityUser user, Resource resource, Operation operation) {
         RbacRole role = getEffectiveRole(user);
-        if (role == null || hasGlobalOperation(role, resource, operation)) {
+        if (role == null || !isResourceManagedByRole(role, resource)
+                || hasGlobalOperation(role, resource, grantedOperation(operation))) {
             return null;
         }
-        List<String> scopedGroups = getScopedGroups(role, resource, operation);
+        List<String> scopedGroups = getScopedGroups(role, resource, grantedOperation(operation));
         if (scopedGroups == null || scopedGroups.isEmpty()) {
             return null;
         }
@@ -122,7 +124,7 @@ public class TbRbacAccessControlService implements AccessControlService {
     public <I extends EntityId, T extends HasTenantId> boolean hasPermission(SecurityUser user, Resource resource, Operation operation,
                                                                             I entityId, T entity) throws ThingsboardException {
         RbacRole role = getEffectiveRole(user);
-        if (role == null) {
+        if (role == null || !isResourceManagedByRole(role, resource)) {
             return defaultAccessControlService.hasPermission(user, resource, operation, entityId, entity);
         }
         if (user.getCustomerId() != null) {
@@ -169,6 +171,35 @@ public class TbRbacAccessControlService implements AccessControlService {
         return scopedGroups != null && !scopedGroups.isEmpty();
     }
 
+    /**
+     * True when the custom role configures this resource. Only the configured resources are restricted by the role:
+     * the auxiliary resources that the WEB UI needs (device profile, telemetry, attributes, widgets, ...) keep the
+     * platform permissions, otherwise a role limited to devices would break the entity details pages.
+     */
+    private boolean isResourceManagedByRole(RbacRole role, Resource resource) {
+        String name = resource.name();
+        return (role.getPermissions() != null && role.getPermissions().containsKey(name))
+                || (role.getScopedPermissions() != null && role.getScopedPermissions().containsKey(name));
+    }
+
+    /**
+     * The role configures the operations READ, WRITE and DELETE. The auxiliary operations of the same entity
+     * (telemetry, attributes, credentials, rpc) are mapped to the configured one.
+     */
+    private static Operation grantedOperation(Operation operation) {
+        switch (operation) {
+            case READ_ATTRIBUTES, READ_TELEMETRY, READ_CREDENTIALS -> {
+                return Operation.READ;
+            }
+            case WRITE_ATTRIBUTES, WRITE_TELEMETRY, WRITE_CREDENTIALS, RPC_CALL, ASSIGN_TO_CUSTOMER, UNASSIGN_FROM_CUSTOMER -> {
+                return Operation.WRITE;
+            }
+            default -> {
+                return operation;
+            }
+        }
+    }
+
     private RbacRole getEffectiveRole(SecurityUser user) {
         if (user == null || user.getId() == null || user.getTenantId() == null || SYS_ADMIN.equals(user.getAuthority())) {
             return null;
@@ -190,10 +221,11 @@ public class TbRbacAccessControlService implements AccessControlService {
      * on one of the entity groups the entity belongs to.
      */
     private boolean hasOperationGrant(TenantId tenantId, RbacRole role, Resource resource, Operation operation, EntityId entityId) {
-        if (hasGlobalOperation(role, resource, operation)) {
+        Operation grantedOperation = grantedOperation(operation);
+        if (hasGlobalOperation(role, resource, grantedOperation)) {
             return true;
         }
-        List<String> scopedGroups = getScopedGroups(role, resource, operation);
+        List<String> scopedGroups = getScopedGroups(role, resource, grantedOperation);
         return entityId != null && scopedGroups != null && !scopedGroups.isEmpty()
                 && entityBelongsToGroups(tenantId, entityId, scopedGroups);
     }

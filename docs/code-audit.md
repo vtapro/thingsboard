@@ -273,3 +273,27 @@ GET /api/device/{id ngoài nhóm} -> 403 (thiết bị mới tạo, không nằm
 
 Hạn chế đã biết: khi có scope, việc lọc được thực hiện trong bộ nhớ với tối đa 1000 entity đầu tiên
 (`SCOPED_FETCH_SIZE_LIMIT`); tenant lớn hơn cần chuyển sang lọc ở tầng query như PE.
+
+### Bổ sung: chỉ siết những resource mà role khai báo
+
+Sau khi bật lọc theo nhóm, trang chi tiết thiết bị của user customer báo **"Access Forbidden"**: role chỉ khai báo
+`DEVICE: READ/WRITE/DELETE`, nhưng panel chi tiết còn gọi các API phụ (`/api/device/{id}/credentials`,
+`/api/plugins/telemetry/.../attributes`, `/api/deviceProfile/{id}`) nên bị từ chối.
+
+Đã sửa theo hai quy tắc:
+
+1. **Role chỉ siết những resource được khai báo.** Nếu role không nhắc tới một resource (device profile, widget,
+   tenant, ...) thì resource đó giữ nguyên quyền của nền tảng CE → các trang chi tiết vẫn hoạt động.
+2. **Các thao tác phụ được quy về thao tác chính**: `READ_ATTRIBUTES`, `READ_TELEMETRY`, `READ_CREDENTIALS` → `READ`;
+   `WRITE_ATTRIBUTES`, `WRITE_TELEMETRY`, `WRITE_CREDENTIALS`, `RPC_CALL`, `ASSIGN_TO_CUSTOMER`,
+   `UNASSIGN_FROM_CUSTOMER` → `WRITE`.
+
+Kiểm chứng lại với user customer của DN1 (role DEVICE READ/WRITE/DELETE theo 2 nhóm):
+
+```text
+/api/customer/DN1/deviceInfos          -> 200, 2 thiết bị
+/api/device/{id trong nhóm}            -> 200
+/api/device/{id trong nhóm}/credentials-> 200   (trước đây 403)
+/api/plugins/telemetry/.../attributes  -> 200   (trước đây 403)
+UI: mở chi tiết "child-device"         -> không còn dialog "Access Forbidden", panel hiển thị đầy đủ
+```
