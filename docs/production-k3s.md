@@ -228,11 +228,13 @@ kubectl -n thingsboard run netcheck --rm -it --restart=Never --image=busybox:1.3
          nc -vz ${p%%:*} ${p##*:}; done'
 ```
 
-### 3.1b. Kafka: dùng broker có sẵn hay chạy trong cụm
+### 3.1b. Kafka chạy trong cụm (mặc định của deployment này)
 
-ThingsBoard cần Kafka cho queue, nhưng **không bắt buộc Kafka phải nằm trong cụm**. Hai cách:
+**Cấu hình đang dùng: Kafka + ZooKeeper + toàn bộ ThingsBoard services chạy trong k3s; chỉ
+PostgreSQL và Cassandra nằm ngoài cụm.** Phần dưới chỉ là phương án dự phòng nếu sau này muốn
+chuyển queue sang một broker có sẵn.
 
-| | Cách A — dùng Kafka có sẵn | Cách B — Kafka trong cụm (mặc định hiện tại) |
+| | Cách A — dùng Kafka có sẵn (dự phòng) | Cách B — Kafka trong cụm (**đang dùng**) |
 |---|---|---|
 | Khai báo | `TB_KAFKA_SERVERS: <host>:<port>` trong `01-config.yaml` | `TB_KAFKA_SERVERS: tb-kafka:9092` |
 | Manifest | bỏ `04-kafka.yaml` khỏi `kustomization.yaml` (xoá Deployment nếu đã tạo) | giữ `04-kafka.yaml` |
