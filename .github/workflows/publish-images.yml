@@ -26,13 +26,17 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**.md'
+      # manifests and helper scripts do not change the images
+      - 'deploy/**'
+      - 'scripts/**'
     tags:
       - 'v*'
   workflow_dispatch:
 
 concurrency:
   group: publish-images-${{ github.ref }}
-  cancel-in-progress: true
+  # never kill a build that is already publishing images: a new push waits instead
+  cancel-in-progress: false
 
 permissions:
   contents: read
