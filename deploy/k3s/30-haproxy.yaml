@@ -144,7 +144,8 @@ data:
       stats enable
       stats uri /stats
       stats refresh 10s
-      stats auth admin:admin
+      # credentials are injected from the tb-secrets Secret (see env below)
+      stats auth ${HAPROXY_STATS_USER}:${HAPROXY_STATS_PASSWORD}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -182,6 +183,19 @@ spec:
         - name: haproxy
           image: haproxy:3.1-alpine
           args: ["-f", "/usr/local/etc/haproxy/haproxy.cfg"]
+          # HAProxy expands ${VAR} in its configuration, so the stats credentials never appear
+          # in the manifest — only in the Secret
+          env:
+            - name: HAPROXY_STATS_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tb-secrets
+                  key: HAPROXY_STATS_USER
+            - name: HAPROXY_STATS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tb-secrets
+                  key: HAPROXY_STATS_PASSWORD
           ports:
             - name: http
               containerPort: 8080

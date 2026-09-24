@@ -14,12 +14,11 @@ namespace: thingsboard
 resources:
   - 00-namespace.yaml
   - 01-config.yaml
-  # PostgreSQL + Cassandra hosted outside the cluster (edit the IPs before applying)
-  - 03-external-databases.yaml
   # in-cluster infrastructure
   - 04-kafka.yaml
   - 05-zookeeper.yaml
-  - 06-redis.yaml
+  # Kafka/ZooKeeper accept connections only from pods of this namespace
+  - 07-network-policies.yaml
   - 10-install-job.yaml
   - 20-tb-core.yaml
   - 21-tb-rule-engine.yaml

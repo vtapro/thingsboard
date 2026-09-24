@@ -1,0 +1,64 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Kafka and ZooKeeper of ThingsBoard CE have no authentication of their own:
+#   * ZooKeeper: thingsboard.yml exposes only enabled/url/timeouts — no user or password;
+#   * Kafka: SASL is wired only through the "confluent" block, which the Node.js js-executor
+#     cannot use (its config exposes no SASL settings).
+# They are therefore kept inside the cluster (ClusterIP/headless Services, no NodePort) and are
+# additionally protected here: only pods of the thingsboard namespace may connect.
+#
+# k3s enforces NetworkPolicy out of the box (kube-router policy controller) — check with
+#   kubectl -n thingsboard describe networkpolicy
+# If the cluster is later switched to a CNI without policy support, these objects are ignored.
+#
+# PostgreSQL and Cassandra do have credentials — the two managed databases use the users stored in
+# the tb-secrets Secret.
+
+# ---- Kafka: only ThingsBoard pods and the js-executor may produce/consume ------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tb-kafka
+  namespace: thingsboard
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tb-kafka
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/part-of
+                operator: In
+                values: ["thingsboard"]
+      ports:
+        - port: 9092
+          protocol: TCP
+---
+# ---- ZooKeeper: discovery between the ThingsBoard services ---------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tb-zookeeper
+  namespace: thingsboard
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tb-zookeeper
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/part-of
+                operator: In
+                values: ["thingsboard"]
+      ports:
+        - port: 2181
+          protocol: TCP

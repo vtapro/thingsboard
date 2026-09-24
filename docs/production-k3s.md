@@ -10,7 +10,7 @@ production của ThingsBoard. Khác biệt với môi trường dev (xem [local-
 | Telemetry | PostgreSQL (`DATABASE_TS_TYPE=sql`) | Cassandra (`DATABASE_TS_TYPE=cassandra`) |
 | Queue | `in-memory` | **Kafka** (bắt buộc) |
 | Discovery | không cần | **ZooKeeper** (bắt buộc) |
-| Cache | `caffeine` | **Redis/Valkey** (bắt buộc khi nhiều replica) |
+| Cache | `caffeine` | `caffeine` trong mỗi pod (TTL ngắn) — deployment này **không dùng Redis** |
 | Số replica | 1 | ≥ 2 mỗi service, có HPA |
 
 Code ThingsBoard **không bị sửa để bỏ Kafka/Cassandra**. Việc "không dùng Kafka/Cassandra" chỉ
@@ -31,9 +31,10 @@ CE vẫn nguyên vẹn (xem mục 8 để có bằng chứng kiểm tra).
                      │  tb-coap / tb-lwm2m / tb-snmp (tuỳ chọn)        │
                      └───────┬───────────┬───────────┬─────────────────┘
                              ▼           ▼           ▼
-                          Kafka     ZooKeeper     Redis
-                       (1 broker)  (discovery)  (cache chia sẻ)
-    ══════════════ Endpoints trỏ ra ngoài cụm ════════════════════════════════════
+                          Kafka     ZooKeeper   (cache: caffeine
+                       (có sẵn hoặc  (discovery)  trong từng pod)
+                       trong cụm)
+    ══════════════ Hostname public + TLS (ngoài cụm) ══════════════════════════════
                              ▼                              ▼
                     PostgreSQL ─ entities,             Cassandra ─ telemetry
                     users, RBAC, white labeling
@@ -168,44 +169,51 @@ kubectl -n thingsboard create secret docker-registry ghcr \
 và thêm `imagePullSecrets: [{name: ghcr}]` vào `spec.template.spec` của từng Deployment (hoặc gắn
 vào ServiceAccount của namespace).
 
-## 3. Data plane: 2 máy chủ dữ liệu + hạ tầng trong cụm
+## 3. Data plane: 2 database managed ngoài cụm + hạ tầng trong cụm
 
-Hai database nằm ở **2 máy chủ thuê riêng, ngoài cụm**:
+PostgreSQL và Cassandra là **2 cluster managed, nằm ngoài k3s**, đều bật SSL:
+
+| | Endpoint | Port | Ghi chú |
+|---|---|---|---|
+| PostgreSQL | `postgresql-215231-0.cloudclusters.net` | `10012` | database riêng cho ThingsBoard, đặt trong `SPRING_DATASOURCE_URL` |
+| Cassandra | `cassandra-215233-0.cloudclusters.net` | `19948` | keyspace `thingsboard`, đặt trong `CASSANDRA_URL` |
 
 ```text
-  k3s cluster (namespace thingsboard)                 máy chủ 1            máy chủ 2
-  ┌───────────────────────────────────┐            ┌──────────────┐    ┌──────────────┐
-  │  tb-core / tb-rule-engine /       │            │  PostgreSQL  │    │  Cassandra   │
-  │  tb-*-transport / tb-edqs         │            │   :5432      │    │   :9042      │
-  │  ── Service + Endpoints ──────────┼── TCP ────▶│              │    │              │
-  │  tb-postgres                      │────────────┘              │    │              │
-  │  tb-cassandra                     │─────────────────────────────────┘              │
-  └───────┬───────────┬───────────────┘            └──────────────┘    └──────────────┘
-          ▼           ▼
-       Kafka      ZooKeeper + Redis        (chạy TRONG cụm: 04-kafka.yaml,
-      :9092         :2181 / :6379          05-zookeeper.yaml, 06-redis.yaml)
+  k3s cluster (namespace thingsboard)              CloudClusters (ngoài cụm)
+  ┌───────────────────────────────────┐            ┌──────────────────────────────┐
+  │  tb-core / tb-rule-engine /       │            │  postgresql-215231-0 …:10012 │
+  │  tb-web-ui / tb-js-executor /     │── TLS ────▶│  (entities, users, RBAC,     │
+  │  tb-*-transport                   │            │   white labeling)            │
+  │                                   │            ├──────────────────────────────┤
+  │  tb-kafka  tb-zookeeper           │── TLS ────▶│  cassandra-215233-0 …:19948  │
+  │  tb-haproxy (edge)                │            │  (telemetry)                 │
+  └───────────────────────────────────┘            └──────────────────────────────┘
+            (hạ tầng trong cụm)                       (2 cluster DB thuê riêng)
 ```
 
-Các pod chỉ nhìn thấy 5 hostname nội bộ (`tb-postgres`, `tb-cassandra`, `tb-kafka`,
-`tb-zookeeper`, `tb-redis`). Hai hostname database do
-[`deploy/k3s/03-external-databases.yaml`](../deploy/k3s/03-external-databases.yaml) tạo ra
-(`Service` không selector + `Endpoints` trỏ về IP máy chủ), ba hostname còn lại là Service của
-hạ tầng chạy trong cụm.
+Vì endpoint là **hostname public có TLS**, không cần `Service`/`Endpoints` trỏ IP trong cụm: pod
+resolve trực tiếp hostname của nhà cung cấp, và việc verify certificate hoạt động đúng (hostname
+trong `CASSANDRA_URL`/JDBC URL khớp CN/SAN của cert).
 
-### 3.1. Cấu hình bắt buộc trên 2 máy chủ dữ liệu
+### 3.1. Cấu hình bắt buộc cho 2 database managed
 
-| Thành phần | Việc phải làm | Vì sao |
+| Việc | PostgreSQL | Cassandra |
 |---|---|---|
-| PostgreSQL (máy chủ 1) | `listen_addresses='*'`, `pg_hba.conf` cho CIDR của pod/service k3s, tạo user + DB `thingsboard` | pod nối trực tiếp tới `:5432` |
-| Cassandra (máy chủ 2) | `listen_address`/`rpc_address` = IP của máy, `broadcast_rpc_address` = IP mà pod thấy, `local_datacenter` khớp `CASSANDRA_LOCAL_DATACENTER` | driver dùng `broadcast_rpc_address` để nối lại các node |
-| Firewall cả hai | cho phép dải CIDR của k3s vào `5432` (Postgres) và `9042` (Cassandra) | mặc định k3s: pod `10.42.0.0/16`, service `10.43.0.0/16` |
+| Whitelist IP client | thêm IP 2 worker `89.117.54.100`, `144.91.106.154` vào allow-list của cluster | như Postgres (cùng danh sách) |
+| TLS | `sslmode=require` trong JDBC URL (nâng lên `verify-full` khi có CA của provider) | `CASSANDRA_USE_SSL=true` + `CASSANDRA_SSL_HOSTNAME_VALIDATION=true` |
+| Credentials | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` trong secret `tb-secrets` | `CASSANDRA_USERNAME` / `CASSANDRA_PASSWORD` trong secret `tb-secrets` |
+| Database/keyspace | tạo DB `thingsboard` (hoặc đổi tên trong `SPRING_DATASOURCE_URL`) | keyspace `thingsboard` do job install tạo |
+| Data center | — | `CASSANDRA_LOCAL_DATACENTER` phải **khớp tên datacenter của cluster** (mặc định `datacenter1`); sai tên này là lỗi phổ biến nhất |
 
-Cassandra tham khảo (`cassandra.yaml`):
+Tất cả biến trên đã khai báo sẵn trong `01-config.yaml`; chỉ cần điền user/password vào secret:
 
-```yaml
-listen_address: <IP-máy-chủ-Cassandra>
-rpc_address: 0.0.0.0
-broadcast_rpc_address: <IP-máy-chủ-Cassandra>
+```bash
+kubectl -n thingsboard create secret generic tb-secrets \
+  --from-literal=SPRING_DATASOURCE_USERNAME='<user postgres>' \
+  --from-literal=SPRING_DATASOURCE_PASSWORD='<mật khẩu postgres>' \
+  --from-literal=CASSANDRA_USERNAME='<user cassandra>' \
+  --from-literal=CASSANDRA_PASSWORD='<mật khẩu cassandra>' \
+  --dry-run=client -o yaml | kubectl apply -f -
 ```
 
 ### 3.2. Khai báo trong cụm và kiểm tra
@@ -220,18 +228,52 @@ kubectl -n thingsboard run netcheck --rm -it --restart=Never --image=busybox:1.3
          nc -vz ${p%%:*} ${p##*:}; done'
 ```
 
-### 3.1b. Hạ tầng chạy trong cụm
+### 3.1b. Kafka: dùng broker có sẵn hay chạy trong cụm
+
+ThingsBoard cần Kafka cho queue, nhưng **không bắt buộc Kafka phải nằm trong cụm**. Hai cách:
+
+| | Cách A — dùng Kafka có sẵn | Cách B — Kafka trong cụm (mặc định hiện tại) |
+|---|---|---|
+| Khai báo | `TB_KAFKA_SERVERS: <host>:<port>` trong `01-config.yaml` | `TB_KAFKA_SERVERS: tb-kafka:9092` |
+| Manifest | bỏ `04-kafka.yaml` khỏi `kustomization.yaml` (xoá Deployment nếu đã tạo) | giữ `04-kafka.yaml` |
+| Yêu cầu | broker phải cho pod kết nối; nếu bật SASL/SSL thì đọc bảng dưới | — |
+
+Broker có sẵn dùng TLS/SASL thì thêm vào `01-config.yaml`:
+
+```yaml
+  # TLS (SSL keystore/truststore mount vào pod)
+  TB_KAFKA_SSL_ENABLED: "true"
+  TB_KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/kafka.truststore.jks
+  TB_KAFKA_SSL_TRUSTSTORE_PASSWORD: <từ secret>
+  # SASL (đi qua khối "confluent" của thingsboard.yml)
+  TB_QUEUE_KAFKA_USE_CONFLUENT_CLOUD: "true"
+  TB_QUEUE_KAFKA_CONFLUENT_SECURITY_PROTOCOL: SASL_SSL
+  TB_QUEUE_KAFKA_CONFLUENT_SASL_MECHANISM: PLAIN
+  TB_QUEUE_KAFKA_CONFLUENT_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="<user>" password="<password>";'
+  # quan trọng: js-executor (Node) KHÔNG đọc được cấu hình SASL này
+  JS_EVALUATOR: local
+```
+
+`TB_QUEUE_KAFKA_CONFLUENT_SASL_JAAS_CONFIG` chứa mật khẩu nên phải để trong Secret `tb-secrets`
+(các pod ThingsBoard đã `envFrom` secret này), không đặt trong ConfigMap.
+
+### 3.1c. Hạ tầng chạy trong cụm
 
 | Manifest | Thành phần | Cấu hình hiện tại | Khi cần HA |
 |---|---|---|---|
-| `04-kafka.yaml` | Kafka | KRaft, **1 broker**, PVC 10Gi (`local-path`), `advertised.listeners=PLAINTEXT://tb-kafka:9092` | scale lên 3 broker (node id + quorum voters) và đặt `TB_QUEUE_KAFKA_REPLICATION_FACTOR=3`, `min.insync.replicas=2` |
+| `04-kafka.yaml` | Kafka (tuỳ chọn, xem §3.1b) | KRaft, **1 broker**, PVC 10Gi (`local-path`), `advertised.listeners=PLAINTEXT://tb-kafka-0...:9092` | scale lên 3 broker (node id + quorum voters) và đặt `TB_QUEUE_KAFKA_REPLICATION_FACTOR=3`, `min.insync.replicas=2` |
 | `05-zookeeper.yaml` | ZooKeeper | **1 replica**, PVC 2Gi | 3 replica (số lẻ mới có quorum) |
-| `06-redis.yaml` | Redis | **1 replica**, `requirepass` từ `tb-secrets`, `maxmemory 512mb`, `allkeys-lru`, PVC 2Gi | sentinel hoặc cluster; hoặc bỏ Redis và đặt `CACHE_TYPE=caffeine` |
 
-Vì hạ tầng nằm trong cụm nên không cần cấu hình `advertised.listeners` thủ công hay mở firewall:
-Service name (`tb-kafka:9092`, `tb-zookeeper:2181`) đã đúng như giá trị trong `01-config.yaml`.
+**Không dùng Redis** (theo yêu cầu): cache là caffeine trong từng pod, với TTL 5 phút cho các cache
+nhạy cảm (`CACHE_SPECS_*_TTL` trong `01-config.yaml`) để dữ liệu cũ tự hết hạn nhanh. Đánh đổi: sửa
+device/credential/role trên một replica có thể mất tới 5 phút mới thấy ở replica còn lại. Nếu sau
+này muốn nhất quán tức thời thì thêm Redis và đổi `CACHE_TYPE: redis` (bỏ các TTL override).
 
-Điểm chết đơn lẻ hiện tại: **mỗi thành phần hạ tầng chỉ 1 replica** và 2 máy chủ database riêng.
+ZooKeeper vẫn phải chạy trong cụm (hoặc trỏ `ZOOKEEPER_URL` ra ngoài — CE không có auth cho ZK nên
+chỉ nên để trong mạng nội bộ): đây là service discovery, mỗi pod giữ 1 session.
+
+Điểm chết đơn lẻ hiện tại: **Kafka và ZooKeeper chỉ 1 replica** (nếu dùng phương án trong cụm) và 2
+cluster database bên ngoài.
 Mất Kafka thì nền tảng ngừng xử lý; mất Cassandra thì không ghi/đọc telemetry; mất Postgres thì
 không đăng nhập được. Khi cần HA thật: Kafka ≥ 3 broker, ZooKeeper ≥ 3, Cassandra ≥ 3 node RF=3,
 PostgreSQL primary + standby — manifest của ThingsBoard **không phải sửa**, chỉ đổi `Endpoints`
@@ -285,12 +327,12 @@ Firewall trên 2 worker cần mở (nếu expose công khai): `30080/tcp`, `3188
 | `vmi3215905` | worker | 4 / ~8Gi | `144.91.106.154`, IPv6 | Ready, nhận workload |
 | `vmi3320735` | control plane | 4 / ~8Gi | `62.171.137.148`, IPv6 | Ready nhưng **cordoned** (taint `node-role.kubernetes.io/control-plane`, `node.kubernetes.io/unschedulable`) |
 
-Version k3s: `v1.35.5+k3s1`. StorageClass: `local-path` (mặc định) — dùng cho PVC của Kafka,
-ZooKeeper, Redis chạy trong cụm; các pod ThingsBoard thì **không cần PVC** vì state nằm ở 2 máy
-chủ database.
+Version k3s: `v1.35.5+k3s1`. StorageClass: `local-path` (mặc định) — dùng cho PVC của Kafka và
+ZooKeeper chạy trong cụm; các pod ThingsBoard thì **không cần PVC** vì state nằm ở 2 cluster
+database bên ngoài và cache là caffeine trong pod.
 
 **Vậy capacity khả dụng = 2 worker = 8 vCPU / ~16Gi.** Control plane không nhận pod, nên đừng tính
-vào. Bộ manifest hiện tại (TB services + Kafka + ZooKeeper + Redis) đã được hạ request cho vừa cụm.
+vào. Bộ manifest hiện tại (TB services + Kafka + ZooKeeper) đã được hạ request cho vừa cụm.
 
 **Thành phần hệ thống đang có / còn thiếu** (kiểm tra bằng `kubectl get pods -A`):
 
@@ -336,7 +378,6 @@ tại:
 | tb-http-transport | 2 | 250m / 512Mi | 0.5 CPU / 1Gi |
 | tb-zookeeper | 1 | 200m / 512Mi | 0.2 CPU / 0.5Gi |
 | tb-kafka | 1 | 500m / 1Gi | 0.5 CPU / 1Gi |
-| tb-redis | 1 | 100m / 256Mi | 0.1 CPU / 0.25Gi |
 | **tổng (chưa tính protocol transport tuỳ chọn)** | **11 pod** | — | **~3.8 CPU / ~9.8Gi** |
 
 Con số này nằm trong 8 vCPU / 16Gi của 2 worker, còn khoảng 4 CPU / 6Gi trống cho k3s system pods và
@@ -346,7 +387,7 @@ HPA (HPA tối đa 4 replica cho tb-core và tb-rule-engine). `JAVA_OPTS` trong 
 Nhớ giữ `limits` > `requests` để HPA còn chỗ nhân bản, và đặt heap (`-Xmx`) thấp hơn `limits` memory
 khoảng 20–25% để JVM không bị OOMKilled.
 
-**Storage**: mọi trạng thái đã nằm ở máy chủ dữ liệu (PostgreSQL/Cassandra) và cache dùng Redis, nên
+**Storage**: mọi trạng thái đã nằm ở 2 cluster database (PostgreSQL/Cassandra) và cache là caffeine trong pod, nên
 các pod ThingsBoard **không cần PVC** — đây là điểm thuận lợi của mô hình data plane bên ngoài.
 
 **MQTT**: vì cụm **không có servicelb/MetalLB**, `tb-mqtt-transport` được khai báo `type: NodePort`
@@ -372,8 +413,6 @@ Toàn bộ biến dưới đây do `thingsboard.yml` định nghĩa, đặt qua 
 | `DATABASE_TS_TYPE` / `DATABASE_TS_LATEST_TYPE` | `cassandra` | hybrid: entities ở Postgres, telemetry ở Cassandra |
 | `CASSANDRA_URL` / `CASSANDRA_KEYSPACE_NAME` | `tb-cassandra:9042` / `thingsboard` | |
 | `CASSANDRA_USE_CREDENTIALS` + `CASSANDRA_USERNAME`/`_PASSWORD` | `true` + secret | |
-| `CACHE_TYPE` | `redis` | bắt buộc khi > 1 replica |
-| `REDIS_HOST` / `REDIS_PORT` | `tb-redis` / `6379` | |
 | `METRICS_ENABLED` + `METRICS_ENDPOINTS_EXPOSE` | `true` + `info,health,prometheus` | `health` cần cho probe, `prometheus` cho scrape |
 | `RUN_INSTALL` | `false` | service không tự chạy migration |
 | `SECURITY_RBAC_ENABLED` | `true` | RBAC của fork; `false` = hành vi CE gốc |
@@ -391,13 +430,11 @@ kubectl apply -f deploy/k3s/01-config.yaml
 kubectl apply -f deploy/k3s/03-external-databases.yaml
 kubectl -n thingsboard create secret generic tb-secrets --from-literal=...
 
-# 2. hạ tầng trong cụm: ZooKeeper trước, sau đó Kafka và Redis
+# 2. hạ tầng trong cụm: ZooKeeper trước, sau đó Kafka (bỏ Kafka nếu dùng broker có sẵn)
 kubectl apply -f deploy/k3s/05-zookeeper.yaml
 kubectl apply -f deploy/k3s/04-kafka.yaml
-kubectl apply -f deploy/k3s/06-redis.yaml
 kubectl -n thingsboard rollout status statefulset/tb-zookeeper --timeout=5m
 kubectl -n thingsboard rollout status statefulset/tb-kafka --timeout=5m
-kubectl -n thingsboard rollout status statefulset/tb-redis --timeout=5m
 
 # 3. image đã mặc định là ghcr.io/vtapro/tb-*:v4.4.0.0 trong manifest;
 #    chỉ đổi tag khi roll bản mới

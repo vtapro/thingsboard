@@ -6,10 +6,9 @@
 # Shared configuration of every ThingsBoard service.
 # Anything that is a secret lives in the tb-secrets Secret instead.
 #
-# Topology: PostgreSQL and Cassandra run outside the cluster (each on its own server, reached
-# through the Endpoints of 03-external-databases.yaml); Kafka, ZooKeeper and Redis run inside
-# the cluster (04-kafka.yaml, 05-zookeeper.yaml, 06-redis.yaml). All five names below resolve
-# inside the namespace either way, so nothing else has to change if a component later moves.
+# Topology: PostgreSQL and Cassandra are managed database clusters outside k3s (each one on its
+# own server, with TLS enabled and reached through its public host name); Kafka and ZooKeeper run
+# inside the cluster (04-kafka.yaml, 05-zookeeper.yaml).
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -20,8 +19,15 @@ metadata:
 data:
   # ---- cluster / queue ------------------------------------------------------
   # Kafka is required in microservices mode: services only talk to each other through it.
+  # Two options:
+  #   a) Kafka already available elsewhere (managed service / another host): put its address
+  #      below in host:port form and drop 04-kafka.yaml from kustomization.yaml;
+  #   b) Kafka deployed in this cluster by 04-kafka.yaml: keep tb-kafka:9092.
   TB_QUEUE_TYPE: kafka
   TB_KAFKA_SERVERS: tb-kafka:9092
+  # If the external broker needs TLS and/or SASL, see docs/production-k3s.md §3.1b:
+  #   TB_KAFKA_SSL_ENABLED + truststore, or the SASL block (note: the Node.js js-executor does
+  #   not support SASL, so with an authenticated Kafka use JS_EVALUATOR=local).
   # single broker in the cluster: raise to 3 together with a 3 broker Kafka setup
   TB_QUEUE_KAFKA_REPLICATION_FACTOR: "1"
   # ZooKeeper is the discovery service used to find the other nodes of the cluster.
@@ -32,28 +38,43 @@ data:
   ZOOKEEPER_SESSION_TIMEOUT_MS: "30000"
 
   # ---- databases ------------------------------------------------------------
-  # Entities/relations/alarms stay in PostgreSQL (external server), telemetry in Cassandra
-  # (second external server).
+  # Managed PostgreSQL (external): entities, relations, alarms, users, admin settings.
+  # sslmode=require is mandatory; switch to verify-full once the CA certificate is published.
   SPRING_DRIVER_CLASS_NAME: org.postgresql.Driver
-  SPRING_DATASOURCE_URL: jdbc:postgresql://tb-postgres:5432/thingsboard
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgresql-215231-0.cloudclusters.net:10012/thingsboard?sslmode=require
   # note: spring.jpa.hibernate.ddl-auto is already "none" in thingsboard.yml; the schema is
   # created/upgraded by the tb-install job only.
+  # Managed Cassandra (external): telemetry. TLS is enabled by default on the server, so the
+  # client has to use it too, and the host name inside CASSANDRA_URL must match the
+  # certificate (hostname validation stays enabled).
   DATABASE_TS_TYPE: cassandra
   DATABASE_TS_LATEST_TYPE: cassandra
-  CASSANDRA_URL: tb-cassandra:9042
+  CASSANDRA_URL: cassandra-215233-0.cloudclusters.net:19948
   CASSANDRA_KEYSPACE_NAME: thingsboard
   CASSANDRA_LOCAL_DATACENTER: datacenter1
   CASSANDRA_USE_CREDENTIALS: "true"
+  CASSANDRA_USE_SSL: "true"
+  CASSANDRA_SSL_HOSTNAME_VALIDATION: "true"
   # the driver negotiates compression with the server; keep 'none' unless the Cassandra
   # server is explicitly configured for lz4
   CASSANDRA_COMPRESSION: none
 
   # ---- cache ----------------------------------------------------------------
-  # Mandatory in microservices: a local caffeine cache is not shared between replicas.
-  CACHE_TYPE: redis
-  REDIS_CONNECTION_TYPE: standalone
-  REDIS_HOST: tb-redis
-  REDIS_PORT: "6379"
+  # No Redis in this deployment: every pod keeps its own in-process (caffeine) cache. That is a
+  # supported CE mode, but a change made on one replica is not visible on the other one until its
+  # own entry expires, so the TTLs below are deliberately short (5 minutes instead of 24 hours).
+  # If Redis/Valkey is added later, set CACHE_TYPE=redis and drop the CACHE_SPECS_*_TTL overrides.
+  CACHE_TYPE: caffeine
+  CACHE_SPECS_DEVICES_TTL: "5"
+  CACHE_SPECS_DEVICE_CREDENTIALS_TTL: "5"
+  CACHE_SPECS_SESSIONS_TTL: "5"
+  CACHE_SPECS_USERS_TTL: "5"
+  CACHE_SPECS_RELATIONS_TTL: "5"
+  CACHE_SPECS_ATTRIBUTES_TTL: "5"
+  CACHE_SPECS_TENANTS_TTL: "5"
+  CACHE_SPECS_TENANT_PROFILES_TTL: "5"
+  CACHE_SPECS_SECURITY_SETTINGS_TTL: "5"
+  CACHE_SPECS_TS_LATEST_TTL: "5"
 
   # ---- observability --------------------------------------------------------
   METRICS_ENABLED: "true"

@@ -13,7 +13,7 @@ SPDX-License-Identifier: Apache-2.0
 | Tài liệu | Nội dung |
 |---|---|
 | [local-dev.md](local-dev.md) | Cài đặt và chạy local trên Windows (PostgreSQL, backend Java, UI dev server), tài khoản mặc định, xử lý sự cố |
-| [production-k3s.md](production-k3s.md) | Triển khai production trên k3s: microservices HA với Kafka/Cassandra/ZooKeeper/Redis, image GHCR, cấu hình, checklist |
+| [production-k3s.md](production-k3s.md) | Triển khai production trên k3s: 8 image microservices, PostgreSQL + Cassandra managed ngoài cụm, Kafka/ZooKeeper trong cụm, HAProxy cho `app.greeniq.vn`, checklist |
 | [white-labeling.md](white-labeling.md) | Tính năng white labeling (system + tenant), API, cách cấu hình |
 | [white-labeling-roadmap.md](white-labeling-roadmap.md) | Lộ trình các phần white labeling còn lại |
 | [access-control-roadmap.md](access-control-roadmap.md) | Lộ trình RBAC (roles, entity groups, user groups, customer hierarchy) |
