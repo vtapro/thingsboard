@@ -36,7 +36,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE: ghcr.io/vtapro/greeniq-backend
+  IMAGE: ghcr.io/vtapro/greeniq-thingsboard
   # Product version of the fork — bump it for every release. It is pushed as an extra
   # tag on every build, next to the branch / sha / git tag tags.
   IMAGE_VERSION: v4.4.0.0

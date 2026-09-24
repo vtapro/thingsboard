@@ -57,8 +57,32 @@ cluster. Nếu muốn id ổn định qua các lần restart, dùng `StatefulSet
 
 ## 2. Build image lên GHCR
 
-Image của sản phẩm là **`ghcr.io/vtapro/greeniq-backend`** (cùng nhóm với `greeniq-frontend` trên
-GHCR), version hiện tại **`v4.4.0.0`** — khai báo trong biến `IMAGE_VERSION` của workflow.
+Image của sản phẩm là **`ghcr.io/vtapro/greeniq-thingsboard`**, version hiện tại **`v4.4.0.0`**
+(khai báo trong biến `IMAGE_VERSION` của workflow).
+
+Vì sao tên là `greeniq-thingsboard`:
+
+- `greeniq-backend` / `greeniq-frontend` trên GHCR **đã là của ứng dụng khác** (package
+  `greeniq-backend:v2.8.2.69`), không được dùng lại cho nền tảng IoT này.
+- Nền tảng này chạy trên mã nguồn ThingsBoard nên tên package phản ánh rõ điều đó, cùng nhóm
+  `greeniq-*` với các sản phẩm còn lại.
+- **Một image dùng cho mọi thành phần** ThingsBoard (`tb-core`, `tb-rule-engine`, `tb-transport`,
+  job installer) — đúng cách ThingsBoard CE đóng gói: cùng một jar, khác nhau ở biến
+  `TB_SERVICE_TYPE`. Nhờ vậy chỉ build/push 1 lần thay vì 4 image giống hệt nhau.
+
+Nếu anh vẫn muốn có **package riêng theo từng service** (ví dụ để dễ thấy trên trang Packages),
+chỉ cần gắn thêm tag rồi push cùng image (không build lại):
+
+```bash
+docker tag  ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0 ghcr.io/vtapro/tb-core:v4.4.0.0
+docker tag  ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0 ghcr.io/vtapro/tb-rule-engine:v4.4.0.0
+docker tag  ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0 ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.0
+docker push ghcr.io/vtapro/tb-core:v4.4.0.0
+docker push ghcr.io/vtapro/tb-rule-engine:v4.4.0.0
+docker push ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.0
+```
+
+(Tương ứng, sửa `IMAGE` trong workflow hoặc thêm bước `docker tag` nếu muốn Actions làm việc này.)
 
 Workflow [`.github/workflows/publish-images.yml`](../.github/workflows/publish-images.yml) build
 `docker/tb-custom/Dockerfile` và push lên GHCR mỗi khi push branch hoặc tag `v*`:
@@ -71,23 +95,23 @@ Workflow [`.github/workflows/publish-images.yml`](../.github/workflows/publish-i
 > và `docker push` lên GHCR.
 
 ```text
-ghcr.io/vtapro/greeniq-backend:v4.4.0.0          # version sản phẩm, tag chính để deploy
-ghcr.io/vtapro/greeniq-backend:<branch>          # ví dụ :RBAC-full-groups-tabs
-ghcr.io/vtapro/greeniq-backend:sha-<short>       # truy vết theo commit
-ghcr.io/vtapro/greeniq-backend:latest            # chỉ trên default branch
+ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0          # version sản phẩm, tag chính để deploy
+ghcr.io/vtapro/greeniq-thingsboard:<branch>          # ví dụ :RBAC-full-groups-tabs
+ghcr.io/vtapro/greeniq-thingsboard:sha-<short>       # truy vết theo commit
+ghcr.io/vtapro/greeniq-thingsboard:latest            # chỉ trên default branch
 ```
 
 ### 2.1. Build/push khi máy có Docker
 
 ```bash
 # build
-docker build -f docker/tb-custom/Dockerfile -t ghcr.io/vtapro/greeniq-backend:v4.4.0.0 .
+docker build -f docker/tb-custom/Dockerfile -t ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0 .
 
 # đăng nhập GHCR (PAT cần scope write:packages)
 echo "$CR_PAT" | docker login ghcr.io -u vtapro --password-stdin
 
 # push
-docker push ghcr.io/vtapro/greeniq-backend:v4.4.0.0
+docker push ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0
 ```
 
 ### 2.2. Không có Docker ở máy dev — dùng GitHub Actions
@@ -101,14 +125,14 @@ gh auth refresh -h github.com -s workflow
 
 # 2. push file workflow lên repo
 git add .github/workflows/publish-images.yml
-git commit -m "ci: publish greeniq-backend image to GHCR"
+git commit -m "ci: publish greeniq-thingsboard image to GHCR"
 git push origin RBAC-full-groups-tabs
 
 # 3. theo dõi build (khoảng 10–20 phút cho lần đầu)
 gh run watch
 
 # 4. kiểm tra image đã lên GHCR
-docker manifest inspect ghcr.io/vtapro/greeniq-backend:v4.4.0.0    # nếu có docker
+docker manifest inspect ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0    # nếu có docker
 # hoặc xem trực tiếp: https://github.com/vtapro?tab=packages
 ```
 
@@ -195,18 +219,52 @@ Nếu PostgreSQL nằm ở **máy chủ khác** với Cassandra/Kafka/ZooKeeper,
 `tb-postgres` của `03-external-data-plane.yaml` thành IP của máy đó — mỗi khối `Endpoints` có IP
 riêng, không bắt buộc cùng một máy chủ.
 
-### 3.3. Cụm hiện tại: 1 control plane + 2 worker
+### 3.3. Cụm k3s thực tế (kiểm tra ngày 2026-09-24)
 
-Cụm k3s gồm **1 server (control plane) + 2 worker**, dữ liệu nằm trên máy chủ riêng. Với cấu hình này:
+Đọc trực tiếp từ cụm bằng kubectl (kubeconfig trong `%APPDATA%\Lens\kubeconfigs`):
+
+| Node | Vai trò | vCPU / RAM | IP | Trạng thái |
+|---|---|---|---|---|
+| `vmi3011340` | worker | 4 / ~8Gi | `89.117.54.100` | Ready, nhận workload |
+| `vmi3215905` | worker | 4 / ~8Gi | `144.91.106.154`, IPv6 | Ready, nhận workload |
+| `vmi3320735` | control plane | 4 / ~8Gi | `62.171.137.148`, IPv6 | Ready nhưng **cordoned** (taint `node-role.kubernetes.io/control-plane`, `node.kubernetes.io/unschedulable`) |
+
+Version k3s: `v1.35.5+k3s1`. StorageClass: `local-path` (mặc định, chưa dùng vì TB không cần PVC).
+
+**Vậy capacity khả dụng = 2 worker = 8 vCPU / ~16Gi.** Control plane không nhận pod, nên đừng tính
+vào. Tổng request của bộ manifest (mục dưới) là 6 CPU / 12Gi — vừa đủ nhưng chỉ còn ~2 CPU dự phòng,
+vì thế nên chạy 1 replica cho mỗi transport (xem phần tuning).
+
+**Thành phần hệ thống đang có / còn thiếu** (kiểm tra bằng `kubectl get pods -A`):
+
+| Thành phần | Trạng thái | Ảnh hưởng |
+|---|---|---|
+| CoreDNS, local-path-provisioner, metrics-server | ✅ đang chạy | đủ cho nhu cầu của ThingsBoard |
+| Ingress controller | ❌ **không có pod nào**, nhưng `IngressClass nginx` vẫn tồn tại (tàn dư) | `30-ingress.yaml` chưa hoạt động, `app.greeniq.vn` chưa vào được |
+| k3s servicelb / MetalLB / Traefik | ❌ không có | `Service type=LoadBalancer` sẽ mãi ở trạng thái `<pending>` |
+
+Hai việc phải làm trên cụm (sau khi đã có image trên GHCR):
+
+```bash
+# 1) cài ingress controller (bản baremetal dùng NodePort, không cần LoadBalancer)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
+kubectl -n ingress-nginx get pods,svc        # chờ controller Running, xem NodePort 80/443
+
+# 2) trỏ DNS app.greeniq.vn về IP một worker (89.117.54.100 hoặc 144.91.106.154),
+#    hoặc dùng LoadBalancer thật nếu sau này cài MetalLB:
+#    kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.9/config/manifests/metallb-native.yaml
+```
+
+Trong lúc chưa có ingress controller, dùng file tạm `40-bringup-nodeport.yaml` để vào nền tảng ngay:
+`http://89.117.54.100:30080` hoặc `http://144.91.106.154:30080` (xoá file này sau khi ingress chạy).
 
 **Phân bố pod**: mỗi Deployment đã khai báo `topologySpreadConstraints` (maxSkew 1 theo
-`kubernetes.io/hostname`) nên 2 replica được đẩy sang 2 node khác nhau. `whenUnsatisfiable:
+`kubernetes.io/hostname`) nên 2 replica được đẩy sang 2 worker khác nhau. `whenUnsatisfiable:
 ScheduleAnyway` để pod vẫn chạy được khi chỉ còn 1 node trống (mất 1 worker không làm pod Pending).
 
 ```bash
 kubectl -n thingsboard get pods -o wide        # kiểm tra NODE của từng pod
 kubectl top nodes                              # kiểm tra tài nguyên còn trống
-kubectl describe node <worker> | Select-String Taints   # k3s server mặc định KHÔNG bị taint
 ```
 
 **Tài nguyên**: k3s server mặc định vẫn nhận workload, nên tổng capacity = 3 node. Tổng request của
@@ -220,13 +278,15 @@ bộ manifest hiện tại:
 | tb-http-transport | 2 | 500m / 1Gi | 1 CPU / 2Gi |
 | **tổng** | **8 pod** | — | **6 CPU / 12Gi** |
 
-Nếu 2 worker + 1 control plane không đủ 6 CPU / 12Gi (ví dụ 3 node × 2 vCPU / 4Gi), giảm xuống:
+Với 2 worker 4 vCPU / 8Gi, 6 CPU / 12Gi là vừa nhưng chật; nên giảm transport xuống 1 replica để
+giải phóng 1 CPU / 2Gi và giữ headroom cho HPA:
 
 ```bash
-# cụm nhỏ: 1 replica cho transport, giữ 2 replica cho core và rule engine
+# cụm hiện tại: 1 replica cho transport, giữ 2 replica cho core và rule engine
 kubectl -n thingsboard scale deploy/tb-mqtt-transport --replicas=1
 kubectl -n thingsboard scale deploy/tb-http-transport --replicas=1
-# và hạ heap tương ứng trong ConfigMap: JAVA_OPTS=-Xms512M -Xmx2G -XX:+UseG1GC -XX:MaxRAMPercentage=70
+# và hạ heap tương ứng trong ConfigMap:
+#   JAVA_OPTS=-Xms512M -Xmx2G -XX:+UseG1GC -XX:MaxRAMPercentage=70
 ```
 
 Nhớ giữ `limits` > `requests` để HPA còn chỗ nhân bản, và đặt heap (`-Xmx`) thấp hơn `limits` memory
@@ -235,9 +295,10 @@ khoảng 20–25% để JVM không bị OOMKilled.
 **Storage**: mọi trạng thái đã nằm ở máy chủ dữ liệu (PostgreSQL/Cassandra) và cache dùng Redis, nên
 các pod ThingsBoard **không cần PVC** — đây là điểm thuận lợi của mô hình data plane bên ngoài.
 
-**MQTT**: `tb-mqtt-transport` dùng `Service type=LoadBalancer`; k3s dùng servicelb nên `EXTERNAL-IP`
-sẽ là IP của các node. Nếu node không có IP public (sau NAT), đổi `type: NodePort` và NAT cổng 1883
-từ ngoài vào 2 worker, hoặc giữ LoadBalancer và trỏ DNS `mqtt.greeniq.vn` vào IP đó.
+**MQTT**: vì cụm **không có servicelb/MetalLB**, `tb-mqtt-transport` được khai báo `type: NodePort`
+với `nodePort: 31883` → thiết bị kết nối `89.117.54.100:31883` hoặc `144.91.106.154:31883`
+(DNS `mqtt.greeniq.vn` trỏ vào 1 trong 2 IP đó). Nếu sau này cài MetalLB, chỉ cần đổi Service thành
+`type: LoadBalancer`, `port: 1883` và bỏ `nodePort`.
 
 ## 4. Cấu hình production (đối chiếu `thingsboard.yml`)
 
@@ -276,9 +337,9 @@ kubectl apply -f deploy/k3s/01-config.yaml
 kubectl apply -f deploy/k3s/03-external-data-plane.yaml
 kubectl -n thingsboard create secret generic tb-secrets --from-literal=...
 
-# 2. image đã mặc định là ghcr.io/vtapro/greeniq-backend:v4.4.0.0 trong manifest;
+# 2. image đã mặc định là ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0 trong manifest;
 #    chỉ cần đổi tag khi roll bản mới
-sed -i 's#greeniq-backend:v4.4.0.0#greeniq-backend:v4.4.0.1#' deploy/k3s/*.yaml
+sed -i 's#greeniq-thingsboard:v4.4.0.0#greeniq-thingsboard:v4.4.0.1#' deploy/k3s/*.yaml
 
 # 3. cài/cập nhật schema — 1 lần cho mỗi release, TRƯỚC khi rolling service
 kubectl apply -f deploy/k3s/10-install-job.yaml

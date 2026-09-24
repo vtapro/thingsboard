@@ -59,11 +59,11 @@ kubectl -n thingsboard create secret generic tb-secrets \
   --from-literal=CASSANDRA_PASSWORD='<password>' \
   --from-literal=REDIS_PASSWORD='<password>'
 
-# the manifests already point to ghcr.io/vtapro/greeniq-backend:v4.4.0.0;
+# the manifests already point to ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0;
 # to roll a specific build of that image over every deployment:
 for d in tb-core tb-rule-engine tb-mqtt-transport tb-http-transport; do
   kubectl -n thingsboard set image deployment/$d \
-    $(kubectl -n thingsboard get deploy/$d -o jsonpath='{.spec.template.spec.containers[0].name}')=ghcr.io/vtapro/greeniq-backend:v4.4.0.0
+    $(kubectl -n thingsboard get deploy/$d -o jsonpath='{.spec.template.spec.containers[0].name}')=ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0
 done
 
 # schema install/upgrade, then the services

@@ -5,8 +5,10 @@
 
 # MQTT transport: device connection point (devices/me/telemetry, rpc, ...).
 # Every replica serves any device, no session affinity is required.
-# Expose it through a LoadBalancer (k3s servicelb / MetalLB) or through the ingress of the
-# cluster; terminate TLS either in the transport itself (SSL_* variables) or in the LB.
+#
+# The cluster has no LoadBalancer implementation (no k3s servicelb, no MetalLB), so the Service
+# below is a NodePort: devices connect to <worker-ip>:31883 and NAT/DNS forward to both workers.
+# Replace type/ports with `LoadBalancer` + `port: 1883` after installing MetalLB or servicelb.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -43,7 +45,7 @@ spec:
               app.kubernetes.io/name: tb-mqtt-transport
       containers:
         - name: tb-mqtt-transport
-          image: ghcr.io/vtapro/greeniq-backend:v4.4.0.0
+          image: ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
@@ -118,10 +120,11 @@ metadata:
     app.kubernetes.io/name: tb-mqtt-transport
     app.kubernetes.io/part-of: thingsboard
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     app.kubernetes.io/name: tb-mqtt-transport
   ports:
     - name: mqtt
       port: 1883
       targetPort: mqtt
+      nodePort: 31883

@@ -3,10 +3,20 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-# Web UI + REST API. k3s ships Traefik, so the Ingress below works out of the box;
-# add the cert-manager annotation (or a TLS secret) for HTTPS.
+# Web UI + REST API for app.greeniq.vn.
 #
-# The JSON body limit of the REST API (device/entity import, dashboards) is raised here.
+# The cluster currently has the IngressClass "nginx" but NO ingress controller running, so this
+# Ingress stays inactive until one is installed. On k3s the bare metal manifest is enough (it
+# exposes the controller through NodePorts and does not need a LoadBalancer implementation):
+#
+#   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
+#   kubectl -n ingress-nginx get pods,svc        # wait for the controller and note the NodePorts
+#
+# Then point the DNS record of app.greeniq.vn to the IP of a worker node. Until the controller is
+# installed, use 40-bringup-nodeport.yaml to reach the platform directly on <node-ip>:30080.
+#
+# HTTPS: install cert-manager and set the annotation below, or upload a TLS secret and enable the
+# `tls:` block. The body limit annotation is required for dashboard/entity import uploads.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -16,10 +26,15 @@ metadata:
     app.kubernetes.io/name: tb-core
     app.kubernetes.io/part-of: thingsboard
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: thingsboard-tb-body-limit@kubernetescrd
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # required for the WebSocket endpoint /api/ws
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/websocket-services: tb-core
     # cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
-  ingressClassName: traefik
+  ingressClassName: nginx
   rules:
     - host: app.greeniq.vn
       http:
@@ -35,14 +50,3 @@ spec:
   #   - hosts:
   #       - app.greeniq.vn
   #     secretName: tb-core-tls
----
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
-metadata:
-  name: tb-body-limit
-  namespace: thingsboard
-  labels:
-    app.kubernetes.io/part-of: thingsboard
-spec:
-  buffering:
-    maxRequestBodyBytes: 52428800

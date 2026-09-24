@@ -21,3 +21,5 @@ resources:
   - 22-tb-mqtt-transport.yaml
   - 23-tb-http-transport.yaml
   - 30-ingress.yaml
+  # temporary access while there is no ingress controller on the cluster
+  - 40-bringup-nodeport.yaml
