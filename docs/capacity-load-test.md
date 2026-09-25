@@ -111,16 +111,24 @@ Nút cổ chai theo thứ tự tác động:
 
 ## 6. Lộ trình mở rộng
 
-### Phase 0 — cấu hình, không thêm hạ tầng (kỳ vọng +50–100 %)
+### Phase 0 — cấu hình, không thêm hạ tầng — ✅ **đã làm ngày 2026-09-25**
 
-1. Tăng `TB_QUEUE_RULE_ENGINE_PACK_PROCESSING_TIMEOUT_MS` từ `2000` lên `30000`–`60000` cho
-   deployment `tb-rule-engine` (phía transport mặc định đã là 60.000 ms).
-2. Tăng partition của queue: `tb_transport.api.requests` 10 → 30 và rule-engine (tạo lại queue theo
-   hướng dẫn TB) trước khi tăng replica rule-engine.
-3. Dọn topic/consumer-group cũ trong Kafka (topic của pod đã xoá) và bật `cleanup.policy` phù hợp.
-4. Đồng bộ `TB_TRANSPORT_SESSIONS_INACTIVITY_TIMEOUT` với `state.defaultInactivityTimeoutInSec`.
-5. Bật Prometheus/Grafana + cảnh báo: `Timeout to process` > 0, Kafka consumer lag, CPU node > 80 %,
-   p95 ghi Cassandra, `Server unavailable` khi connect.
+1. ✅ Tăng `TB_QUEUE_RULE_ENGINE_PACK_PROCESSING_TIMEOUT_MS` 2000 → **30000 ms** cho `tb-rule-engine`
+   và `TB_QUEUE_CORE_PACK_PROCESSING_TIMEOUT_MS` 2000 → **30000 ms** cho `tb-core`
+   (`deploy/k3s/20-tb-core.yaml`, `deploy/k3s/21-tb-rule-engine.yaml`, đã rolling restart).
+2. ✅ Tăng partition `tb_transport.api.requests` 10 → **30** (đã alter topic trên cụm và đặt mặc định
+   `TB_QUEUE_KAFKA_TA_TOPIC_PROPERTIES` trong `deploy/k3s/01-config.yaml` cho topic tạo mới). Queue
+   rule-engine vẫn 10 partition (`tb_rule_engine.hp|main|sq.0..9`) — tăng khi thêm replica (Phase 1).
+3. ✅ Dọn topic/consumer-group cũ: job `deploy/k3s/96-kafka-cleanup.yaml` xoá **236 → 113 topic**
+   (chỉ còn topic thật + topic của pod đang chạy), consumer group mồ côi cũng bị xoá.
+4. ✅ `TB_TRANSPORT_SESSIONS_INACTIVITY_TIMEOUT` (600000 ms) và `DEFAULT_INACTIVITY_TIMEOUT` (600 s)
+   đã đồng bộ sẵn theo mặc định — ghi chú lại trong `01-config.yaml`.
+5. ✅ Bật Prometheus + Alertmanager + Grafana (`deploy/monitoring/`, hướng dẫn ở
+   [monitoring.md](monitoring.md)) với 6 alert: service down, JVM heap, CPU node, RAM node, pod
+   restart, lỗi 5xx. Alert theo Kafka lag / log timeout cần JMX exporter / Loki → Phase 1.
+
+Việc còn lại của Phase 0: đổi receiver Alertmanager sang Slack/Teams/email thật (xem
+[monitoring.md](monitoring.md) §5).
 
 ### Phase 1 — thêm node trong cụm (mục tiêu 3.000–5.000 thiết bị × 1 msg/s)
 

@@ -232,8 +232,13 @@ export class WhiteLabelingService {
     const background = this.normalizeColor(settings.backgroundColor);
     let backgroundCss = '';
     if (background) {
-      backgroundCss = `html, body { background-color: ${background}; }` +
-        ` .tb-default, .tb-dark { --mat-sys-surface: ${background}; --mat-sys-background: ${background};` +
+      // 'html, body' is deliberately NOT styled here: it is the colour of the boot screen shown
+      // while Angular is still loading (see src/index.html, which keeps it white). Painting it with
+      // the configured background made a fresh page load flash in the tenant colour.
+      // ':not(.tb-booting)' keeps the boot screen white as well - the class is dropped by
+      // AppComponent.onActivateComponent as soon as the first routed page is rendered.
+      backgroundCss = ` .tb-default:not(.tb-booting), .tb-dark:not(.tb-booting) { --mat-sys-surface: ${background};` +
+        ` --mat-sys-background: ${background};` +
         ` --mat-app-background-color: ${background}; background-color: ${background}; }`;
     }
     if (!rules.length) {

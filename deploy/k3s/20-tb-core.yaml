@@ -68,6 +68,13 @@ spec:
               value: "true"
             - name: JS_EVALUATOR
               value: remote
+            # Default in thingsboard.yml is 2000 ms (TB_QUEUE_CORE_PACK_PROCESSING_TIMEOUT_MS).
+            # PostgreSQL/Cassandra of this deployment are managed clusters reached over ~110 ms RTT,
+            # so a burst of transport API requests (device connects, credential lookups) can exceed
+            # 2 s and the core queue would report "Timeout to process". 30 s removes those false
+            # positives without hiding real failures. Measured: docs/capacity-load-test.md.
+            - name: TB_QUEUE_CORE_PACK_PROCESSING_TIMEOUT_MS
+              value: "30000"
           ports:
             - name: http
               containerPort: 8080

@@ -1,0 +1,114 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Housekeeping for Kafka: ThingsBoard creates one topic (and one consumer group) per pod instance
+# for notifications/responses (tb_core.notifications.<pod>, tb_transport.notifications.<pod>,
+# js_eval.responses.<pod>, ...). Those objects are never removed when the pod disappears, so a
+# cluster that restarts a few times ends up with hundreds of dead topics and consumer groups.
+#
+# This job deletes only:
+#   * topics of a known per-pod prefix whose suffix is NOT one of the pods passed in LIVE_PODS
+#   * consumer groups that contain a dead pod name AND are in state "Empty"
+#
+# LIVE_PODS must be generated right before the run (it is not read from the API on purpose, so the
+# job needs no RBAC and cannot delete a topic of a pod that is actually running):
+#
+#   LIVE=$(kubectl -n thingsboard get pods -o name | sed 's#pod/##' | paste -sd, -)
+#   kubectl -n thingsboard create configmap tb-kafka-cleanup-live \
+#     --from-literal=LIVE_PODS="$LIVE" --dry-run=client -o yaml | kubectl apply -f -
+#   kubectl -n thingsboard apply -f deploy/k3s/96-kafka-cleanup.yaml
+#   kubectl -n thingsboard logs job/tb-kafka-cleanup
+#   kubectl -n thingsboard delete job tb-kafka-cleanup configmap/tb-kafka-cleanup-live
+#
+# DRY_RUN=true only prints what would be deleted. Not part of kustomization.yaml.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tb-kafka-cleanup
+  namespace: thingsboard
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        # required by the tb-kafka NetworkPolicy (07-network-policies.yaml)
+        app.kubernetes.io/part-of: thingsboard
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: kafka-cleanup
+          image: apache/kafka:3.9.1
+          env:
+            - name: DRY_RUN
+              value: "false"
+            - name: KAFKA_BOOTSTRAP
+              value: "tb-kafka:9092"
+            - name: LIVE_PODS
+              valueFrom:
+                configMapKeyRef:
+                  name: tb-kafka-cleanup-live
+                  key: LIVE_PODS
+          command: ["/bin/bash","-c"]
+          args:
+            - |
+              set -uo pipefail
+              K=/opt/kafka/bin
+              BS=${KAFKA_BOOTSTRAP:-tb-kafka:9092}
+              LIVE=",${LIVE_PODS:-},"
+              DRY="${DRY_RUN:-true}"
+              PER_POD_PREFIXES="tb_core.notifications tb_edge.notifications tb_rule_engine.notifications calculated_field.notifications js_eval.responses tb_transport.notifications tb_transport.api.responses tb_transport.api.requests"
+
+              is_live() { case "$LIVE" in *",$1,"*) return 0;; *) return 1;; esac; }
+              is_pod_suffix() { echo "$1" | grep -Eq '^[a-z0-9]+(-[a-z0-9]+)*-[a-z0-9]{5}$'; }
+
+              if [ "$LIVE" = ",," ]; then
+                echo "LIVE_PODS is empty - aborting (would risk deleting topics of running pods)"; exit 1
+              fi
+
+              BEFORE=$($K/kafka-topics.sh --bootstrap-server $BS --list | wc -l)
+              echo "topics_before=$BEFORE dry_run=$DRY"
+
+              DELETED=0
+              for t in $($K/kafka-topics.sh --bootstrap-server $BS --list); do
+                prefix="${t%.*}"
+                suffix="${t##*.}"
+                echo "$PER_POD_PREFIXES" | grep -qw -- "$prefix" || continue
+                [ "$prefix" = "$t" ] && continue
+                is_pod_suffix "$suffix" || continue
+                is_live "$suffix" && continue
+                echo "delete_topic $t"
+                if [ "$DRY" != "true" ]; then
+                  $K/kafka-topics.sh --bootstrap-server $BS --delete --topic "$t" >/dev/null 2>&1 || echo "  (failed)"
+                fi
+                DELETED=$((DELETED+1))
+              done
+              echo "topics_deleted=$DELETED"
+
+              GD=0
+              for g in $($K/kafka-consumer-groups.sh --bootstrap-server $BS --list); do
+                suffix="${g##*-}"
+                pod=""
+                case "$g" in
+                  *-node-tb-*|*-node-*|js-tb-*) pod="${g##*tb-}"; pod="tb-$pod";;
+                esac
+                [ -z "$pod" ] && continue
+                is_pod_suffix "$pod" || continue
+                is_live "$pod" && continue
+                state=$($K/kafka-consumer-groups.sh --bootstrap-server $BS --describe --group "$g" --state 2>/dev/null | awk 'NR>1{print $2}' | tail -1)
+                [ "$state" = "Empty" ] || continue
+                echo "delete_group $g (state=$state)"
+                if [ "$DRY" != "true" ]; then
+                  $K/kafka-consumer-groups.sh --bootstrap-server $BS --delete --group "$g" >/dev/null 2>&1 || echo "  (failed)"
+                fi
+                GD=$((GD+1))
+              done
+              echo "groups_deleted=$GD"
+
+              AFTER=$($K/kafka-topics.sh --bootstrap-server $BS --list | wc -l)
+              echo "topics_after=$AFTER"
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 768Mi}

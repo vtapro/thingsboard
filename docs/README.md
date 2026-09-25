@@ -18,6 +18,7 @@ SPDX-License-Identifier: Apache-2.0
 | [white-labeling-roadmap.md](white-labeling-roadmap.md) | Lộ trình các phần white labeling còn lại |
 | [access-control-roadmap.md](access-control-roadmap.md) | Lộ trình RBAC (roles, entity groups, user groups, customer hierarchy) |
 | [capacity-load-test.md](capacity-load-test.md) | Kết quả đo tải thật trên cụm (MQTT 1 msg/s/thiết bị), nút cổ chai và lộ trình mở rộng |
+| [monitoring.md](monitoring.md) | Stack Prometheus/Alertmanager/Grafana trong namespace `monitoring`, alert đang bật, cách thêm receiver |
 | [implementation-status.md](implementation-status.md) | Trạng thái từng tính năng và môi trường chạy local |
 | [code-audit.md](code-audit.md) | Kết quả audit toàn bộ code tự thêm so với ThingsBoard CE, bằng chứng kiểm chứng |
 

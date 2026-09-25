@@ -63,6 +63,13 @@ spec:
             # "remote" needs the tb-js-executor deployment; use "local" for a smaller cluster.
             - name: JS_EVALUATOR
               value: remote
+            # Default in thingsboard.yml is 2000 ms (TB_QUEUE_RULE_ENGINE_PACK_PROCESSING_TIMEOUT_MS).
+            # Every telemetry message goes through the "Save Timeseries" rule node, i.e. a write to the
+            # managed Cassandra at ~110 ms RTT; under load a pack of 100+ messages easily needs more than
+            # 2 s and was reported as "Timeout to process" (messages dropped). 30 s = same order as the
+            # transport side default (60 s). Measured: docs/capacity-load-test.md §5.
+            - name: TB_QUEUE_RULE_ENGINE_PACK_PROCESSING_TIMEOUT_MS
+              value: "30000"
             # Optional: pin this replica to specific tenant profiles (isolation feature).
             # - name: TB_RULE_ENGINE_ASSIGNED_TENANT_PROFILES
             #   value: "profile-uuid-1,profile-uuid-2"

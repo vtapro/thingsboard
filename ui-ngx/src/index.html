@@ -91,7 +91,9 @@
 
   </style>
 </head>
-<body class="tb-default">
+<!-- 'tb-booting' keeps the boot screen white while Angular loads (see white-labeling.service.ts);
+     AppComponent.onActivateComponent removes it together with the loading spinner. -->
+<body class="tb-default tb-booting">
   <tb-root></tb-root>
   <div id="tb-loading-spinner" class="tb-loading-spinner">
     <div class="tb-bounce1"></div>

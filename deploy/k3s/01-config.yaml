@@ -30,6 +30,21 @@ data:
   #   not support SASL, so with an authenticated Kafka use JS_EVALUATOR=local).
   # single broker in the cluster: raise to 3 together with a 3 broker Kafka setup
   TB_QUEUE_KAFKA_REPLICATION_FACTOR: "1"
+  # ---- Kafka topic properties (applied when a topic is created) -------------
+  # tb_transport.api.requests is a single topic with N partitions and is the hot path for every
+  # device connect and telemetry message in microservices mode. Raised from the CE default of 10
+  # to 30 because the measured ceiling of this cluster with 10 partitions was ~900-1.100 msg/s
+  # (docs/capacity-load-test.md §5).
+  # NOTE: this only applies to topics created afterwards. Resize an existing topic with:
+  #   kubectl -n thingsboard exec tb-kafka-0 -- /opt/kafka/bin/kafka-topics.sh \
+  #     --bootstrap-server localhost:9092 --alter --topic tb_transport.api.requests --partitions 30
+  TB_QUEUE_KAFKA_TA_TOPIC_PROPERTIES: "retention.ms:604800000;segment.bytes:52428800;retention.bytes:1048576000;partitions:30;min.insync.replicas:1"
+  # The rule-engine and core queues use one topic per partition (tb_rule_engine.main.0..9,
+  # tb_rule_engine.hp.0..9, tb_core.0..9), so "partitions:1" per topic is correct; the
+  # parallelism comes from the partition count of the queue itself (10). Keep
+  # min.insync.replicas=1 while the cluster runs a single broker and raise it to 2 together
+  # with TB_QUEUE_KAFKA_REPLICATION_FACTOR=3 (Phase 1 in docs/capacity-load-test.md).
+  TB_QUEUE_KAFKA_RE_TOPIC_PROPERTIES: "retention.ms:604800000;segment.bytes:52428800;retention.bytes:1048576000;partitions:1;min.insync.replicas:1"
   # ZooKeeper is the discovery service used to find the other nodes of the cluster.
   ZOOKEEPER_ENABLED: "true"
   ZOOKEEPER_URL: tb-zookeeper:2181
@@ -81,6 +96,12 @@ data:
   # TTL is 5 minutes for the caches whose staleness is visible (devices, credentials, sessions,
   # users, attributes, tenants, ...), otherwise the ThingsBoard default of 24 hours.
   CACHE_TYPE: caffeine
+
+  # ---- device / session timeouts -------------------------------------------
+  # The MQTT session inactivity timeout (TB_TRANSPORT_SESSIONS_INACTIVITY_TIMEOUT, ms) and the
+  # device inactivity timeout (DEFAULT_INACTIVITY_TIMEOUT, s) must stay in sync. Both are left at
+  # the ThingsBoard defaults (600000 ms = 600 s = 10 minutes), i.e. already consistent; if one is
+  # ever changed, change the other as well.
 
   # ---- observability --------------------------------------------------------
   METRICS_ENABLED: "true"

@@ -1,0 +1,242 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Prometheus: scrapes every ThingsBoard pod (label app.kubernetes.io/part-of=thingsboard,
+# container port named "http") on /actuator/prometheus, plus kubelet/cAdvisor for node and
+# container CPU/memory. Sends alerts to Alertmanager.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        monitor: thingsboard
+        cluster: greeniq-k3s
+
+    rule_files:
+      - /etc/prometheus/rules.yml
+
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets: ['alertmanager:9093']
+
+    scrape_configs:
+      - job_name: prometheus
+        static_configs:
+          - targets: ['localhost:9090']
+
+      # Every ThingsBoard microservice exposes Spring Boot actuator metrics.
+      - job_name: thingsboard
+        metrics_path: /actuator/prometheus
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [thingsboard]
+        relabel_configs:
+          # only pods of this ThingsBoard deployment ...
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_part_of]
+            regex: thingsboard
+            action: keep
+          # ... of the services that actually expose /actuator/prometheus on the pod IP:
+          #   web-ui (nginx) and haproxy are not Spring Boot apps, and the js-executor does not
+          #   expose the actuator endpoint on its API port. Add them back here once they do.
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            regex: tb-core|tb-rule-engine|tb-mqtt-transport|tb-http-transport|tb-coap-transport|tb-lwm2m-transport|tb-snmp-transport|tb-vc-executor|tb-monitoring
+            action: keep
+          # ... and only the management port called "http"
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            regex: http
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            target_label: service
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+
+      # kubelet + cAdvisor through the API proxy: node/container CPU, memory, filesystem.
+      - job_name: kubelet
+        scheme: https
+        metrics_path: /metrics
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        tls_config:
+          insecure_skip_verify: true
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          # k3s kubelet listens on 10250; scrape it directly instead of through the API proxy
+          - source_labels: [__address__]
+            regex: '(.+):(\d+)'
+            target_label: __address__
+            replacement: '$1:10250'
+          - source_labels: [__meta_kubernetes_node_name]
+            target_label: node
+
+      - job_name: cadvisor
+        scheme: https
+        metrics_path: /metrics/cadvisor
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        tls_config:
+          insecure_skip_verify: true
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - source_labels: [__address__]
+            regex: '(.+):(\d+)'
+            target_label: __address__
+            replacement: '$1:10250'
+          - source_labels: [__meta_kubernetes_node_name]
+            target_label: node
+
+  rules.yml: |
+    groups:
+      - name: thingsboard
+        rules:
+          - alert: TbServiceDown
+            expr: up{job="thingsboard"} == 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "ThingsBoard pod {{ $labels.pod }} không scrape được ({{ $labels.service }})"
+              description: "Pod có thể đã chết hoặc /actuator/prometheus không truy cập được."
+
+          - alert: TbJvmHeapHigh
+            expr: >
+              max by (pod) (jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}) > 0.85
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Heap JVM của {{ $labels.pod }} > 85%"
+              description: "Tăng JAVA_OPTS -Xmx hoặc thêm replica trước khi OOM."
+
+          # Node CPU/memory come from kubelet + cAdvisor (no node-exporter in this cluster):
+          # container_cpu_usage_seconds_total{id="/"} is the root cgroup = whole node.
+          - alert: TbNodeHighCpu
+            expr: >
+              sum by (node) (rate(container_cpu_usage_seconds_total{id="/"}[5m]))
+              / on(node) group_left() max by (node) (machine_cpu_cores) > 0.85
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Node {{ $labels.node }} dùng > 85% CPU trong 15 phút"
+              description: "Kiểm tra `kubectl -n thingsboard top pods`; cân nhắc thêm worker (Phase 1)."
+
+          - alert: TbNodeHighMemory
+            expr: >
+              sum by (node) (container_memory_working_set_bytes{id="/"})
+              / on(node) group_left() max by (node) (machine_memory_bytes) > 0.9
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Node {{ $labels.node }} dùng > 90% RAM"
+              description: "Thêm RAM/node hoặc giảm -Xmx của các service."
+
+          - alert: TbPodRestarted
+            expr: changes(container_start_time_seconds{namespace="thingsboard",container!="",container!="POD"}[1h]) > 0
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Pod {{ $labels.pod }} vừa khởi động lại"
+              description: "Kiểm tra `kubectl -n thingsboard describe pod {{ $labels.pod }}` (OOMKilled, probe fail, ...)."
+
+          - alert: TbHttpServerErrors
+            expr: >
+              sum by (service) (rate(http_server_requests_seconds_count{status=~"5.."}[5m])) > 0.5
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "{{ $labels.service }} trả nhiều lỗi 5xx"
+              description: "Kiểm tra log của pod tương ứng; đây là dấu hiệu DB chậm hoặc rule node lỗi."
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prometheus
+        app.kubernetes.io/part-of: thingsboard
+    spec:
+      serviceAccountName: prometheus
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v3.1.0
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time=15d
+            - --web.enable-lifecycle
+            - --web.enable-admin-api
+          ports:
+            - name: http
+              containerPort: 9090
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+            - name: data
+              mountPath: /prometheus
+          readinessProbe:
+            httpGet: {path: /-/ready, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /-/healthy, port: http}
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests: {cpu: 200m, memory: 512Mi}
+            limits: {cpu: "1", memory: 2Gi}
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+        # emptyDir: metrics history is lost when the pod is replaced. Move to a PVC (or Thanos) if
+        # long term retention is required.
+        - name: data
+          emptyDir:
+            sizeLimit: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+spec:
+  selector:
+    app.kubernetes.io/name: prometheus
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http

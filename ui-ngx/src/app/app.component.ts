@@ -132,6 +132,9 @@ export class AppComponent {
     if (loadingElement.length) {
       loadingElement.remove();
     }
+    // the app is now on screen: release the white boot background so that the (optional)
+    // background colour of the white labeling takes over
+    $('body').removeClass('tb-booting');
   }
 
   private notifyUserLang(userLang: string) {
