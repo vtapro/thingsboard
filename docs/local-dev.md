@@ -269,6 +269,8 @@ MQTT: cổng `1883` mở sẵn khi chạy monolith; username = **device access t
 | `java.nio.file.AccessDeniedException: C:\.rocksdb` khi khởi động | trên máy này `user.home` = `C:\` nên đường dẫn mặc định `${user.home}/.rocksdb` bị chặn → phải truyền `-Dqueue.edqs.local.rocksdb_path` và `-Dqueue.calculated_fields.rocks_db_path` (script `start-tb.ps1` đã làm sẵn, trỏ vào `application/target/rocksdb`) |
 | `cannot be loaded because running scripts is disabled` | chạy script kèm `-ExecutionPolicy Bypass` (máy đang bị policy chặn) |
 | Installer: `database already upgraded` | thêm biến môi trường `SKIP_SCHEMA_VERSION_CHECK=true` khi chạy ở chế độ upgrade |
+| UI dev server báo `[vite] http proxy error: /api/... AggregateError` | backend chưa chạy (cổng 8080 trống) → chạy `scripts\start-tb.ps1` rồi F5 lại; kiểm tra bằng `Invoke-WebRequest http://localhost:8080/api/noauth/whiteLabeling` |
+| `Error: Could not find or load main class org.thingsboard.server.ThingsboardServerApplication` khi start backend | `application\target\classes` bị thiếu class do lần build trước **lỗi giữa đường**, lần build sau chỉ biên dịch file thay đổi → xoá `Remove-Item -Recurse -Force application\target\classes` rồi build lại `mvn -o -B -pl application install -DskipTests -Dskip.ui.build=true -Dpkg.skip=true -Dlicense.skip=true` |
 
 ## 9. Lệnh chạy dev đã kiểm chứng (2026-09-25)
 
