@@ -220,3 +220,72 @@ MQTT: cổng `1883` mở sẵn khi chạy monolith; username = **device access t
 | `java.nio.file.AccessDeniedException: C:\.rocksdb` khi khởi động | trên máy này `user.home` = `C:\` nên đường dẫn mặc định `${user.home}/.rocksdb` bị chặn → phải truyền `-Dqueue.edqs.local.rocksdb_path` và `-Dqueue.calculated_fields.rocks_db_path` (script `start-tb.ps1` đã làm sẵn, trỏ vào `application/target/rocksdb`) |
 | `cannot be loaded because running scripts is disabled` | chạy script kèm `-ExecutionPolicy Bypass` (máy đang bị policy chặn) |
 | Installer: `database already upgraded` | thêm biến môi trường `SKIP_SCHEMA_VERSION_CHECK=true` khi chạy ở chế độ upgrade |
+
+## 9. Lệnh chạy dev đã kiểm chứng (2026-09-25)
+
+Chuỗi lệnh dưới đây đã chạy đúng trên máy này (Windows, JDK 25, Maven 3.9.11, Node 24 + yarn 1.22 qua corepack).
+
+### 9.1. Build backend
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-25.0.4.101-hotspot"
+$env:PATH = "$env:JAVA_HOME\bin;C:\Users\vthea\tools\apache-maven-3.9.11\bin;$env:PATH"
+
+# build toàn bộ module backend (KHÔNG dùng "clean" — xem cảnh báo bên dưới)
+mvn -o -B install -DskipTests -Dskip.ui.build=true -Dpkg.skip=true -Dlicense.skip=true `
+    -Duser.home=C:/Users/vthea -Dmaven.repo.local=C:/Users/vthea/.m2/repository
+
+# chỉ sửa code Java trong module application (nhanh, ~30 giây)
+mvn -o -B -pl application install -DskipTests -Dskip.ui.build=true -Dpkg.skip=true -Dlicense.skip=true `
+    -Duser.home=C:/Users/vthea -Dmaven.repo.local=C:/Users/vthea/.m2/repository
+```
+
+> ⚠️ **Không chạy `mvn clean` ở thư mục gốc**: module `ui-ngx` được Maven "clean" bằng cách xoá
+> `ui-ngx/node_modules` — thư mục này đang được các tiến trình khác giữ (VS Code Java LS, esbuild/rollup
+> `.node`), nên `clean` sẽ xoá dở dang, làm hỏng môi trường UI. Nếu lỡ bị, khôi phục bằng:
+>
+> ```powershell
+> cd ui-ngx; corepack yarn install      # ~60 giây
+> ```
+>
+> `mvn clean` cũng xoá `*/target/proto` (chứa các file `.proto` lấy từ module khác) → lần build sau
+> protoc báo `tbmsg.proto: File not found`. Cách xử lý: build **tuần tự** (bỏ `-T 1C`) một lần, hoặc copy
+> tạm: `Copy-Item common/message/src/main/proto/*.proto common/proto/target/proto/`.
+
+### 9.2. Chạy backend local
+
+```powershell
+# sinh classpath (chỉ cần lại khi đổi dependency)
+mvn -o -B -q -pl application dependency:build-classpath -Dmdep.outputFile=target\classpath.txt
+
+# cách nhanh nhất: dùng script có sẵn (Postgres + in-memory + SQL timeseries + RBAC)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-tb.ps1
+
+# kiểm tra
+Invoke-WebRequest http://localhost:8080/api/noauth/whiteLabeling -UseBasicParsing | Select-Object StatusCode   # 200
+```
+
+### 9.3. Build / chạy UI
+
+```powershell
+cd ui-ngx
+
+# build production (đã pass 2026-09-25, ~77 giây; output: ui-ngx/target/generated-resources/public)
+node --max_old_space_size=4096 ./node_modules/@angular/cli/bin/ng.js build --configuration production
+
+# dev server hot reload -> http://localhost:4200 (proxy /api sang 8080)
+node --max_old_space_size=8048 ./node_modules/@angular/cli/bin/ng.js serve --configuration development --host 0.0.0.0
+```
+
+### 9.4. Test tính năng Automation ngay trên máy
+
+Script `scripts/test-automation-local.py` chạy trọn luồng: tạo thiết bị + token, kết nối MQTT đóng vai
+máy bơm, tạo rule hẹn giờ, bấm "run now", chờ scheduler tự chạy, rồi sửa/tắt/xoá rule.
+
+```powershell
+python -m pip install paho-mqtt requests
+python .\scripts\test-automation-local.py
+```
+
+Kết quả lần chạy đầu (2026-09-25): **15/15 PASS**, gồm `RPC delivered to device (run now)`,
+`scheduler executed the rule`, `RPC delivered by scheduler`.

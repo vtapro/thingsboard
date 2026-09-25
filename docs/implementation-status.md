@@ -21,6 +21,7 @@ Cách cài đặt/chạy chi tiết: [local-dev.md](local-dev.md).
 | 12 | Kafka + Cassandra cho môi trường dev | ➖ | — | **đã bỏ ở local**: bản Cassandra của CE không hiện thực `findAllKeysByEntityIds` nên widget không liệt kê được key telemetry; dev dùng PostgreSQL + queue in-memory. Production vẫn dùng Kafka + Cassandra (xem [production-k3s.md](production-k3s.md)) |
 | 13 | Deploy production trên k3s (microservices, domain `app.greeniq.vn`) | 🟡 | 🟡 | 8 image riêng theo từng service (`ghcr.io/vtapro/tb-*`), manifest ở `deploy/k3s/`: PostgreSQL + Cassandra là 2 cluster managed ngoài cụm (TLS), Kafka/ZooKeeper trong cụm, cache caffeine — **không dùng Redis**; edge là HAProxy; workflow GHCR ở `.github/workflows/publish-images.yml` |
 | 14 | Đo tải / năng lực hệ thống | ✅ | — | bộ công cụ ở `deploy/loadtest/`, kết quả ở [capacity-load-test.md](capacity-load-test.md): an toàn ≤ 500 thiết bị × 1 msg/s, trần ~1.000 msg/s; 2.000 msg/s bắt đầu mất dữ liệu |
+| 15 | Automation (hẹn giờ điều khiển thiết bị) | ✅ | ✅ | rule hẹn giờ theo ngày/tuần/cron → gửi server-side RPC (bật/tắt máy bơm, tưới cây…); lưu trong `admin_settings` key `automation` (không thêm bảng); API `/api/tenant/automation`; trang **Automation** ở menu trái; test local 15/15 PASS (`scripts/test-automation-local.py`) |
 
 ## 2. Môi trường local hiện tại (native, không Docker)
 

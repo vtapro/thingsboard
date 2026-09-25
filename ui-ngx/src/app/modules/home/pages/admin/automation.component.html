@@ -1,0 +1,94 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<mat-card appearance="outlined" class="settings-card">
+  <mat-card-header>
+    <mat-card-title>
+      <span class="mat-headline-5" translate>automation.title</span>
+    </mat-card-title>
+  </mat-card-header>
+  @if (isLoading) {
+    <mat-progress-bar color="warn" mode="indeterminate"></mat-progress-bar>
+  }
+  @if (!isLoading) {
+    <div style="height: 4px;"></div>
+  }
+  <mat-card-content>
+    <div class="tb-automation-hint" translate>automation.hint</div>
+    <div class="tb-automation-toolbar">
+      <span class="flex-1"></span>
+      <button mat-raised-button color="primary" (click)="addRule()">
+        <mat-icon>add</mat-icon>
+        <span translate>automation.add</span>
+      </button>
+    </div>
+    @if (!rules.length && !isLoading) {
+      <div class="tb-automation-empty" translate>automation.no-rules</div>
+    }
+    @if (rules.length) {
+      <table class="tb-automation-table">
+        <thead>
+        <tr>
+          <th translate>automation.name</th>
+          <th translate>automation.device</th>
+          <th translate>automation.schedule</th>
+          <th class="tb-automation-center" translate>automation.enabled</th>
+          <th translate>automation.last-run</th>
+          <th translate>automation.next-run</th>
+          <th class="tb-automation-center" translate>automation.actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        @for (rule of rules; track rule.id) {
+          <tr>
+            <td>
+              <div class="tb-automation-name">{{ rule.name }}</div>
+              <div class="tb-automation-secondary">{{ rule.method }}</div>
+            </td>
+            <td>{{ rule.deviceName || '-' }}</td>
+            <td>{{ scheduleDescription(rule) }}</td>
+            <td class="tb-automation-center">
+              <mat-slide-toggle [checked]="rule.enabled" (change)="onEnabledChange(rule, $event.checked)">
+              </mat-slide-toggle>
+            </td>
+            <td>
+              @if (rule.lastRunTs) {
+                <div>{{ rule.lastRunTs | date:'short' }}</div>
+                <div class="tb-automation-secondary" [class.tb-automation-error]="rule.lastStatus !== 'OK'">
+                  {{ rule.lastMessage }}
+                </div>
+              } @else {
+                <span>-</span>
+              }
+            </td>
+            <td>
+              @if (rule.nextRunTs && rule.enabled) {
+                {{ rule.nextRunTs | date:'short' }}
+              } @else {
+                <span>-</span>
+              }
+            </td>
+            <td class="tb-automation-center tb-automation-actions">
+              <button mat-icon-button matTooltip="{{ 'automation.run-now' | translate }}"
+                      (click)="runNow(rule)">
+                <mat-icon>play_arrow</mat-icon>
+              </button>
+              <button mat-icon-button matTooltip="{{ 'action.edit' | translate }}"
+                      (click)="editRule(rule)">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button matTooltip="{{ 'action.delete' | translate }}"
+                      (click)="deleteRule(rule)">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </tr>
+        }
+        </tbody>
+      </table>
+    }
+  </mat-card-content>
+</mat-card>

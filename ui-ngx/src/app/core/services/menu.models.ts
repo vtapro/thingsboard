@@ -60,6 +60,7 @@ export enum MenuId {
   settings = 'settings',
   general = 'general',
   white_labeling = 'white_labeling',
+  automation = 'automation',
   mail_server = 'mail_server',
   home_settings = 'home_settings',
   notification_settings = 'notification_settings',
@@ -406,6 +407,17 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
       type: 'link',
       path: '/settings/outgoing-mail',
       icon: 'mail_outline'
+    }
+  ],
+  [
+    MenuId.automation,
+    {
+      id: MenuId.automation,
+      name: 'automation.title',
+      fullName: 'automation.title',
+      type: 'link',
+      path: '/automation',
+      icon: 'schedule'
     }
   ],
   [
@@ -1004,6 +1016,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
       },
       {id: MenuId.roles},
       {id: MenuId.white_labeling},
+      {id: MenuId.automation},
       {
         id: MenuId.platform_section,
         pages: [

@@ -31,6 +31,8 @@ import { CustomTranslationComponent } from '@home/pages/admin/custom-translation
 import { CustomMenuComponent } from '@home/pages/admin/custom-menu.component';
 import { LoginSettingsComponent } from '@home/pages/admin/login-settings.component';
 import { RolesComponent } from '@home/pages/admin/roles.component';
+import { AutomationComponent } from '@home/pages/admin/automation.component';
+import { AutomationRuleDialogComponent } from '@home/pages/admin/automation-rule-dialog.component';
 
 @NgModule({
   declarations:
@@ -57,7 +59,9 @@ import { RolesComponent } from '@home/pages/admin/roles.component';
       CustomTranslationComponent,
       CustomMenuComponent,
       LoginSettingsComponent,
-      RolesComponent
+      RolesComponent,
+      AutomationComponent,
+      AutomationRuleDialogComponent
     ],
   imports: [
     CommonModule,

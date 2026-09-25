@@ -1,0 +1,116 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<mat-toolbar color="primary">
+  <h2>{{ (data.isAdd ? 'automation.add' : 'automation.edit') | translate }}</h2>
+  <span class="flex-1"></span>
+  <button mat-icon-button mat-dialog-close type="button">
+    <mat-icon>close</mat-icon>
+  </button>
+</mat-toolbar>
+<mat-progress-bar color="warn" mode="indeterminate" *ngIf="false"></mat-progress-bar>
+<div mat-dialog-content class="tb-automation-dialog-content">
+  <form [formGroup]="ruleForm" (ngSubmit)="save()">
+    <mat-form-field class="mat-block" appearance="outline" subscriptSizing="dynamic">
+      <mat-label translate>automation.name</mat-label>
+      <input matInput formControlName="name" required>
+      <mat-error *ngIf="ruleForm.get('name').hasError('required')" translate>automation.name-required</mat-error>
+    </mat-form-field>
+
+    <tb-entity-autocomplete
+      useFullEntityId
+      formControlName="deviceId"
+      appearance="outline"
+      required
+      [entityType]="entityType.DEVICE"
+      labelText="automation.device">
+    </tb-entity-autocomplete>
+
+    <mat-form-field class="mat-block" appearance="outline" subscriptSizing="dynamic">
+      <mat-label translate>automation.method</mat-label>
+      <input matInput formControlName="method" required placeholder="setState">
+      <mat-hint translate>automation.method-hint</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field class="mat-block" appearance="outline">
+      <mat-label translate>automation.params</mat-label>
+      <textarea matInput rows="4" [ngModel]="paramsJson" [ngModelOptions]="{standalone: true}"
+                (ngModelChange)="onParamsChanged($event)"></textarea>
+      <mat-error *ngIf="paramsError" translate>automation.params-invalid</mat-error>
+      <mat-hint translate>automation.params-hint</mat-hint>
+    </mat-form-field>
+
+    <div class="tb-automation-switches">
+      <mat-checkbox formControlName="oneWay" translate>automation.one-way</mat-checkbox>
+      <mat-checkbox formControlName="persistent" translate>automation.persistent</mat-checkbox>
+      <mat-checkbox formControlName="enabled" translate>automation.enabled</mat-checkbox>
+    </div>
+
+    <mat-divider class="tb-automation-divider"></mat-divider>
+    <div class="mat-subtitle-1" translate>automation.schedule</div>
+
+    <mat-form-field class="mat-block" appearance="outline" subscriptSizing="dynamic">
+      <mat-label translate>automation.schedule-type</mat-label>
+      <mat-select formControlName="scheduleType">
+        <mat-option [value]="scheduleTypes.DAILY" translate>automation.type-daily</mat-option>
+        <mat-option [value]="scheduleTypes.WEEKLY" translate>automation.type-weekly</mat-option>
+        <mat-option [value]="scheduleTypes.CRON" translate>automation.type-cron</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    @if (scheduleType !== scheduleTypes.CRON) {
+      <div class="tb-automation-row">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label translate>automation.time</mat-label>
+          <input matInput type="time" formControlName="time" required>
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label translate>automation.timezone</mat-label>
+          <mat-select formControlName="timeZone">
+            @for (tz of timeZones; track tz) {
+              <mat-option [value]="tz">{{ tz }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+    }
+
+    @if (scheduleType === scheduleTypes.WEEKLY) {
+      <div class="tb-automation-days">
+        @for (day of daysOfWeek; track day.value) {
+          <button type="button" mat-stroked-button
+                  [class.tb-day-selected]="isDaySelected(day.value)"
+                  (click)="toggleDay(day.value)">
+            {{ day.label | translate }}
+          </button>
+        }
+      </div>
+    }
+
+    @if (scheduleType === scheduleTypes.CRON) {
+      <div class="tb-automation-row">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label translate>automation.cron</mat-label>
+          <input matInput formControlName="cron" placeholder="0 0 6 * * *">
+          <mat-hint translate>automation.cron-hint</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label translate>automation.timezone</mat-label>
+          <mat-select formControlName="timeZone">
+            @for (tz of timeZones; track tz) {
+              <mat-option [value]="tz">{{ tz }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+    }
+  </form>
+</div>
+<div mat-dialog-actions class="tb-automation-dialog-actions">
+  <button mat-button type="button" (click)="cancel()" translate>action.cancel</button>
+  <button mat-raised-button color="primary" type="button" [disabled]="ruleForm.invalid"
+          (click)="save()" translate>action.save</button>
+</div>

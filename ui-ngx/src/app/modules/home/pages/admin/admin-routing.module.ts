@@ -36,6 +36,7 @@ import { TrendzSettingsComponent } from '@home/pages/admin/trendz-settings.compo
 import { aiModelRoutes } from '@home/pages/ai-model/ai-model-routing.module';
 import { WhiteLabelingComponent } from '@home/pages/admin/white-labeling.component';
 import { RolesComponent } from '@home/pages/admin/roles.component';
+import { AutomationComponent } from '@home/pages/admin/automation.component';
 
 export const scadaSymbolResolver: ResolveFn<ScadaSymbolData> =
   (route: ActivatedRouteSnapshot,
@@ -395,6 +396,17 @@ const routes: Routes = [
       title: 'admin.white-labeling',
       breadcrumb: {
         menuId: MenuId.white_labeling
+      }
+    }
+  },
+  {
+    path: 'automation',
+    component: AutomationComponent,
+    data: {
+      auth: [Authority.TENANT_ADMIN],
+      title: 'automation.title',
+      breadcrumb: {
+        menuId: MenuId.automation
       }
     }
   },
