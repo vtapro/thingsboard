@@ -9,7 +9,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { DialogService } from '@core/services/dialog.service';
 import { TranslateService } from '@ngx-translate/core';
 import { AutomationService } from '@core/http/automation.service';
-import { AutomationRule, AutomationScheduleType } from '@shared/models/automation.models';
+import { AutomationRule, AutomationScheduleType, AutomationTriggerType } from '@shared/models/automation.models';
 import { AutomationRuleDialogComponent, AutomationRuleDialogData } from '@home/pages/admin/automation-rule-dialog.component';
 import { take } from 'rxjs/operators';
 
@@ -22,6 +22,7 @@ import { take } from 'rxjs/operators';
 export class AutomationComponent extends PageComponent implements OnInit {
 
   readonly scheduleTypes = AutomationScheduleType;
+  readonly triggerTypes = AutomationTriggerType;
 
   rules: AutomationRule[] = [];
   isLoading = true;
@@ -117,13 +118,41 @@ export class AutomationComponent extends PageComponent implements OnInit {
 
   scheduleDescription(rule: AutomationRule): string {
     const schedule = rule.schedule;
+    const tz = schedule?.timeZone ? ` (${schedule.timeZone})` : '';
+    switch (rule.triggerType) {
+      case AutomationTriggerType.INTERVAL: {
+        const unit = rule.interval?.unit === 'MINUTES' ? 'min' : 'h';
+        let text = `${this.translate.instant('automation.every')} ${rule.interval?.value || 1} ${unit}`;
+        if (rule.interval?.fromTime && rule.interval?.toTime) {
+          text += ` (${rule.interval.fromTime}-${rule.interval.toTime})`;
+        }
+        return text;
+      }
+      case AutomationTriggerType.TELEMETRY:
+        return `${rule.condition?.key} ${this.operatorLabel(rule.condition?.operator)} ${rule.condition?.value}`
+          + (rule.condition?.forSeconds ? ` / ${rule.condition.forSeconds}s` : '')
+          + (rule.condition?.cooldownMinutes ? ` / cool ${rule.condition.cooldownMinutes}min` : '');
+      case AutomationTriggerType.DEVICE_STATE:
+        return this.translate.instant(rule.deviceState?.state === 'ONLINE'
+          ? 'automation.state-online' : 'automation.state-offline');
+      case AutomationTriggerType.ALARM:
+        return `${rule.alarm?.alarmType} - ${this.translate.instant(rule.alarm?.event === 'CLEARED'
+          ? 'automation.alarm-cleared' : 'automation.alarm-active')}`;
+      default:
+        return this.scheduleText(schedule, tz);
+    }
+  }
+
+  private scheduleText(schedule: any, tz: string): string {
     if (!schedule) {
       return '';
     }
-    const tz = schedule.timeZone ? ` (${schedule.timeZone})` : '';
     switch (schedule.type) {
       case AutomationScheduleType.CRON:
         return `${this.translate.instant('automation.type-cron')}: ${schedule.cron}${tz}`;
+      case AutomationScheduleType.ASTRONOMY:
+        return `${this.translate.instant(schedule.astronomyEvent === 'SUNSET' ? 'automation.sunset' : 'automation.sunrise')}`
+          + (schedule.offsetMinutes ? ` ${schedule.offsetMinutes > 0 ? '+' : ''}${schedule.offsetMinutes}min` : '');
       case AutomationScheduleType.WEEKLY: {
         const days = (schedule.daysOfWeek || [])
           .map(d => this.translate.instant('automation.day-' + ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][d - 1]))
@@ -132,6 +161,17 @@ export class AutomationComponent extends PageComponent implements OnInit {
       }
       default:
         return `${this.translate.instant('automation.type-daily')} ${schedule.time}${tz}`;
+    }
+  }
+
+  private operatorLabel(operator: string): string {
+    switch ((operator || 'EQ').toUpperCase()) {
+      case 'GT': return '>';
+      case 'GTE': return '>=';
+      case 'LT': return '<';
+      case 'LTE': return '<=';
+      case 'NE': return '!=';
+      default: return '=';
     }
   }
 

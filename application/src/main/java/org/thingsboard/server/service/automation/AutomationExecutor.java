@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.thingsboard.server.service.automation;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Sends the server side RPC request of one automation rule to the device and records the outcome.
+ * Supports timed actions: switch the device on, then switch it off automatically after
+ * {@link AutomationRule#getDurationMinutes()} minutes (the pending "off" is stored in the rule, so
+ * it survives a restart of the service).
  */
 @TbCoreComponent
 @Service
@@ -40,6 +44,13 @@ public class AutomationExecutor {
     private final TbCoreDeviceRpcService deviceRpcService;
 
     public void execute(TenantId tenantId, AutomationRule rule) {
+        execute(tenantId, rule, null);
+    }
+
+    /**
+     * @param reason human readable reason shown in the run history (may be null)
+     */
+    public void execute(TenantId tenantId, AutomationRule rule, String reason) {
         long now = System.currentTimeMillis();
         rule.setLastRunTs(now);
         try {
@@ -58,15 +69,15 @@ public class AutomationExecutor {
                 addRun(rule, now, "FAILED", "RPC method is not configured");
                 return;
             }
-            String params = rule.getParams() == null || rule.getParams().isNull() ? "{}" : JacksonUtil.toString(rule.getParams());
-            ToDeviceRpcRequestBody body = new ToDeviceRpcRequestBody(rule.getMethod(), params);
-            long expTime = now + TimeUnit.SECONDS.toMillis(rule.isPersistent() ? 3600 : 30);
-            ToDeviceRpcRequest request = new ToDeviceRpcRequest(UUID.randomUUID(), tenantId, deviceId,
-                    rule.isOneWay(), expTime, body, rule.isPersistent(), null, null);
-            deviceRpcService.processRestApiRpcRequest(request, response ->
-                            log.debug("[{}][{}] Automation RPC response: {}", tenantId, rule.getId(), response),
-                    null);
-            addRun(rule, now, "OK", "RPC '" + rule.getMethod() + "' sent to " + device.getName());
+            sendRpc(tenantId, deviceId, rule.getMethod(), rule.getParams(), rule.isOneWay(), rule.isPersistent());
+            String message = "RPC '" + rule.getMethod() + "' sent to " + device.getName()
+                    + (reason != null && !reason.isBlank() ? " (" + reason + ")" : "");
+            if (rule.getDurationMinutes() > 0) {
+                long offTs = now + TimeUnit.MINUTES.toMillis(rule.getDurationMinutes());
+                rule.setPendingOffTs(offTs);
+                message = message + ", auto off after " + rule.getDurationMinutes() + " minutes";
+            }
+            addRun(rule, now, "OK", message);
             log.info("[{}][{}] Automation '{}' executed: {} -> {}", tenantId, rule.getId(), rule.getName(),
                     device.getName(), rule.getMethod());
         } catch (Exception e) {
@@ -75,7 +86,39 @@ public class AutomationExecutor {
         }
     }
 
-    private void addRun(AutomationRule rule, long ts, String status, String message) {
+    /**
+     * Sends the configured "off" request (used by {@link AutomationRule#getDurationMinutes()}).
+     */
+    public void executeOff(TenantId tenantId, AutomationRule rule) {
+        long now = System.currentTimeMillis();
+        try {
+            String method = rule.getOffMethod() == null || rule.getOffMethod().isBlank()
+                    ? rule.getMethod() : rule.getOffMethod();
+            JsonNode params = rule.getOffParams() != null && !rule.getOffParams().isNull()
+                    ? rule.getOffParams() : JacksonUtil.toJsonNode("{\"state\":\"OFF\"}");
+            sendRpc(tenantId, rule.getDeviceId(), method, params, rule.isOneWay(), rule.isPersistent());
+            rule.setPendingOffTs(null);
+            addRun(rule, now, "OK", "RPC '" + method + "' sent (auto off)");
+            log.info("[{}][{}] Automation '{}' auto off: {}", tenantId, rule.getId(), rule.getName(), method);
+        } catch (Exception e) {
+            log.warn("[{}][{}] Automation '{}' auto off failed", tenantId, rule.getId(), rule.getName(), e);
+            rule.setPendingOffTs(null);
+            addRun(rule, now, "FAILED", "auto off: " + e.getMessage());
+        }
+    }
+
+    private void sendRpc(TenantId tenantId, DeviceId deviceId, String method, JsonNode params,
+                         boolean oneWay, boolean persistent) {
+        String paramsJson = params == null || params.isNull() ? "{}" : JacksonUtil.toString(params);
+        ToDeviceRpcRequestBody body = new ToDeviceRpcRequestBody(method, paramsJson);
+        long expTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(persistent ? 3600 : 30);
+        ToDeviceRpcRequest request = new ToDeviceRpcRequest(UUID.randomUUID(), tenantId, deviceId,
+                oneWay, expTime, body, persistent, null, null);
+        deviceRpcService.processRestApiRpcRequest(request, response ->
+                log.debug("[{}] Automation RPC response: {}", tenantId, response), null);
+    }
+
+    public void addRun(AutomationRule rule, long ts, String status, String message) {
         rule.setLastStatus(status);
         rule.setLastMessage(message);
         List<AutomationRun> runs = rule.getRuns() == null ? new ArrayList<>() : rule.getRuns();

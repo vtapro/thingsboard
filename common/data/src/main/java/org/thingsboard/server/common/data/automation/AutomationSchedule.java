@@ -33,4 +33,24 @@ public class AutomationSchedule {
      * 6 field cron expression (second minute hour day-of-month month day-of-week), used by CRON schedules.
      */
     private String cron;
+
+    /**
+     * SUNRISE or SUNSET, used by ASTRONOMY schedules.
+     */
+    private String astronomyEvent = "SUNRISE";
+
+    /**
+     * Latitude of the field/device, used by ASTRONOMY schedules.
+     */
+    private Double latitude = 10.8231;
+
+    /**
+     * Longitude of the field/device, used by ASTRONOMY schedules.
+     */
+    private Double longitude = 106.6297;
+
+    /**
+     * Minutes added to the sunrise/sunset time (may be negative).
+     */
+    private int offsetMinutes;
 }

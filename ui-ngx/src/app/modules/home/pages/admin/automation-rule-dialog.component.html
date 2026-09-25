@@ -8,10 +8,12 @@
   {{ (data.isAdd ? 'automation.add' : 'automation.edit') | translate }}
 </h2>
 <mat-dialog-content class="tb-automation-dialog-content">
-  <form [formGroup]="ruleForm" class="tb-automation-form">
-    <div class="tb-automation-section-title" translate>automation.section-action</div>
+  <form [formGroup]="ruleForm" class="tb-automation-grid">
 
-    <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
+    <!-- ============================ ACTION ============================ -->
+    <div class="tb-automation-section-title tb-col-12" translate>automation.section-action</div>
+
+    <mat-form-field class="tb-col-7" subscriptSizing="dynamic" appearance="outline">
       <mat-label translate>automation.name</mat-label>
       <input matInput formControlName="name" required>
       @if (ruleForm.get('name').hasError('required')) {
@@ -19,8 +21,16 @@
       }
     </mat-form-field>
 
+    <mat-form-field class="tb-col-5" subscriptSizing="dynamic" appearance="outline">
+      <mat-label translate>automation.enabled</mat-label>
+      <mat-select formControlName="enabled">
+        <mat-option [value]="true">{{ 'automation.enabled-on' | translate }}</mat-option>
+        <mat-option [value]="false">{{ 'automation.enabled-off' | translate }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
     <tb-entity-autocomplete
-      class="mat-block"
+      class="tb-col-7"
       useFullEntityId
       formControlName="deviceId"
       appearance="outline"
@@ -29,84 +39,206 @@
       labelText="automation.device">
     </tb-entity-autocomplete>
 
-    <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
+    <mat-form-field class="tb-col-5" subscriptSizing="dynamic" appearance="outline">
       <mat-label translate>automation.method</mat-label>
       <input matInput formControlName="method" required placeholder="setState">
-      <mat-hint translate>automation.method-hint</mat-hint>
     </mat-form-field>
 
-    <mat-form-field class="mat-block" appearance="outline">
+    <mat-form-field class="tb-col-12" appearance="outline">
       <mat-label translate>automation.params</mat-label>
-      <textarea matInput rows="5" [ngModel]="paramsJson" [ngModelOptions]="{standalone: true}"
+      <textarea matInput rows="3" [ngModel]="paramsJson" [ngModelOptions]="{standalone: true}"
                 (ngModelChange)="onParamsChanged($event)"></textarea>
       @if (paramsError) {
         <mat-error>{{ 'automation.params-invalid' | translate }}</mat-error>
+      } @else {
+        <mat-hint translate>automation.params-hint</mat-hint>
       }
-      <mat-hint translate>automation.params-hint</mat-hint>
     </mat-form-field>
 
-    <div class="tb-automation-switches">
-      <mat-checkbox formControlName="oneWay">{{ 'automation.one-way' | translate }}</mat-checkbox>
+    <mat-form-field class="tb-col-4" subscriptSizing="dynamic" appearance="outline">
+      <mat-label translate>automation.duration</mat-label>
+      <input matInput type="number" min="0" formControlName="durationMinutes">
+      <mat-hint translate>automation.duration-hint</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field class="tb-col-8" subscriptSizing="dynamic" appearance="outline">
+      <mat-label translate>automation.off-params</mat-label>
+      <input matInput formControlName="offParamsJson" placeholder='{"state": "OFF"}'>
+      <mat-hint translate>automation.off-params-hint</mat-hint>
+    </mat-form-field>
+
+    <div class="tb-automation-switches tb-col-12">
+      <mat-checkbox formControlName="oneWay">{{ 'automation.one-way-short' | translate }}</mat-checkbox>
       <mat-checkbox formControlName="persistent">{{ 'automation.persistent' | translate }}</mat-checkbox>
-      <mat-checkbox formControlName="enabled">{{ 'automation.enabled' | translate }}</mat-checkbox>
     </div>
 
-    <mat-divider class="tb-automation-divider"></mat-divider>
-    <div class="tb-automation-section-title" translate>automation.section-schedule</div>
+    <!-- ============================ TRIGGER ============================ -->
+    <mat-divider class="tb-automation-divider tb-col-12"></mat-divider>
+    <div class="tb-automation-section-title tb-col-12" translate>automation.section-trigger</div>
 
-    <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
-      <mat-label translate>automation.schedule-type</mat-label>
-      <mat-select formControlName="scheduleType">
-        <mat-option [value]="scheduleTypes.DAILY">{{ 'automation.type-daily' | translate }}</mat-option>
-        <mat-option [value]="scheduleTypes.WEEKLY">{{ 'automation.type-weekly' | translate }}</mat-option>
-        <mat-option [value]="scheduleTypes.CRON">{{ 'automation.type-cron' | translate }}</mat-option>
+    <mat-form-field class="tb-col-4" subscriptSizing="dynamic" appearance="outline">
+      <mat-label translate>automation.trigger-type</mat-label>
+      <mat-select formControlName="triggerType">
+        <mat-option [value]="triggerTypes.SCHEDULE">{{ 'automation.trigger-schedule' | translate }}</mat-option>
+        <mat-option [value]="triggerTypes.INTERVAL">{{ 'automation.trigger-interval' | translate }}</mat-option>
+        <mat-option [value]="triggerTypes.TELEMETRY">{{ 'automation.trigger-telemetry' | translate }}</mat-option>
+        <mat-option [value]="triggerTypes.DEVICE_STATE">{{ 'automation.trigger-device-state' | translate }}</mat-option>
+        <mat-option [value]="triggerTypes.ALARM">{{ 'automation.trigger-alarm' | translate }}</mat-option>
       </mat-select>
     </mat-form-field>
 
-    @if (scheduleType === scheduleTypes.WEEKLY) {
-      <div class="tb-automation-field-label" translate>automation.days-of-week</div>
-      <div class="tb-automation-days">
-        @for (day of daysOfWeek; track day.value) {
-          <button type="button" mat-stroked-button class="tb-automation-day"
-                  [class.tb-day-selected]="isDaySelected(day.value)"
-                  (click)="toggleDay(day.value)">
-            {{ day.label | translate }}
-          </button>
-        }
-      </div>
-    }
+    @if (triggerType === triggerTypes.SCHEDULE) {
+      <mat-form-field class="tb-col-4" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.schedule-type</mat-label>
+        <mat-select formControlName="scheduleType">
+          <mat-option [value]="scheduleTypes.DAILY">{{ 'automation.type-daily' | translate }}</mat-option>
+          <mat-option [value]="scheduleTypes.WEEKLY">{{ 'automation.type-weekly' | translate }}</mat-option>
+          <mat-option [value]="scheduleTypes.CRON">{{ 'automation.type-cron' | translate }}</mat-option>
+          <mat-option [value]="scheduleTypes.ASTRONOMY">{{ 'automation.type-astronomy' | translate }}</mat-option>
+        </mat-select>
+      </mat-form-field>
 
-    @if (scheduleType === scheduleTypes.CRON) {
-      <div class="tb-automation-row">
-        <mat-form-field class="tb-automation-col" subscriptSizing="dynamic" appearance="outline">
+      @if (scheduleType === scheduleTypes.CRON) {
+        <mat-form-field class="tb-col-4" subscriptSizing="dynamic" appearance="outline">
           <mat-label translate>automation.cron</mat-label>
           <input matInput formControlName="cron" placeholder="0 0 6 * * *">
-          <mat-hint translate>automation.cron-hint</mat-hint>
         </mat-form-field>
-        <mat-form-field class="tb-automation-col" subscriptSizing="dynamic" appearance="outline">
-          <mat-label translate>automation.timezone</mat-label>
-          <mat-select formControlName="timeZone">
-            @for (tz of timeZones; track tz) {
-              <mat-option [value]="tz">{{ tz }}</mat-option>
-            }
+      } @else if (scheduleType === scheduleTypes.ASTRONOMY) {
+        <mat-form-field class="tb-col-2" subscriptSizing="dynamic" appearance="outline">
+          <mat-label translate>automation.astronomy-event</mat-label>
+          <mat-select formControlName="astronomyEvent">
+            <mat-option value="SUNRISE">{{ 'automation.sunrise' | translate }}</mat-option>
+            <mat-option value="SUNSET">{{ 'automation.sunset' | translate }}</mat-option>
           </mat-select>
         </mat-form-field>
-      </div>
-    } @else {
-      <div class="tb-automation-row">
-        <mat-form-field class="tb-automation-col" subscriptSizing="dynamic" appearance="outline">
+        <mat-form-field class="tb-col-2" subscriptSizing="dynamic" appearance="outline">
+          <mat-label>{{ 'automation.offset-minutes' | translate }}</mat-label>
+          <input matInput type="number" formControlName="offsetMinutes">
+        </mat-form-field>
+      } @else {
+        <mat-form-field class="tb-col-2" subscriptSizing="dynamic" appearance="outline">
           <mat-label translate>automation.time</mat-label>
           <input matInput type="time" formControlName="time" required>
         </mat-form-field>
-        <mat-form-field class="tb-automation-col" subscriptSizing="dynamic" appearance="outline">
-          <mat-label translate>automation.timezone</mat-label>
-          <mat-select formControlName="timeZone">
-            @for (tz of timeZones; track tz) {
-              <mat-option [value]="tz">{{ tz }}</mat-option>
-            }
-          </mat-select>
+      }
+
+      @if (scheduleType === scheduleTypes.ASTRONOMY) {
+        <mat-form-field class="tb-col-3" subscriptSizing="dynamic" appearance="outline">
+          <mat-label translate>automation.latitude</mat-label>
+          <input matInput type="number" step="0.0001" formControlName="latitude">
         </mat-form-field>
-      </div>
+        <mat-form-field class="tb-col-3" subscriptSizing="dynamic" appearance="outline">
+          <mat-label translate>automation.longitude</mat-label>
+          <input matInput type="number" step="0.0001" formControlName="longitude">
+        </mat-form-field>
+      }
+
+      <mat-form-field class="tb-col-4" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.timezone</mat-label>
+        <mat-select formControlName="timeZone">
+          @for (tz of timeZones; track tz) {
+            <mat-option [value]="tz">{{ tz }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      @if (scheduleType === scheduleTypes.WEEKLY) {
+        <div class="tb-automation-days tb-col-12">
+          @for (day of daysOfWeek; track day.value) {
+            <button type="button" mat-stroked-button class="tb-automation-day"
+                    [class.tb-day-selected]="isDaySelected(day.value)"
+                    (click)="toggleDay(day.value)">
+              {{ day.label | translate }}
+            </button>
+          }
+        </div>
+      }
+    }
+
+    @if (triggerType === triggerTypes.INTERVAL) {
+      <mat-form-field class="tb-col-2" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.every</mat-label>
+        <input matInput type="number" min="1" formControlName="intervalValue">
+      </mat-form-field>
+      <mat-form-field class="tb-col-2" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.unit</mat-label>
+        <mat-select formControlName="intervalUnit">
+          <mat-option value="MINUTES">{{ 'automation.unit-minutes' | translate }}</mat-option>
+          <mat-option value="HOURS">{{ 'automation.unit-hours' | translate }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="tb-col-2" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.window-from</mat-label>
+        <input matInput type="time" formControlName="intervalFrom">
+      </mat-form-field>
+      <mat-form-field class="tb-col-2" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.window-to</mat-label>
+        <input matInput type="time" formControlName="intervalTo">
+      </mat-form-field>
+      <mat-form-field class="tb-col-4" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.timezone</mat-label>
+        <mat-select formControlName="timeZone">
+          @for (tz of timeZones; track tz) {
+            <mat-option [value]="tz">{{ tz }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    @if (triggerType === triggerTypes.TELEMETRY) {
+      <mat-form-field class="tb-col-4" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.telemetry-key</mat-label>
+        <input matInput formControlName="conditionKey" placeholder="soilMoisture" required>
+        <mat-hint translate>automation.telemetry-key-hint</mat-hint>
+      </mat-form-field>
+      <mat-form-field class="tb-col-2" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.operator</mat-label>
+        <mat-select formControlName="conditionOperator">
+          <mat-option value="GT">&gt;</mat-option>
+          <mat-option value="GTE">&ge;</mat-option>
+          <mat-option value="LT">&lt;</mat-option>
+          <mat-option value="LTE">&le;</mat-option>
+          <mat-option value="EQ">=</mat-option>
+          <mat-option value="NE">&ne;</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="tb-col-2" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.value</mat-label>
+        <input matInput type="number" formControlName="conditionValue">
+      </mat-form-field>
+      <mat-form-field class="tb-col-2" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.for-seconds</mat-label>
+        <input matInput type="number" min="0" formControlName="conditionForSeconds">
+      </mat-form-field>
+      <mat-form-field class="tb-col-2" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.cooldown-minutes</mat-label>
+        <input matInput type="number" min="0" formControlName="conditionCooldownMinutes">
+      </mat-form-field>
+    }
+
+    @if (triggerType === triggerTypes.DEVICE_STATE) {
+      <mat-form-field class="tb-col-4" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.device-state</mat-label>
+        <mat-select formControlName="deviceState">
+          <mat-option value="ONLINE">{{ 'automation.state-online' | translate }}</mat-option>
+          <mat-option value="OFFLINE">{{ 'automation.state-offline' | translate }}</mat-option>
+        </mat-select>
+        <mat-hint translate>automation.device-state-hint</mat-hint>
+      </mat-form-field>
+    }
+
+    @if (triggerType === triggerTypes.ALARM) {
+      <mat-form-field class="tb-col-4" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.alarm-type</mat-label>
+        <input matInput formControlName="alarmType" placeholder="High temperature" required>
+      </mat-form-field>
+      <mat-form-field class="tb-col-4" subscriptSizing="dynamic" appearance="outline">
+        <mat-label translate>automation.alarm-event</mat-label>
+        <mat-select formControlName="alarmEvent">
+          <mat-option value="ACTIVE">{{ 'automation.alarm-active' | translate }}</mat-option>
+          <mat-option value="CLEARED">{{ 'automation.alarm-cleared' | translate }}</mat-option>
+        </mat-select>
+      </mat-form-field>
     }
   </form>
 </mat-dialog-content>

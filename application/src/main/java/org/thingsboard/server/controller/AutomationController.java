@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.automation.AutomationRule;
 import org.thingsboard.server.common.data.automation.AutomationRules;
+import org.thingsboard.server.common.data.automation.AutomationTriggerType;
 import org.thingsboard.server.common.data.exception.ThingsboardErrorCode;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.id.TenantId;
@@ -84,16 +85,13 @@ public class AutomationController extends BaseController {
         if (rule.getMethod() == null || rule.getMethod().isBlank()) {
             throw new ThingsboardException("RPC method is required", ThingsboardErrorCode.BAD_REQUEST_PARAMS);
         }
-        if (!AutomationScheduleCalculator.isValid(rule.getSchedule())) {
-            throw new ThingsboardException("Schedule is invalid (check the time or the cron expression)",
-                    ThingsboardErrorCode.BAD_REQUEST_PARAMS);
-        }
+        validateTrigger(rule);
         Device device = deviceService.findDeviceById(tenantId, rule.getDeviceId());
         if (device == null) {
             throw new ThingsboardException("Device not found", ThingsboardErrorCode.ITEM_NOT_FOUND);
         }
         rule.setDeviceName(device.getName());
-        rule.setNextRunTs(AutomationScheduleCalculator.nextRunTs(rule.getSchedule(), System.currentTimeMillis()));
+        rule.setNextRunTs(computeNextRunTs(rule));
 
         AutomationRules rules = automationService.getAutomationRules(tenantId);
         List<AutomationRule> stored = rules.getRules() == null ? new ArrayList<>() : new ArrayList<>(rules.getRules());
@@ -179,5 +177,55 @@ public class AutomationController extends BaseController {
             return null;
         }
         return rules.getRules().stream().filter(rule -> ruleId.equals(rule.getId())).findFirst().orElse(null);
+    }
+
+    private void validateTrigger(AutomationRule rule) throws ThingsboardException {
+        AutomationTriggerType triggerType = rule.getTriggerType() == null
+                ? AutomationTriggerType.SCHEDULE : rule.getTriggerType();
+        switch (triggerType) {
+            case INTERVAL -> {
+                if (rule.getInterval() == null || rule.getInterval().toMillis() <= 0) {
+                    throw new ThingsboardException("Interval must be greater than 0",
+                            ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+                }
+            }
+            case TELEMETRY -> {
+                if (rule.getCondition() == null || rule.getCondition().getKey() == null
+                        || rule.getCondition().getKey().isBlank()) {
+                    throw new ThingsboardException("Telemetry key of the condition is required",
+                            ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+                }
+            }
+            case ALARM -> {
+                if (rule.getAlarm() == null || rule.getAlarm().getAlarmType() == null
+                        || rule.getAlarm().getAlarmType().isBlank()) {
+                    throw new ThingsboardException("Alarm type is required",
+                            ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+                }
+            }
+            case DEVICE_STATE -> {
+                // nothing else to validate
+            }
+            default -> {
+                if (!AutomationScheduleCalculator.isValid(rule.getSchedule())) {
+                    throw new ThingsboardException("Schedule is invalid (check the time or the cron expression)",
+                            ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+                }
+            }
+        }
+    }
+
+    private Long computeNextRunTs(AutomationRule rule) {
+        long now = System.currentTimeMillis();
+        AutomationTriggerType triggerType = rule.getTriggerType() == null
+                ? AutomationTriggerType.SCHEDULE : rule.getTriggerType();
+        if (triggerType == AutomationTriggerType.INTERVAL) {
+            String timeZone = rule.getSchedule() != null ? rule.getSchedule().getTimeZone() : null;
+            return AutomationScheduleCalculator.nextIntervalTs(rule.getInterval(), timeZone, now, null);
+        }
+        if (triggerType == AutomationTriggerType.SCHEDULE) {
+            return AutomationScheduleCalculator.nextRunTs(rule.getSchedule(), now);
+        }
+        return null;
     }
 }

@@ -1,62 +1,75 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
+
+/* Dialog 2 cot: luoi 12 phan, o nhap nho gon, tu dong xuong dong khi cua so hep */
 .tb-automation-dialog-content {
-  width: 620px;
+  width: 720px;
   max-width: 100%;
-  max-height: 70vh;
+  max-height: 74vh;
+
+  /* Material density: o nhap thap va gon hon mac dinh */
+  --mat-form-field-container-height: 44px;
+  --mat-form-field-container-vertical-padding: 10px;
+
+  .mat-mdc-form-field {
+    font-size: 13px;
+  }
+
+  .mat-mdc-form-field-hint {
+    font-size: 11px;
+  }
+
+  .mat-mdc-checkbox label {
+    font-size: 13px;
+  }
 }
 
-.tb-automation-form {
-  display: flex;
-  flex-direction: column;
-  padding-top: 4px;
+.tb-automation-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 10px 12px;
+  align-items: start;
+  padding-top: 2px;
 }
+
+.tb-col-12 { grid-column: span 12; }
+.tb-col-8  { grid-column: span 8; }
+.tb-col-7  { grid-column: span 7; }
+.tb-col-5  { grid-column: span 5; }
+.tb-col-4  { grid-column: span 4; }
+.tb-col-3  { grid-column: span 3; }
+.tb-col-2  { grid-column: span 2; }
 
 .tb-automation-section-title {
   font-weight: 500;
-  font-size: 13px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: .4px;
   color: rgba(0, 0, 0, .54);
-  margin: 4px 0 8px;
-}
-
-.tb-automation-field-label {
-  font-size: 12px;
-  color: rgba(0, 0, 0, .6);
-  margin-bottom: 6px;
-}
-
-.tb-automation-row {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-}
-
-.tb-automation-col {
-  flex: 1 1 0;
-  min-width: 0;
+  margin-top: 2px;
 }
 
 .tb-automation-switches {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 24px;
-  margin: 4px 0 8px;
+  gap: 4px 20px;
 }
 
 .tb-automation-divider {
-  margin: 16px 0;
+  margin: 4px 0;
 }
 
 .tb-automation-days {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 6px;
 
   .tb-automation-day {
-    min-width: 56px;
+    min-width: 52px;
+    height: 34px;
+    padding: 0 10px;
+    font-size: 12px;
+    line-height: 32px;
   }
 
   .tb-day-selected {
@@ -66,17 +79,18 @@
   }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 760px) {
   .tb-automation-dialog-content {
     width: 100%;
   }
 
-  .tb-automation-row {
-    flex-direction: column;
-    gap: 0;
+  .tb-col-8, .tb-col-7, .tb-col-5, .tb-col-4, .tb-col-3, .tb-col-2 {
+    grid-column: span 6;
+  }
+}
 
-    .tb-automation-col {
-      width: 100%;
-    }
+@media (max-width: 560px) {
+  .tb-col-8, .tb-col-7, .tb-col-5, .tb-col-4, .tb-col-3, .tb-col-2 {
+    grid-column: span 12;
   }
 }

@@ -5,7 +5,40 @@ import { EntityId } from '@shared/models/id/entity-id';
 export enum AutomationScheduleType {
   DAILY = 'DAILY',
   WEEKLY = 'WEEKLY',
-  CRON = 'CRON'
+  CRON = 'CRON',
+  ASTRONOMY = 'ASTRONOMY'
+}
+
+export enum AutomationTriggerType {
+  SCHEDULE = 'SCHEDULE',
+  INTERVAL = 'INTERVAL',
+  TELEMETRY = 'TELEMETRY',
+  DEVICE_STATE = 'DEVICE_STATE',
+  ALARM = 'ALARM'
+}
+
+export interface AutomationInterval {
+  value: number;
+  unit: string;
+  fromTime?: string;
+  toTime?: string;
+}
+
+export interface AutomationCondition {
+  key: string;
+  operator: string;
+  value: number;
+  forSeconds: number;
+  cooldownMinutes: number;
+}
+
+export interface AutomationDeviceState {
+  state: string;
+}
+
+export interface AutomationAlarmTrigger {
+  alarmType: string;
+  event: string;
 }
 
 export interface AutomationSchedule {
@@ -14,6 +47,10 @@ export interface AutomationSchedule {
   time: string;
   daysOfWeek: number[];
   cron?: string;
+  astronomyEvent?: string;
+  latitude?: number;
+  longitude?: number;
+  offsetMinutes?: number;
 }
 
 export interface AutomationRun {
@@ -26,17 +63,26 @@ export interface AutomationRule {
   id?: string;
   name: string;
   enabled: boolean;
+  triggerType?: AutomationTriggerType;
+  interval?: AutomationInterval;
+  condition?: AutomationCondition;
+  deviceState?: AutomationDeviceState;
+  alarm?: AutomationAlarmTrigger;
   deviceId?: EntityId;
   deviceName?: string;
   method: string;
   params?: any;
   oneWay: boolean;
   persistent: boolean;
+  durationMinutes?: number;
+  offMethod?: string;
+  offParams?: any;
   schedule: AutomationSchedule;
   lastRunTs?: number;
   lastStatus?: string;
   lastMessage?: string;
   nextRunTs?: number;
+  pendingOffTs?: number;
   runs?: AutomationRun[];
 }
 

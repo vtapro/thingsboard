@@ -14,5 +14,9 @@ public enum AutomationScheduleType {
     /**
      * Runs according to a 6 field Spring cron expression ({@link AutomationSchedule#getCron()}).
      */
-    CRON
+    CRON,
+    /**
+     * Runs at sunrise or sunset of the configured location (agriculture: irrigate at dawn).
+     */
+    ASTRONOMY
 }

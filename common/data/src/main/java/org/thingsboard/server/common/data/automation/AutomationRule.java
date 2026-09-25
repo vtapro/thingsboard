@@ -26,6 +26,31 @@ public class AutomationRule {
 
     private boolean enabled = true;
 
+    /**
+     * What makes this rule run: fixed schedule, interval, telemetry threshold, device state or alarm.
+     */
+    private AutomationTriggerType triggerType = AutomationTriggerType.SCHEDULE;
+
+    /**
+     * Repeat every N minutes/hours (triggerType = INTERVAL).
+     */
+    private AutomationInterval interval = new AutomationInterval();
+
+    /**
+     * Telemetry threshold (triggerType = TELEMETRY).
+     */
+    private AutomationCondition condition = new AutomationCondition();
+
+    /**
+     * Device connectivity (triggerType = DEVICE_STATE).
+     */
+    private AutomationDeviceState deviceState = new AutomationDeviceState();
+
+    /**
+     * Device alarm (triggerType = ALARM).
+     */
+    private AutomationAlarmTrigger alarm = new AutomationAlarmTrigger();
+
     private DeviceId deviceId;
 
     /**
@@ -53,6 +78,22 @@ public class AutomationRule {
      */
     private boolean persistent;
 
+    /**
+     * Run the action for this many minutes and then send the "off" request automatically
+     * (e.g. switch the pump on for 10 minutes). 0 = no automatic stop.
+     */
+    private int durationMinutes;
+
+    /**
+     * RPC method used to stop the action, defaults to {@link #method}.
+     */
+    private String offMethod;
+
+    /**
+     * RPC parameters used to stop the action, e.g. {"state": "OFF"}.
+     */
+    private JsonNode offParams;
+
     private AutomationSchedule schedule = new AutomationSchedule();
 
     private Long lastRunTs;
@@ -70,4 +111,24 @@ public class AutomationRule {
      * Bounded execution history (newest first), e.g. the last 20 runs.
      */
     private List<AutomationRun> runs = new ArrayList<>();
+
+    /**
+     * Epoch milliseconds of the pending automatic "off" request (see {@link #durationMinutes}).
+     */
+    private Long pendingOffTs;
+
+    /**
+     * Epoch milliseconds when the telemetry condition became true (used for "for N seconds").
+     */
+    private Long conditionSinceTs;
+
+    /**
+     * Last known device connectivity, used to detect online/offline edges.
+     */
+    private Boolean lastDeviceActive;
+
+    /**
+     * Last known alarm state, used to detect alarm appeared/cleared edges.
+     */
+    private Boolean lastAlarmActive;
 }
