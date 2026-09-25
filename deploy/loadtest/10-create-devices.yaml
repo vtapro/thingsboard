@@ -1,0 +1,57 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Tạo N thiết bị test (loadtest-0001...) + access token trong PostgreSQL.
+# Sửa generate_series(1, 2000) nếu muốn số lượng khác.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tb-loadtest-devices
+  namespace: thingsboard
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: psql
+          image: postgres:16-alpine
+          env:
+            - name: PGHOST
+              value: postgresql-215231-0.cloudclusters.net
+            - name: PGPORT
+              value: "10012"
+            - name: PGDATABASE
+              value: greeniq
+            - name: PGUSER
+              valueFrom: {secretKeyRef: {name: tb-secrets, key: SPRING_DATASOURCE_USERNAME}}
+            - name: PGPASSWORD
+              valueFrom: {secretKeyRef: {name: tb-secrets, key: SPRING_DATASOURCE_PASSWORD}}
+            - name: PGSSLMODE
+              value: require
+          command: ["sh","-c"]
+          args:
+            - |
+              psql -v ON_ERROR_STOP=1 <<'SQL'
+              DELETE FROM device_credentials WHERE device_id IN (SELECT id FROM device WHERE name LIKE 'loadtest-%');
+              DELETE FROM device WHERE name LIKE 'loadtest-%';
+
+              -- entity id phải là UUID v1 (timeuuid) nếu không Cassandra sẽ từ chối ghi telemetry
+              INSERT INTO device (id, created_time, tenant_id, device_profile_id, device_data, type, name, version)
+              SELECT (substr(m,1,8)||'-'||substr(m,9,4)||'-1'||substr(m,13,3)||'-'||substr(m,17,4)||'-'||substr(m,21,12))::uuid,
+                     (extract(epoch from now())*1000)::bigint,
+                     t.tenant_id, t.device_profile_id, t.device_data, t.type,
+                     'loadtest-' || lpad(gs::text, 4, '0'), 1
+              FROM (SELECT gs, md5(random()::text || gs::text) AS m FROM generate_series(1, 2000) gs) g,
+                   (SELECT tenant_id, device_profile_id, device_data, type FROM device WHERE name = 'TB1') t;
+
+              INSERT INTO device_credentials (id, created_time, credentials_id, credentials_type, credentials_value, device_id, version)
+              SELECT gen_random_uuid(), (extract(epoch from now())*1000)::bigint,
+                     'lt' || substr(md5(random()::text || d.id::text), 1, 20),
+                     'ACCESS_TOKEN', NULL, d.id, 1
+              FROM device d WHERE d.name LIKE 'loadtest-%';
+              SQL
+              psql -t -A -c "select 'devices='||count(*) from device where name like 'loadtest-%';"

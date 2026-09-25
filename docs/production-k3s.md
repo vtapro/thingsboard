@@ -633,7 +633,26 @@ Các bean chứng minh nhánh production còn nguyên: `KafkaTbCoreQueueFactory`
 `KafkaTbTransportQueueFactory`, `KafkaEdqsSyncService`, `KafkaEdgeEventService`,
 `CassandraTimeseriesDao`, `CassandraBaseTimeseriesLatestDao`.
 
-## 10. Checklist trước khi go-live
+## 10. Năng lực đo được & lộ trình mở rộng
+
+Đã đo tải thật trên chính cụm này ngày **2026-09-25** (chi tiết, số liệu và cách chạy lại:
+[capacity-load-test.md](capacity-load-test.md)). Kết luận ngắn:
+
+| Mức tải (1 message/giây/thiết bị) | Kết quả đo | Khuyến nghị |
+|---|---|---|
+| ≤ 500 thiết bị (~500 msg/s) | Không mất gói, p95 thấp | **Mức khai thác an toàn hiện tại** |
+| 1.000 thiết bị (~1.000 msg/s) | Đã kiểm chứng 0 % mất gói (số dòng Cassandra khớp tuyệt đối) | Trần thực tế, hết dư địa CPU |
+| 2.000 thiết bị (~2.000 msg/s) | 106 kết nối bị `CONNACK: Server unavailable`, rule-engine `Timeout to process` | **Không dùng — phải mở rộng trước** |
+
+Nút cổ chai theo thứ tự: (1) `TB_QUEUE_RULE_ENGINE_PACK_PROCESSING_TIMEOUT_MS` mặc định **2000 ms**
+quá ngắn khi mỗi message phải ghi Cassandra cách 110 ms; (2) Kafka 1 broker `replication.factor=1`,
+queue rule-engine ít partition; (3) tổng CPU của cụm (2 worker × 4 vCPU, CPU request đã ~66 %);
+(4) database managed đặt ở Mỹ làm tăng p95 và làm bão kết nối chậm.
+
+Các bước mở rộng đã soạn sẵn trong [capacity-load-test.md](capacity-load-test.md) §6 (Phase 0 chỉ đổi cấu hình,
+Phase 1 thêm worker + Kafka 3 broker RF=3, Phase 2 đưa database về cùng region, Phase 3 HA/failover drill).
+
+## 11. Checklist trước khi go-live
 
 - [ ] Image đã được push lên GHCR và `imagePullSecrets` đã cấu hình.
 - [ ] Máy chủ dữ liệu đã mở firewall cho CIDR của k3s; `Endpoints` trong `03-external-data-plane.yaml`
@@ -649,3 +668,7 @@ Các bean chứng minh nhánh production còn nguyên: `KafkaTbCoreQueueFactory`
 - [ ] Probe `/actuator/health` xanh, HPA hoạt động, cảnh báo consumer lag đã bật.
 - [ ] Backup tự động (PostgreSQL + Cassandra) và đã thử restore.
 - [ ] `mvn -B license:check` vẫn pass (không sửa header bản quyền của ThingsBoard).
+- [ ] Đã tăng `TB_QUEUE_RULE_ENGINE_PACK_PROCESSING_TIMEOUT_MS` (mặc định 2000 ms là quá thấp cho
+      database ở xa) và đã bật cảnh báo khi log xuất hiện `Timeout to process`.
+- [ ] Đã ghi nhận mức tải an toàn của cụm hiện tại và lịch đo tải định kỳ
+      ([capacity-load-test.md](capacity-load-test.md)).

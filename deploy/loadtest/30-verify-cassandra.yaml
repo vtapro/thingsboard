@@ -1,0 +1,50 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Đếm số dòng telemetry trong Cassandra. So delta giữa 2 lần chạy với số message đã publish:
+#   số dòng tăng thêm = số message nhận được × số key trong 1 message (test hiện tại: 4 key).
+# SAMPLE_IDS: danh sách entity_id (UUID, phân tách bằng dấu phẩy) để xem chi tiết từng thiết bị.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tb-loadtest-verify
+  namespace: thingsboard
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: cqlsh
+          image: cassandra:5.0
+          env:
+            - {name: CASSANDRA_HOST, value: cassandra-215233-0.cloudclusters.net}
+            - {name: CASSANDRA_PORT, value: "19948"}
+            - {name: SAMPLE_IDS, value: "none"}
+            - name: CQLSH_USER
+              valueFrom: {secretKeyRef: {name: tb-secrets, key: CASSANDRA_USERNAME}}
+            - name: CQLSH_PASSWORD
+              valueFrom: {secretKeyRef: {name: tb-secrets, key: CASSANDRA_PASSWORD}}
+          command: ["sh","-c"]
+          args:
+            - |
+              mkdir -p /root/.cassandra
+              printf "[ssl]\nvalidate = false\n" > /root/.cassandra/cqlshrc
+              q() { cqlsh --ssl --request-timeout=300 -u "$CQLSH_USER" -p "$CQLSH_PASSWORD" "$CASSANDRA_HOST" "$CASSANDRA_PORT" -e "$1" 2>/dev/null | grep -Eo '^ +[0-9]+' | head -1 | tr -d ' '; }
+              echo -n "ts_kv_cf_device="
+              q "SELECT count(*) FROM greeniq.ts_kv_cf WHERE entity_type='DEVICE' ALLOW FILTERING;"
+              echo -n "latest_cf_device="
+              q "SELECT count(*) FROM greeniq.ts_kv_latest_cf WHERE entity_type='DEVICE' ALLOW FILTERING;"
+              if [ "$SAMPLE_IDS" != "none" ]; then
+                echo "--- per-device rows ---"
+                for D in $(echo $SAMPLE_IDS | tr ',' ' '); do
+                  N=$(q "SELECT count(*) FROM greeniq.ts_kv_cf WHERE entity_id=$D ALLOW FILTERING;")
+                  echo "device=$D history_rows=$N"
+                done
+              fi
+          resources:
+            requests: {cpu: 200m, memory: 512Mi}
+            limits: {cpu: "1", memory: 1Gi}

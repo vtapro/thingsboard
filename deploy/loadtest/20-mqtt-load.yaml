@@ -1,0 +1,151 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Bơm tải MQTT: mỗi thiết bị mở 1 kết nối và publish 1 message/giây vào v1/devices/me/telemetry.
+# Job dạng Indexed: 8 shard × 250 thiết bị = 2000 thiết bị (≈2000 msg/s) theo mặc định.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tb-loadtest-script
+  namespace: thingsboard
+data:
+  run.py: |
+    import collections, json, os, time
+    import psycopg2
+    import paho.mqtt.client as mqtt
+
+    HOST = os.environ.get("MQTT_HOST", "tb-mqtt-transport")
+    PORT = int(os.environ.get("MQTT_PORT", "1883"))
+    COUNT = int(os.environ.get("DEVICES_PER_SHARD", "250"))
+    OFFSET = int(os.environ.get("OFFSET", "0"))
+    STAGGER = float(os.environ.get("STAGGER_MS", "20")) / 1000.0
+    DURATION = int(os.environ.get("DURATION", "60"))
+    PREFIX = os.environ.get("PREFIX", "loadtest-")
+    TOPIC = "v1/devices/me/telemetry"
+
+    def load_tokens():
+        conn = psycopg2.connect(
+            host=os.environ["PGHOST"], port=os.environ.get("PGPORT", "5432"),
+            dbname=os.environ.get("PGDATABASE", "postgres"),
+            user=os.environ["PGUSER"], password=os.environ["PGPASSWORD"],
+            sslmode=os.environ.get("PGSSLMODE", "prefer"))
+        cur = conn.cursor()
+        cur.execute(
+            "select d.name, c.credentials_id from device_credentials c "
+            "join device d on d.id = c.device_id where d.name like %s "
+            "order by d.name limit %s offset %s", (PREFIX + "%", COUNT, OFFSET))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return rows
+
+    counters = {"published": 0, "puback": 0, "publish_errors": 0}
+    conn_rc = collections.Counter()
+    connect_err = collections.Counter()
+
+    def on_publish(client, userdata, mid, reason_code=None, properties=None):
+        counters["puback"] += 1
+
+    def on_connect(client, userdata, flags, reason_code, properties=None):
+        conn_rc[str(reason_code)] += 1
+
+    rows = load_tokens()
+    print("devices_loaded=%d offset=%d" % (len(rows), OFFSET), flush=True)
+    if not rows:
+        raise SystemExit("no device tokens found")
+
+    clients = []
+    t0 = time.time()
+    for name, token in rows:
+        c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=name)
+        c.username_pw_set(token)
+        c.on_connect = on_connect
+        c.on_publish = on_publish
+        try:
+            c.connect(HOST, PORT, keepalive=120)
+            c.loop_start()
+            clients.append(c)
+        except Exception as exc:
+            connect_err["%s: %s" % (type(exc).__name__, exc)] += 1
+        time.sleep(STAGGER)
+    print("connect_phase_seconds=%.1f" % (time.time() - t0), flush=True)
+
+    time.sleep(10)
+    print("sockets_created=%d connected=%d" % (len(clients), sum(1 for c in clients if c.is_connected())), flush=True)
+    print("connack_codes=%s" % dict(conn_rc), flush=True)
+    for k, v in connect_err.most_common(3):
+        print("connect_error[%d] %s" % (v, k), flush=True)
+
+    start = time.time()
+    tick = 0
+    while True:
+        now = time.time()
+        if now - start >= DURATION:
+            break
+        for c in clients:
+            if c.is_connected():
+                payload = json.dumps({
+                    "ts": int(now * 1000),
+                    "values": {"temperature": 25.0 + tick % 5,
+                               "humidity": 55.0, "battery": 90, "seq": tick}})
+                info = c.publish(TOPIC, payload, qos=1)
+                if info.rc == mqtt.MQTT_ERR_SUCCESS:
+                    counters["published"] += 1
+                else:
+                    counters["publish_errors"] += 1
+            else:
+                counters["publish_errors"] += 1
+        tick += 1
+        time.sleep(max(0.0, 1.0 - ((time.time() - start) % 1.0)))
+
+    print("loop_seconds=%.1f ticks=%d published=%d puback=%d publish_errors=%d" %
+          (time.time() - start, tick, counters["published"], counters["puback"],
+           counters["publish_errors"]), flush=True)
+    print("still_connected=%d" % sum(1 for c in clients if c.is_connected()), flush=True)
+    print("done", flush=True)
+    os._exit(0)
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tb-loadtest-mqtt
+  namespace: thingsboard
+spec:
+  backoffLimit: 0
+  completions: 8
+  parallelism: 8
+  completionMode: Indexed
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: mqtt-load
+          image: python:3.12-slim
+          command: ["sh","-c"]
+          args:
+            - pip install --quiet --disable-pip-version-check paho-mqtt psycopg2-binary && export OFFSET=$((JOB_COMPLETION_INDEX * DEVICES_PER_SHARD)) && python /scripts/run.py
+          env:
+            - {name: MQTT_HOST, value: "tb-mqtt-transport"}
+            - {name: MQTT_PORT, value: "1883"}
+            - {name: DEVICES_PER_SHARD, value: "250"}
+            - {name: DURATION, value: "60"}
+            - name: PGHOST
+              value: postgresql-215231-0.cloudclusters.net
+            - {name: PGPORT, value: "10012"}
+            - {name: PGDATABASE, value: "greeniq"}
+            - name: PGUSER
+              valueFrom: {secretKeyRef: {name: tb-secrets, key: SPRING_DATASOURCE_USERNAME}}
+            - name: PGPASSWORD
+              valueFrom: {secretKeyRef: {name: tb-secrets, key: SPRING_DATASOURCE_PASSWORD}}
+            - {name: PGSSLMODE, value: "require"}
+          volumeMounts:
+            - {name: script, mountPath: /scripts, readOnly: true}
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 1Gi}
+      volumes:
+        - name: script
+          configMap: {name: tb-loadtest-script}

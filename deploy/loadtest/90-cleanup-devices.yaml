@@ -1,0 +1,40 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Xoá toàn bộ thiết bị test (loadtest-%) và access token của chúng khỏi PostgreSQL.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tb-loadtest-cleanup
+  namespace: thingsboard
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: psql
+          image: postgres:16-alpine
+          env:
+            - name: PGHOST
+              value: postgresql-215231-0.cloudclusters.net
+            - name: PGPORT
+              value: "10012"
+            - name: PGDATABASE
+              value: greeniq
+            - name: PGUSER
+              valueFrom: {secretKeyRef: {name: tb-secrets, key: SPRING_DATASOURCE_USERNAME}}
+            - name: PGPASSWORD
+              valueFrom: {secretKeyRef: {name: tb-secrets, key: SPRING_DATASOURCE_PASSWORD}}
+            - name: PGSSLMODE
+              value: require
+          command: ["sh","-c"]
+          args:
+            - |
+              psql -v ON_ERROR_STOP=1 -c "DELETE FROM device_credentials WHERE device_id IN (SELECT id FROM device WHERE name LIKE 'loadtest-%');"
+              psql -v ON_ERROR_STOP=1 -c "DELETE FROM device WHERE name LIKE 'loadtest-%';"
+              psql -t -A -c "select 'device_con_lai='||count(*) from device;"
+              psql -t -A -c "select 'loadtest_con_lai='||count(*) from device where name like 'loadtest-%';"
