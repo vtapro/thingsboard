@@ -28,6 +28,7 @@ mvn -o -B -pl application install -DskipTests -Dskip.ui.build=true -Dpkg.skip=tr
 #    - script tự build lại module application nếu thiếu application\target\classes
 #    - script chạy nền tiến trình java và giữ cửa sổ, nên hãy mở nó ở terminal riêng
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-tb.ps1
+#    - nếu backend đã chạy sẵn, script chỉ thông báo và thoát (mã 0), không báo lỗi
 #    backend đang chạy sẵn mà muốn restart (sau khi build lại code Java):
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-tb.ps1 -Force
 Invoke-WebRequest http://localhost:8080/api/noauth/whiteLabeling -UseBasicParsing | Select-Object StatusCode
@@ -275,7 +276,7 @@ MQTT: cổng `1883` mở sẵn khi chạy monolith; username = **device access t
 | Installer: `database already upgraded` | thêm biến môi trường `SKIP_SCHEMA_VERSION_CHECK=true` khi chạy ở chế độ upgrade |
 | UI dev server báo `[vite] http proxy error: /api/... AggregateError` | backend chưa chạy (cổng 8080 trống) → chạy `scripts\start-tb.ps1` rồi F5 lại; kiểm tra bằng `Invoke-WebRequest http://localhost:8080/api/noauth/whiteLabeling` |
 | `Error: Could not find or load main class org.thingsboard.server.ThingsboardServerApplication` khi start backend | `application\target\classes` bị thiếu class do lần build trước **lỗi giữa đường**, lần build sau chỉ biên dịch file thay đổi → xoá `Remove-Item -Recurse -Force application\target\classes` rồi build lại `mvn -o -B -pl application install -DskipTests -Dskip.ui.build=true -Dpkg.skip=true -Dlicense.skip=true` |
-| `Cong 8080 dang ban (pid: ...)` khi chạy `start-tb.ps1` | **không phải lỗi**: backend đang chạy sẵn (pid được in ra). Muốn giữ nguyên thì dùng luôn; muốn restart thì chạy `.\scripts\start-tb.ps1 -Force` (script tự dừng pid cũ rồi khởi động lại) |
+| Chạy `start-tb.ps1` khi backend đã chạy sẵn | **không phải lỗi** — script in `ThingsBoard dang chay san (pid: ...)` rồi thoát với mã 0. Muốn restart (sau khi build lại Java) thì chạy `.\scripts\start-tb.ps1 -Force`; muốn dừng thì `.\scripts\stop-tb.ps1`. Nếu cổng 8080 bị **chương trình khác** chiếm (không phải ThingsBoard) thì script mới báo lỗi |
 | `application\target\classes` tự nhiên biến mất / thiếu class sau khi mở VS Code | Java Language Server của VS Code có thể xoá và biên dịch lại thư mục output của Maven → từ bản này `scripts\start-tb.ps1` **tự phát hiện và build lại** module `application` trước khi chạy |
 
 ## 9. Lệnh chạy dev đã kiểm chứng (2026-09-25)

@@ -55,8 +55,20 @@ if (Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyCont
     $owners = (Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue |
                Select-Object -ExpandProperty OwningProcess | Sort-Object -Unique)
     if (-not $Force) {
-        throw ("Cong 8080 dang ban (pid: " + ($owners -join ", ") +
-               "). Chay lai voi -Force de tu dong restart, hoac dung scripts\stop-tb.ps1.")
+        # Da co backend chay san: kiem tra xem co phai ThingsBoard khong roi bao thanh cong (khong phai loi).
+        $healthy = $false
+        try {
+            $resp = Invoke-WebRequest "http://localhost:8080/api/noauth/whiteLabeling" -UseBasicParsing -TimeoutSec 10
+            $healthy = ($resp.StatusCode -eq 200)
+        } catch { $healthy = $false }
+        if ($healthy) {
+            Write-Host "ThingsBoard dang chay san (pid: $($owners -join ', ') -> http://localhost:8080). Khong can start lai."
+            Write-Host "Muon restart (sau khi build lai code Java): .\scripts\start-tb.ps1 -Force"
+            Write-Host "Muon dung: .\scripts\stop-tb.ps1"
+            exit 0
+        }
+        throw ("Cong 8080 dang bi chiem boi tien trinh khac (pid: " + ($owners -join ", ") +
+               ") va khong phai ThingsBoard. Hay dung tien trinh do, hoac chay lai voi -Force.")
     }
     Write-Host "==> Cong 8080 dang ban (pid: $($owners -join ', ')), dang dung lai vi co -Force"
     foreach ($ownerPid in $owners) {
@@ -95,8 +107,10 @@ $props += @("-cp", $cp, "org.thingsboard.server.ThingsboardServerApplication")
 $argsFile = "$env:TEMP\tb-server.args"
 [System.IO.File]::WriteAllLines($argsFile, $props)
 
+# -WindowStyle Hidden: backend khong phu thuoc cua so terminal dang chay script
+# (dong terminal van khong lam chet ThingsBoard), log van ghi ra 2 file ben duoi.
 $process = Start-Process -FilePath "$jdk25\bin\java.exe" -ArgumentList "@$argsFile" `
-    -NoNewWindow -PassThru -RedirectStandardOutput "$env:TEMP\tb-server.out" -RedirectStandardError "$env:TEMP\tb-server.err"
+    -WindowStyle Hidden -PassThru -RedirectStandardOutput "$env:TEMP\tb-server.out" -RedirectStandardError "$env:TEMP\tb-server.err"
 $process.Id | Set-Content "$env:TEMP\tb-server.pid"
 
 for ($i = 0; $i -lt 30; $i++) {
@@ -105,6 +119,9 @@ for ($i = 0; $i -lt 30; $i++) {
         Write-Host "ThingsBoard san sang: http://localhost:8080 (pid $($process.Id))"
         Write-Host "UI dev: cd ui-ngx; corepack yarn ng serve --configuration development --port 4200"
         exit 0
+    }
+    if (($i + 1) % 3 -eq 0) {
+        Write-Host "    dang khoi dong... ($([int](($i + 1) * 5)) giay) - log: $env:TEMP\tb-server.out"
     }
 }
 throw "Backend khong khoi dong duoc, xem log: $env:TEMP\tb-server.out"
