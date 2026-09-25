@@ -25,6 +25,8 @@ mvn -o -B -pl application install -DskipTests -Dskip.ui.build=true -Dpkg.skip=tr
     -Duser.home=C:/Users/vthea -Dmaven.repo.local=C:/Users/vthea/.m2/repository
 
 # 4) chạy backend -> http://localhost:8080 (PostgreSQL local + queue in-memory + RBAC bật)
+#    LƯU Ý: chạy từ THƯ MỤC GỐC repo (C:\Users\vthea\Documents\GitHub\thingsboard).
+#    Nếu đang ở ui-ngx thì dùng ..\scripts\start-tb.ps1, không phải .\scripts\...
 #    - script tự build lại module application nếu thiếu application\target\classes
 #    - script chạy nền tiến trình java và giữ cửa sổ, nên hãy mở nó ở terminal riêng
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-tb.ps1
@@ -277,6 +279,7 @@ MQTT: cổng `1883` mở sẵn khi chạy monolith; username = **device access t
 | UI dev server báo `[vite] http proxy error: /api/... AggregateError` | backend chưa chạy (cổng 8080 trống) → chạy `scripts\start-tb.ps1` rồi F5 lại; kiểm tra bằng `Invoke-WebRequest http://localhost:8080/api/noauth/whiteLabeling` |
 | `Error: Could not find or load main class org.thingsboard.server.ThingsboardServerApplication` khi start backend | `application\target\classes` bị thiếu class do lần build trước **lỗi giữa đường**, lần build sau chỉ biên dịch file thay đổi → xoá `Remove-Item -Recurse -Force application\target\classes` rồi build lại `mvn -o -B -pl application install -DskipTests -Dskip.ui.build=true -Dpkg.skip=true -Dlicense.skip=true` |
 | Chạy `start-tb.ps1` khi backend đã chạy sẵn | **không phải lỗi** — script in `ThingsBoard dang chay san (pid: ...)` rồi thoát với mã 0. Muốn restart (sau khi build lại Java) thì chạy `.\scripts\start-tb.ps1 -Force`; muốn dừng thì `.\scripts\stop-tb.ps1`. Nếu cổng 8080 bị **chương trình khác** chiếm (không phải ThingsBoard) thì script mới báo lỗi |
+| `The term '.\scripts\start-tb.ps1' is not recognized ...` | đang đứng ở thư mục `ui-ngx` (script nằm ở thư mục gốc repo). Chạy `cd ..` trước, hoặc dùng đường dẫn `..\scripts\start-tb.ps1`. Nên gọi đầy đủ: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-tb.ps1` (máy chặn chạy `.ps1` trực tiếp) |
 | `application\target\classes` tự nhiên biến mất / thiếu class sau khi mở VS Code | Java Language Server của VS Code có thể xoá và biên dịch lại thư mục output của Maven → từ bản này `scripts\start-tb.ps1` **tự phát hiện và build lại** module `application` trước khi chạy |
 
 ## 9. Lệnh chạy dev đã kiểm chứng (2026-09-25)
