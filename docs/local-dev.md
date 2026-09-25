@@ -3,6 +3,55 @@
 Dự án chạy trực tiếp trên Windows: PostgreSQL + ThingsBoard (Java) + Angular dev server.
 Không cần Docker cho vòng lặp phát triển hằng ngày.
 
+## 0. Bắt đầu nhanh (copy-paste)
+
+```powershell
+# ---------- một lần cho mỗi cửa sổ PowerShell ----------
+$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-25.0.4.101-hotspot"
+$env:PATH = "$env:JAVA_HOME\bin;C:\Users\vthea\tools\apache-maven-3.9.11\bin;$env:PATH"
+cd C:\Users\vthea\Documents\GitHub\thingsboard
+
+# ---------- BACKEND ----------
+# 1) lần đầu (hoặc sau khi đổi dependency): build toàn bộ backend, KHÔNG dùng "clean"
+mvn -o -B install -DskipTests -Dskip.ui.build=true -Dpkg.skip=true -Dlicense.skip=true `
+    -Duser.home=C:/Users/vthea -Dmaven.repo.local=C:/Users/vthea/.m2/repository
+
+# 2) lần đầu: sinh classpath để chạy backend bằng java
+mvn -o -B -q -pl application dependency:build-classpath -Dmdep.outputFile=target\classpath.txt `
+    -Duser.home=C:/Users/vthea -Dmaven.repo.local=C:/Users/vthea/.m2/repository
+
+# 3) mỗi lần sửa code Java: chỉ build lại module application (~30 giây)
+mvn -o -B -pl application install -DskipTests -Dskip.ui.build=true -Dpkg.skip=true -Dlicense.skip=true `
+    -Duser.home=C:/Users/vthea -Dmaven.repo.local=C:/Users/vthea/.m2/repository
+
+# 4) chạy backend -> http://localhost:8080 (PostgreSQL local + queue in-memory + RBAC bật)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-tb.ps1
+Invoke-WebRequest http://localhost:8080/api/noauth/whiteLabeling -UseBasicParsing | Select-Object StatusCode
+
+# ---------- FRONTEND ----------
+# 5) dev server hot reload -> http://localhost:4200 (proxy /api -> 8080)
+cd ui-ngx
+node --max_old_space_size=8048 ./node_modules/@angular/cli/bin/ng.js serve --configuration development --host 0.0.0.0
+
+# 6) build production giống CI (nên chạy trước khi push)
+node --max_old_space_size=4096 ./node_modules/@angular/cli/bin/ng.js build --configuration production
+
+# ---------- DỪNG ----------
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-tb.ps1   # dừng cả backend + ng serve
+```
+
+Tài khoản local: `sysadmin@thingsboard.org / sysadmin`, `tenant@thingsboard.org / tenant`,
+`user@thingsboard.org / user123`.
+
+Test nhanh Automation (tạo rule hẹn giờ + thiết bị MQTT giả):
+
+```powershell
+python -m pip install paho-mqtt requests
+python .\scripts\test-automation-local.py     # kỳ vọng: SUMMARY 15/15 PASS
+```
+
+Chỉ sau khi local pass mới đẩy lên GHCR + k3s (xem §10).
+
 ## 1. Thành phần đã cài trên máy
 
 | Thành phần | Phiên bản | Đường dẫn | Ghi chú |
@@ -289,3 +338,30 @@ python .\scripts\test-automation-local.py
 
 Kết quả lần chạy đầu (2026-09-25): **15/15 PASS**, gồm `RPC delivered to device (run now)`,
 `scheduler executed the rule`, `RPC delivered by scheduler`.
+
+## 10. Chỉ sau khi local pass: đẩy GHCR + deploy k3s
+
+```powershell
+# 1) commit + push -> GitHub Actions build 8 image ghcr.io/vtapro/tb-*:v4.4.0.0 (~8-15 phút)
+git add -A
+git commit -m "feat: ..."
+git push origin RBAC-full-groups-tabs
+gh -R vtapro/thingsboard run list --limit 1
+gh -R vtapro/thingsboard run watch <run-id> --exit-status
+
+# 2) deploy đúng service đã thay đổi (xem bảng bên dưới)
+kubectl -n thingsboard rollout restart deployment/tb-core deployment/tb-web-ui
+kubectl -n thingsboard rollout status deployment/tb-core --timeout=600s
+kubectl -n thingsboard rollout status deployment/tb-web-ui --timeout=600s
+
+# 3) kiểm tra
+kubectl -n thingsboard get pods --no-headers | Select-String -NotMatch "Running"   # kỳ vọng: rỗng
+Invoke-WebRequest https://app.greeniq.vn/api/tenant/automation -UseBasicParsing    # 401 = API đã lên (chưa login)
+```
+
+| Thay đổi | Service cần rollout lại |
+|---|---|
+| Java trong `application`, `dao`, `common` (API, rule engine, RBAC…) | `tb-core` (thêm `tb-rule-engine` nếu sửa rule node) |
+| `ui-ngx` (trang, menu, i18n, assets, logo) | `tb-web-ui` |
+| `transport/*` (MQTT/HTTP/CoAP…) | transport tương ứng, ví dụ `tb-mqtt-transport` |
+| chỉ `docs/**`, `deploy/**`, `scripts/**`, `**/*.md` | không cần — workflow có `paths-ignore`, push tài liệu không trigger build |
