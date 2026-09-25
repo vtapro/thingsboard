@@ -1,40 +1,77 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
-.tb-automation-hint {
-  margin-bottom: 12px;
-  color: rgba(0, 0, 0, .6);
+.tb-automation-card {
+  mat-card-header {
+    padding-bottom: 8px;
+  }
 }
 
-.tb-automation-toolbar {
+.tb-automation-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+}
+
+.tb-automation-header-actions {
   display: flex;
   align-items: center;
-  margin-bottom: 8px;
+  gap: 16px;
+  white-space: nowrap;
+}
+
+.tb-automation-counter {
+  font-size: 12px;
+  color: rgba(0, 0, 0, .54);
+}
+
+.tb-automation-hint {
+  margin-top: 6px;
+  max-width: 900px;
+  color: rgba(0, 0, 0, .6);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .tb-automation-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: auto;
 
   th, td {
     text-align: left;
-    padding: 12px 8px;
-    border-bottom: 1px solid rgba(0, 0, 0, .12);
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, .08);
     vertical-align: middle;
   }
 
   th {
     font-weight: 500;
-    color: rgba(0, 0, 0, .6);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    color: rgba(0, 0, 0, .54);
     white-space: nowrap;
+    border-bottom: 1px solid rgba(0, 0, 0, .16);
+  }
+
+  tbody tr:hover {
+    background-color: rgba(0, 0, 0, .03);
   }
 }
 
-.tb-automation-center {
+.tb-automation-row-disabled {
+  opacity: .55;
+}
+
+.tb-center {
   text-align: center;
 }
 
 .tb-automation-actions {
   white-space: nowrap;
+  text-align: right;
 }
 
 .tb-automation-name {
@@ -46,12 +83,73 @@
   color: rgba(0, 0, 0, .54);
 }
 
-.tb-automation-error {
-  color: #d32f2f;
+.tb-automation-message {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tb-automation-inline-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  vertical-align: -2px;
+}
+
+.tb-automation-sep {
+  margin: 0 4px;
+}
+
+.tb-automation-run,
+.tb-automation-next {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tb-automation-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  background-color: rgba(0, 0, 0, .08);
+}
+
+.tb-chip-ok {
+  background-color: rgba(56, 142, 60, .16);
+  color: #2e7d32;
+}
+
+.tb-chip-failed {
+  background-color: rgba(211, 47, 47, .14);
+  color: #c62828;
 }
 
 .tb-automation-empty {
-  padding: 32px;
-  text-align: center;
-  color: rgba(0, 0, 0, .54);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 16px;
+  color: rgba(0, 0, 0, .45);
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+  }
+}
+
+.tb-automation-empty-text {
+  font-size: 14px;
+}
+
+@media (max-width: 1100px) {
+  .tb-automation-header {
+    flex-direction: column;
+  }
 }

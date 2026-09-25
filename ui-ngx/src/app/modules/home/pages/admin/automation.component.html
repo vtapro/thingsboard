@@ -4,84 +4,108 @@
     SPDX-License-Identifier: Apache-2.0
 
 -->
-<mat-card appearance="outlined" class="settings-card">
+<mat-card appearance="outlined" class="settings-card tb-automation-card">
   <mat-card-header>
-    <mat-card-title>
-      <span class="mat-headline-5" translate>automation.title</span>
-    </mat-card-title>
+    <div class="tb-automation-header">
+      <div>
+        <mat-card-title>
+          <span class="mat-headline-5" translate>automation.title</span>
+        </mat-card-title>
+        <div class="tb-automation-hint" translate>automation.hint</div>
+      </div>
+      <div class="tb-automation-header-actions">
+        <span class="tb-automation-counter" *ngIf="rules.length">
+          {{ enabledCount }}/{{ rules.length }} {{ 'automation.enabled' | translate }}
+        </span>
+        <button mat-raised-button color="primary" (click)="addRule()">
+          <mat-icon>add</mat-icon>
+          <span translate>automation.add</span>
+        </button>
+      </div>
+    </div>
   </mat-card-header>
   @if (isLoading) {
-    <mat-progress-bar color="warn" mode="indeterminate"></mat-progress-bar>
-  }
-  @if (!isLoading) {
-    <div style="height: 4px;"></div>
+    <mat-progress-bar color="accent" mode="indeterminate"></mat-progress-bar>
   }
   <mat-card-content>
-    <div class="tb-automation-hint" translate>automation.hint</div>
-    <div class="tb-automation-toolbar">
-      <span class="flex-1"></span>
-      <button mat-raised-button color="primary" (click)="addRule()">
-        <mat-icon>add</mat-icon>
-        <span translate>automation.add</span>
-      </button>
-    </div>
     @if (!rules.length && !isLoading) {
-      <div class="tb-automation-empty" translate>automation.no-rules</div>
+      <div class="tb-automation-empty">
+        <mat-icon>schedule</mat-icon>
+        <div class="tb-automation-empty-text" translate>automation.no-rules</div>
+      </div>
     }
     @if (rules.length) {
       <table class="tb-automation-table">
         <thead>
         <tr>
-          <th translate>automation.name</th>
-          <th translate>automation.device</th>
-          <th translate>automation.schedule</th>
-          <th class="tb-automation-center" translate>automation.enabled</th>
-          <th translate>automation.last-run</th>
-          <th translate>automation.next-run</th>
-          <th class="tb-automation-center" translate>automation.actions</th>
+          <th>{{ 'automation.name' | translate }}</th>
+          <th>{{ 'automation.schedule' | translate }}</th>
+          <th class="tb-center">{{ 'automation.enabled' | translate }}</th>
+          <th>{{ 'automation.last-run' | translate }}</th>
+          <th>{{ 'automation.next-run' | translate }}</th>
+          <th class="tb-center">{{ 'automation.actions' | translate }}</th>
         </tr>
         </thead>
         <tbody>
         @for (rule of rules; track rule.id) {
-          <tr>
+          <tr [class.tb-automation-row-disabled]="!rule.enabled">
             <td>
               <div class="tb-automation-name">{{ rule.name }}</div>
-              <div class="tb-automation-secondary">{{ rule.method }}</div>
+              <div class="tb-automation-secondary">
+                <mat-icon class="tb-automation-inline-icon">devices_other</mat-icon>
+                {{ rule.deviceName || '-' }}
+                <span class="tb-automation-sep">•</span>
+                <code>{{ rule.method }}</code>
+              </div>
             </td>
-            <td>{{ rule.deviceName || '-' }}</td>
-            <td>{{ scheduleDescription(rule) }}</td>
-            <td class="tb-automation-center">
+            <td>
+              <div>{{ scheduleDescription(rule) }}</div>
+              @if (rule.schedule?.cron && rule.schedule?.type === scheduleTypes.CRON) {
+                <div class="tb-automation-secondary">{{ rule.schedule.cron }}</div>
+              }
+            </td>
+            <td class="tb-center">
               <mat-slide-toggle [checked]="rule.enabled" (change)="onEnabledChange(rule, $event.checked)">
               </mat-slide-toggle>
             </td>
             <td>
               @if (rule.lastRunTs) {
-                <div>{{ rule.lastRunTs | date:'short' }}</div>
-                <div class="tb-automation-secondary" [class.tb-automation-error]="rule.lastStatus !== 'OK'">
-                  {{ rule.lastMessage }}
+                <div class="tb-automation-run">
+                  <span class="tb-automation-chip"
+                        [class.tb-chip-ok]="rule.lastStatus === 'OK'"
+                        [class.tb-chip-failed]="rule.lastStatus !== 'OK'">
+                    {{ statusLabel(rule) }}
+                  </span>
+                  <span class="tb-automation-secondary">{{ rule.lastRunTs | date:'short' }}</span>
                 </div>
+                @if (rule.lastMessage) {
+                  <div class="tb-automation-secondary tb-automation-message" [title]="rule.lastMessage">
+                    {{ rule.lastMessage }}
+                  </div>
+                }
               } @else {
-                <span>-</span>
+                <span class="tb-automation-secondary">{{ 'automation.never-run' | translate }}</span>
               }
             </td>
             <td>
               @if (rule.nextRunTs && rule.enabled) {
-                {{ rule.nextRunTs | date:'short' }}
+                <div class="tb-automation-next">
+                  <mat-icon class="tb-automation-inline-icon">schedule</mat-icon>
+                  {{ rule.nextRunTs | date:'short' }}
+                </div>
               } @else {
-                <span>-</span>
+                <span class="tb-automation-secondary">-</span>
               }
             </td>
-            <td class="tb-automation-center tb-automation-actions">
-              <button mat-icon-button matTooltip="{{ 'automation.run-now' | translate }}"
+            <td class="tb-center tb-automation-actions">
+              <button mat-icon-button color="primary" matTooltip="{{ 'automation.run-now' | translate }}"
                       (click)="runNow(rule)">
                 <mat-icon>play_arrow</mat-icon>
               </button>
-              <button mat-icon-button matTooltip="{{ 'action.edit' | translate }}"
-                      (click)="editRule(rule)">
+              <button mat-icon-button matTooltip="{{ 'action.edit' | translate }}" (click)="editRule(rule)">
                 <mat-icon>edit</mat-icon>
               </button>
-              <button mat-icon-button matTooltip="{{ 'action.delete' | translate }}"
-                      (click)="deleteRule(rule)">
+              <button mat-icon-button matTooltip="{{ 'action.delete' | translate }}" (click)="deleteRule(rule)">
                 <mat-icon>delete</mat-icon>
               </button>
             </td>

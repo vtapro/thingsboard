@@ -1,50 +1,82 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
 .tb-automation-dialog-content {
-  min-width: 520px;
-  max-width: 720px;
+  width: 620px;
+  max-width: 100%;
+  max-height: 70vh;
+}
+
+.tb-automation-form {
+  display: flex;
+  flex-direction: column;
+  padding-top: 4px;
+}
+
+.tb-automation-section-title {
+  font-weight: 500;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  color: rgba(0, 0, 0, .54);
+  margin: 4px 0 8px;
+}
+
+.tb-automation-field-label {
+  font-size: 12px;
+  color: rgba(0, 0, 0, .6);
+  margin-bottom: 6px;
 }
 
 .tb-automation-row {
   display: flex;
   gap: 16px;
+  align-items: flex-start;
+}
 
-  mat-form-field {
-    flex: 1;
-  }
+.tb-automation-col {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .tb-automation-switches {
   display: flex;
-  gap: 16px;
   flex-wrap: wrap;
-  margin: 8px 0;
+  gap: 8px 24px;
+  margin: 4px 0 8px;
 }
 
 .tb-automation-divider {
-  margin: 16px 0 8px;
+  margin: 16px 0;
 }
 
 .tb-automation-days {
   display: flex;
-  gap: 8px;
   flex-wrap: wrap;
-  margin-top: 8px;
+  gap: 8px;
+  margin-bottom: 12px;
+
+  .tb-automation-day {
+    min-width: 56px;
+  }
 
   .tb-day-selected {
     background-color: rgba(25, 118, 210, .12);
     border-color: #1976d2;
+    color: #1976d2;
   }
 }
 
-.tb-automation-dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   .tb-automation-dialog-content {
-    min-width: auto;
+    width: 100%;
+  }
+
+  .tb-automation-row {
+    flex-direction: column;
+    gap: 0;
+
+    .tb-automation-col {
+      width: 100%;
+    }
   }
 }

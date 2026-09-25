@@ -21,6 +21,8 @@ import { take } from 'rxjs/operators';
 })
 export class AutomationComponent extends PageComponent implements OnInit {
 
+  readonly scheduleTypes = AutomationScheduleType;
+
   rules: AutomationRule[] = [];
   isLoading = true;
 
@@ -35,6 +37,14 @@ export class AutomationComponent extends PageComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadRules();
+  }
+
+  get enabledCount(): number {
+    return this.rules.filter(rule => rule.enabled).length;
+  }
+
+  statusLabel(rule: AutomationRule): string {
+    return this.translate.instant(rule.lastStatus === 'OK' ? 'automation.status-ok' : 'automation.status-failed');
   }
 
   loadRules(): void {
