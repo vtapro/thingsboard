@@ -21,6 +21,7 @@ import org.thingsboard.server.dao.settings.RoleService;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -78,19 +79,30 @@ public class TbRbacAccessControlService implements AccessControlService {
         if (role == null || !isResourceManagedByRole(role, resource)) {
             return defaultAccessControlService.hasPermission(user, resource, operation);
         }
-        return (hasGlobalOperation(role, resource, grantedOperation(operation))
-                || hasScopedOperation(role, resource, grantedOperation(operation)))
+        Operation effective = resolveOperation(role, resource, operation);
+        if (effective == null) {
+            // The role declares detailed operations and this one is not granted.
+            return false;
+        }
+        return (hasGlobalOperation(role, resource, effective)
+                || hasScopedOperation(role, resource, effective))
                 && defaultAccessControlService.hasPermission(user, resource, operation);
     }
 
     @Override
     public Set<UUID> getAllowedEntityIds(SecurityUser user, Resource resource, Operation operation) {
         RbacRole role = getEffectiveRole(user);
-        if (role == null || !isResourceManagedByRole(role, resource)
-                || hasGlobalOperation(role, resource, grantedOperation(operation))) {
+        if (role == null || !isResourceManagedByRole(role, resource)) {
             return null;
         }
-        List<String> scopedGroups = getScopedGroups(role, resource, grantedOperation(operation));
+        Operation effective = resolveOperation(role, resource, operation);
+        if (effective == null) {
+            return Set.of();
+        }
+        if (hasGlobalOperation(role, resource, effective)) {
+            return null;
+        }
+        List<String> scopedGroups = getScopedGroups(role, resource, effective);
         if (scopedGroups == null || scopedGroups.isEmpty()) {
             return null;
         }
@@ -198,6 +210,55 @@ public class TbRbacAccessControlService implements AccessControlService {
         // Everything that reads (attributes, telemetry, credentials, calculated fields) requires READ,
         // every other auxiliary operation (rpc, claim, assign, create, ALL) requires WRITE.
         return operation.name().startsWith("READ") ? Operation.READ : Operation.WRITE;
+    }
+
+    /**
+     * The operations of the legacy role model: the auxiliary operations of the same entity are derived.
+     */
+    private static final Set<String> LEGACY_OPERATIONS = Set.of("READ", "WRITE", "DELETE");
+
+    /**
+     * Resolves the operation that must be present in the role for the requested {@code operation}:
+     * <ul>
+     *   <li>role without any operation for this resource -> not restricted here;</li>
+     *   <li>role with the requested operation (or ALL) -> granted;</li>
+     *   <li>role that only declares READ/WRITE/DELETE (legacy) -> keep the derived behaviour, so
+     *       existing roles are not affected by the detailed matrix;</li>
+     *   <li>role with detailed operations -> granted only when listed explicitly.</li>
+     * </ul>
+     *
+     * @return the operation to look up in the role, or null when the role does not grant it.
+     */
+    private static Operation resolveOperation(RbacRole role, Resource resource, Operation operation) {
+        List<String> configured = configuredOperations(role, resource);
+        if (configured.isEmpty()) {
+            return operation;
+        }
+        if (configured.contains(operation.name()) || configured.contains(Operation.ALL.name())) {
+            return operation;
+        }
+        boolean legacyRole = configured.stream().allMatch(LEGACY_OPERATIONS::contains);
+        if (legacyRole) {
+            Operation derived = grantedOperation(operation);
+            return configured.contains(derived.name()) ? derived : null;
+        }
+        return null;
+    }
+
+    private static List<String> configuredOperations(RbacRole role, Resource resource) {
+        String resourceName = resource.name();
+        List<String> result = new ArrayList<>();
+        if (role.getPermissions() != null && role.getPermissions().get(resourceName) != null) {
+            result.addAll(role.getPermissions().get(resourceName));
+        }
+        if (role.getScopedPermissions() != null && role.getScopedPermissions().get(resourceName) != null) {
+            role.getScopedPermissions().get(resourceName).forEach((operation, groups) -> {
+                if (groups != null && !groups.isEmpty()) {
+                    result.add(operation);
+                }
+            });
+        }
+        return result;
     }
 
     private RbacRole getEffectiveRole(SecurityUser user) {
