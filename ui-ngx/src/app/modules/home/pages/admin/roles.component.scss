@@ -9,6 +9,28 @@
   overflow: auto;
 }
 
+.tb-roles-presets {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+
+  .tb-roles-presets-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    color: rgba(0, 0, 0, .54);
+  }
+
+  .tb-roles-preset {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+    line-height: 28px;
+  }
+}
+
 .tb-roles-page {
   padding: 16px;
   max-width: 1440px;

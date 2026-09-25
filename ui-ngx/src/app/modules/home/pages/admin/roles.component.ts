@@ -80,7 +80,81 @@ export class RolesComponent extends PageComponent implements OnInit {
    */
   readonly groupScopedResources = GROUP_ENTITY_TYPES;
   readonly entityTypes = GROUP_ENTITY_TYPES;
+  /** Legacy trio, still used for roles created before the detailed matrix. */
   readonly operations = ['READ', 'WRITE', 'DELETE'];
+
+  /**
+   * PE like permission matrix: the operations offered for each entity type.
+   * Roles that only use READ/WRITE/DELETE keep the legacy behaviour on the backend.
+   */
+  readonly operationsByResource: { [resource: string]: string[] } = {
+    DEVICE: ['CREATE', 'READ', 'WRITE', 'DELETE', 'READ_TELEMETRY', 'WRITE_TELEMETRY',
+      'READ_ATTRIBUTES', 'WRITE_ATTRIBUTES', 'READ_CREDENTIALS', 'WRITE_CREDENTIALS',
+      'RPC_CALL', 'CLAIM_DEVICES', 'ASSIGN_TO_CUSTOMER'],
+    ASSET: ['CREATE', 'READ', 'WRITE', 'DELETE', 'READ_ATTRIBUTES', 'WRITE_ATTRIBUTES', 'ASSIGN_TO_CUSTOMER'],
+    ENTITY_VIEW: ['CREATE', 'READ', 'WRITE', 'DELETE', 'READ_TELEMETRY', 'READ_ATTRIBUTES', 'ASSIGN_TO_CUSTOMER'],
+    DASHBOARD: ['CREATE', 'READ', 'WRITE', 'DELETE', 'ASSIGN_TO_CUSTOMER'],
+    ALARM: ['READ', 'WRITE', 'DELETE'],
+    CUSTOMER: ['CREATE', 'READ', 'WRITE', 'DELETE', 'ASSIGN_TO_CUSTOMER'],
+    USER: ['CREATE', 'READ', 'WRITE', 'DELETE']
+  };
+
+  readonly presets: Array<{ id: string; label: string }> = [
+    {id: 'viewer', label: 'Viewer'},
+    {id: 'operator', label: 'Operator'},
+    {id: 'manager', label: 'Manager'},
+    {id: 'admin', label: 'Admin'}
+  ];
+
+  /** Operations offered for an entity type (fallback: create/read/write/delete). */
+  operationsFor(resource: string): string[] {
+    return this.operationsByResource[resource] || ['CREATE', 'READ', 'WRITE', 'DELETE'];
+  }
+
+  /** Human readable label of an operation, e.g. READ_TELEMETRY -> "Read telemetry". */
+  operationLabel(operation: string): string {
+    const text = operation.replace(/_/g, ' ').toLowerCase();
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
+  /** Applies a preset (Viewer / Operator / Manager / Admin) to the entity type. */
+  applyPreset(resource: string, presetId: string): void {
+    const available = this.operationsFor(resource);
+    const wanted = this.presetOperations(presetId);
+    const draft = this.permissionDraft[resource] || (this.permissionDraft[resource] = {});
+    for (const operation of available) {
+      draft[operation] = wanted.includes(operation)
+        || (presetId === 'operator' && operation.startsWith('READ'))
+        || (presetId === 'manager' && (operation.startsWith('READ') || operation === 'WRITE_TELEMETRY'));
+    }
+  }
+
+  selectAllOperations(resource: string): void {
+    const draft = this.permissionDraft[resource] || (this.permissionDraft[resource] = {});
+    for (const operation of this.operationsFor(resource)) {
+      draft[operation] = true;
+    }
+  }
+
+  clearAllOperations(resource: string): void {
+    this.permissionDraft[resource] = {};
+  }
+
+  private presetOperations(presetId: string): string[] {
+    switch (presetId) {
+      case 'viewer':
+        return ['READ'];
+      case 'operator':
+        return ['READ', 'WRITE_TELEMETRY', 'RPC_CALL'];
+      case 'manager':
+        return ['CREATE', 'READ', 'WRITE', 'DELETE', 'WRITE_ATTRIBUTES', 'WRITE_TELEMETRY',
+          'RPC_CALL', 'CLAIM_DEVICES', 'ASSIGN_TO_CUSTOMER'];
+      default:
+        return ['CREATE', 'READ', 'WRITE', 'DELETE', 'READ_TELEMETRY', 'WRITE_TELEMETRY',
+          'READ_ATTRIBUTES', 'WRITE_ATTRIBUTES', 'READ_CREDENTIALS', 'WRITE_CREDENTIALS',
+          'RPC_CALL', 'CLAIM_DEVICES', 'ASSIGN_TO_CUSTOMER'];
+    }
+  }
 
   readonly roleColumns = ['name', 'permissions', 'users', 'actions'];
   readonly groupColumns = ['name', 'entityType', 'description', 'public', 'members', 'actions'];
@@ -141,7 +215,7 @@ export class RolesComponent extends PageComponent implements OnInit {
     const permissions: { [resource: string]: string[] } = {};
     const scopedPermissions: { [resource: string]: { [operation: string]: string[] } } = {};
     for (const resource of this.resources) {
-      const operations = this.operations.filter(operation => this.isOperationGranted(resource, operation));
+      const operations = this.operationsFor(resource).filter(operation => this.isOperationGranted(resource, operation));
       if (!operations.length) {
         continue;
       }
@@ -219,7 +293,7 @@ export class RolesComponent extends PageComponent implements OnInit {
 
   hasAnyOperation(resource: string): boolean {
     const operations = this.permissionDraft[resource];
-    return !!operations && this.operations.some(operation => operations[operation]);
+    return !!operations && this.operationsFor(resource).some(operation => operations[operation]);
   }
 
   canScopeToGroups(resource: string): boolean {
@@ -246,7 +320,7 @@ export class RolesComponent extends PageComponent implements OnInit {
     if (!operations) {
       return '';
     }
-    return this.operations.filter(operation => operations[operation]).join(', ');
+    return this.operationsFor(resource).filter(operation => operations[operation]).join(', ');
   }
 
   /**

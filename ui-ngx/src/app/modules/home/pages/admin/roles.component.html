@@ -48,11 +48,23 @@
                       }
                     </ng-template>
                     <div class="tb-roles-resource">
+                      <div class="tb-roles-presets">
+                        <span class="tb-roles-presets-label" translate>admin.roles-presets</span>
+                        @for (preset of presets; track preset.id) {
+                          <button type="button" mat-stroked-button class="tb-roles-preset"
+                                  (click)="applyPreset(resource, preset.id)">{{ preset.label }}</button>
+                        }
+                        <span class="flex-1"></span>
+                        <button type="button" mat-button (click)="selectAllOperations(resource)"
+                                translate>admin.roles-select-all</button>
+                        <button type="button" mat-button (click)="clearAllOperations(resource)"
+                                translate>admin.roles-clear-all</button>
+                      </div>
                       <div class="tb-roles-ops">
-                        @for (operation of operations; track operation) {
+                        @for (operation of operationsFor(resource); track operation) {
                           <mat-checkbox [checked]="isOperationGranted(resource, operation)"
                                         (change)="toggleOperation(resource, operation)">
-                            {{ operation }}
+                            {{ operationLabel(operation) }}
                           </mat-checkbox>
                         }
                       </div>
