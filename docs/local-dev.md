@@ -25,7 +25,11 @@ mvn -o -B -pl application install -DskipTests -Dskip.ui.build=true -Dpkg.skip=tr
     -Duser.home=C:/Users/vthea -Dmaven.repo.local=C:/Users/vthea/.m2/repository
 
 # 4) chạy backend -> http://localhost:8080 (PostgreSQL local + queue in-memory + RBAC bật)
+#    - script tự build lại module application nếu thiếu application\target\classes
+#    - script chạy nền tiến trình java và giữ cửa sổ, nên hãy mở nó ở terminal riêng
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-tb.ps1
+#    backend đang chạy sẵn mà muốn restart (sau khi build lại code Java):
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-tb.ps1 -Force
 Invoke-WebRequest http://localhost:8080/api/noauth/whiteLabeling -UseBasicParsing | Select-Object StatusCode
 
 # ---------- FRONTEND ----------
@@ -271,6 +275,8 @@ MQTT: cổng `1883` mở sẵn khi chạy monolith; username = **device access t
 | Installer: `database already upgraded` | thêm biến môi trường `SKIP_SCHEMA_VERSION_CHECK=true` khi chạy ở chế độ upgrade |
 | UI dev server báo `[vite] http proxy error: /api/... AggregateError` | backend chưa chạy (cổng 8080 trống) → chạy `scripts\start-tb.ps1` rồi F5 lại; kiểm tra bằng `Invoke-WebRequest http://localhost:8080/api/noauth/whiteLabeling` |
 | `Error: Could not find or load main class org.thingsboard.server.ThingsboardServerApplication` khi start backend | `application\target\classes` bị thiếu class do lần build trước **lỗi giữa đường**, lần build sau chỉ biên dịch file thay đổi → xoá `Remove-Item -Recurse -Force application\target\classes` rồi build lại `mvn -o -B -pl application install -DskipTests -Dskip.ui.build=true -Dpkg.skip=true -Dlicense.skip=true` |
+| `Cong 8080 dang ban (pid: ...)` khi chạy `start-tb.ps1` | **không phải lỗi**: backend đang chạy sẵn (pid được in ra). Muốn giữ nguyên thì dùng luôn; muốn restart thì chạy `.\scripts\start-tb.ps1 -Force` (script tự dừng pid cũ rồi khởi động lại) |
+| `application\target\classes` tự nhiên biến mất / thiếu class sau khi mở VS Code | Java Language Server của VS Code có thể xoá và biên dịch lại thư mục output của Maven → từ bản này `scripts\start-tb.ps1` **tự phát hiện và build lại** module `application` trước khi chạy |
 
 ## 9. Lệnh chạy dev đã kiểm chứng (2026-09-25)
 

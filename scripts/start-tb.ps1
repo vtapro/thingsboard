@@ -13,24 +13,62 @@ param(
     [string]$DatabaseUrl = "jdbc:postgresql://localhost:5432/thingsboard",
     [string]$DatabaseUser = "postgres",
     [string]$DatabasePassword = "postgres",
-    [switch]$DisableRbac
+    [switch]$DisableRbac,
+    # Dung backend dang chay (neu co) roi khoi dong lai - tien khi vua build lai code Java
+    [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $jdk25 = "C:\Program Files\Eclipse Adoptium\jdk-25.0.4.101-hotspot"
+$mavenBin = "C:\Users\vthea\tools\apache-maven-3.9.11\bin"
 $classes = Join-Path $repoRoot "application\target\classes"
 $classpathFile = Join-Path $repoRoot "application\target\classpath.txt"
 $RocksDbDir = (Join-Path $repoRoot "application\target\rocksdb") -replace '\\', '/'
+$env:JAVA_HOME = $jdk25
+if ($env:PATH -notlike "*$mavenBin*") { $env:PATH = "$jdk25\bin;$mavenBin;$env:PATH" }
 
 New-Item -ItemType Directory -Force -Path ($RocksDbDir -replace '/', '\') | Out-Null
 
 if (-not (Test-Path $classpathFile)) {
     throw "Thieu $classpathFile - chay: mvn -B -q -pl application dependency:build-classpath -Dmdep.outputFile=target\classpath.txt"
 }
+
+# VS Code Java Language Server co the xoa/recompile lai application\target\classes, hoac lan build truoc
+# bi loi giua duong -> tu dong build lai module application truoc khi chay.
+$mainClass = Join-Path $classes "org\thingsboard\server\ThingsboardServerApplication.class"
+if (-not (Test-Path $mainClass)) {
+    Write-Host "==> Thieu $mainClass -> build lai module application (co the mat 1-2 phut)..."
+    Push-Location $repoRoot
+    try {
+        & "$mavenBin\mvn.cmd" -o -B -pl application install "-DskipTests" "-Dskip.ui.build=true" "-Dpkg.skip=true" `
+            "-Dlicense.skip=true" "-Duser.home=C:/Users/vthea" "-Dmaven.repo.local=C:/Users/vthea/.m2/repository"
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $mainClass)) {
+            throw "Build lai module application that bai, xem log ben tren."
+        }
+    } finally {
+        Pop-Location
+    }
+}
 if (Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue) {
-    throw "Cong 8080 dang ban. Dung tien trinh Java cu truoc (scripts\stop-tb.ps1)."
+    $owners = (Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue |
+               Select-Object -ExpandProperty OwningProcess | Sort-Object -Unique)
+    if (-not $Force) {
+        throw ("Cong 8080 dang ban (pid: " + ($owners -join ", ") +
+               "). Chay lai voi -Force de tu dong restart, hoac dung scripts\stop-tb.ps1.")
+    }
+    Write-Host "==> Cong 8080 dang ban (pid: $($owners -join ', ')), dang dung lai vi co -Force"
+    foreach ($ownerPid in $owners) {
+        try { Stop-Process -Id $ownerPid -Force -ErrorAction Stop; Write-Host "    da dung pid $ownerPid" } catch { }
+    }
+    for ($i = 0; $i -lt 20; $i++) {
+        Start-Sleep -Milliseconds 500
+        if (-not (Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue)) { break }
+    }
+    if (Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue) {
+        throw "Khong giai phong duoc cong 8080, kiem tra lai cac tien trinh Java dang chay."
+    }
 }
 
 $cp = ($classes -replace '\\', '/') + ";" + ((Get-Content $classpathFile -Raw).Trim() -replace '\\', '/')
