@@ -127,6 +127,11 @@
                                         (change)="toggleOwnOnly(resource)">
                             {{ 'admin.roles-own-only' | translate }}
                           </mat-checkbox>
+                          @if (isOwnOnly(resource)) {
+                            <div class="tb-roles-own-warning">
+                              {{ 'admin.roles-own-only-warning' | translate }}
+                            </div>
+                          }
                           <mat-form-field class="tb-roles-scope" subscriptSizing="dynamic" appearance="outline">
                             <mat-label translate>admin.roles-scope-groups</mat-label>
                             <mat-select multiple

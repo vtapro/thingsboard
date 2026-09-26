@@ -163,7 +163,11 @@ public class TbRbacAccessControlService implements AccessControlService {
     @Override
     public void checkPermission(SecurityUser user, Resource resource, Operation operation) throws ThingsboardException {
         if (!hasPermission(user, resource, operation)) {
-            permissionDenied();
+            RbacRole role = getEffectiveRole(user);
+            if (role != null && isResourceManagedByRole(role, resource)) {
+                permissionDenied("Your role does not grant \"" + operationLabel(operation) + "\" on " + resource + ".");
+            }
+            permissionDenied(PERMISSION_DENIED_MESSAGE);
         }
     }
 
@@ -282,8 +286,55 @@ public class TbRbacAccessControlService implements AccessControlService {
     public <I extends EntityId, T extends HasTenantId> void checkPermission(SecurityUser user, Resource resource, Operation operation,
                                                                            I entityId, T entity) throws ThingsboardException {
         if (!hasPermission(user, resource, operation, entityId, entity)) {
-            permissionDenied();
+            permissionDenied(denialReason(user, resource, operation, entityId, entity));
         }
+    }
+
+    /**
+     * Human readable explanation of a denied request. The WEB UI shows it in the dialog, so the administrator (and
+     * the end user) knows whether the operation is missing, the entity is not in the granted groups or the user is
+     * not the owner of the entity.
+     */
+    private <I extends EntityId, T extends HasTenantId> String denialReason(SecurityUser user, Resource resource,
+                                                                           Operation operation, I entityId, T entity) {
+        RbacRole role = getEffectiveRole(user);
+        if (role == null || !isResourceManagedByRole(role, resource)) {
+            return PERMISSION_DENIED_MESSAGE;
+        }
+        String entityLabel = entityLabel(entityId, resource);
+        if (isOwnOnlyResource(role, resource) && entityId != null && !isEntityOwner(user, entity)) {
+            if (entity != null) {
+                return "You are not the owner of this " + entityLabel
+                        + ". Only the user that created it can read or change it.";
+            }
+        }
+        if (resolveOperation(role, resource, operation) == null) {
+            return "Your role does not grant \"" + operationLabel(operation) + "\" on " + resource + ".";
+        }
+        if (entityId != null) {
+            List<String> scopedGroups = getScopedGroups(role, resource, grantedOperation(operation));
+            if (scopedGroups != null && !scopedGroups.isEmpty()
+                    && !entityBelongsToGroups(user.getTenantId(), entityId, scopedGroups)) {
+                return "This " + entityLabel + " is not a member of the entity groups granted to your role.";
+            }
+        }
+        if (user.getCustomerId() != null) {
+            return "This " + entityLabel + " does not belong to your customer, so your role can not grant access to it.";
+        }
+        return PERMISSION_DENIED_MESSAGE;
+    }
+
+    private static String entityLabel(EntityId entityId, Resource resource) {
+        String name = entityId != null ? entityId.getEntityType().name() : resource.name();
+        return name.replace('_', ' ').toLowerCase();
+    }
+
+    /**
+     * READ_CREDENTIALS -> "Read credentials".
+     */
+    private static String operationLabel(Operation operation) {
+        String label = operation.name().replace('_', ' ').toLowerCase();
+        return Character.toUpperCase(label.charAt(0)) + label.substring(1);
     }
 
     /**
@@ -512,9 +563,8 @@ public class TbRbacAccessControlService implements AccessControlService {
         return value;
     }
 
-    private void permissionDenied() throws ThingsboardException {
-        throw new ThingsboardException(PERMISSION_DENIED_MESSAGE,
-                ThingsboardErrorCode.PERMISSION_DENIED);
+    private void permissionDenied(String message) throws ThingsboardException {
+        throw new ThingsboardException(message, ThingsboardErrorCode.PERMISSION_DENIED);
     }
 
     private record CacheEntry<T>(T value, long expiresAt) {

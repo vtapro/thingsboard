@@ -126,10 +126,14 @@ export class DialogService {
       }).afterClosed();
   }
 
-  private permissionDenied() {
+  /**
+   * Alert dialog for a denied operation. When the backend explains the reason (missing operation, entity of another
+   * owner, entity outside the granted entity groups) that reason is shown instead of the generic text.
+   */
+  permissionDenied(message?: string) {
     this.alert(
       this.translate.instant('access.permission-denied'),
-      this.translate.instant('access.permission-denied-text'),
+      message || this.translate.instant('access.permission-denied-text'),
       this.translate.instant('action.close')
     );
   }

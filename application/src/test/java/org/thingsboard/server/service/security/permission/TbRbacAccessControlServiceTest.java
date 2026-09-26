@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.thingsboard.server.common.data.asset.Asset;
+import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.id.AssetId;
 import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.TenantId;
@@ -28,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -208,6 +210,28 @@ public class TbRbacAccessControlServiceTest {
 
         assertThat(accessControlService.hasPermission(customerUser, Resource.ASSET, Operation.READ_CREDENTIALS,
                 childCustomerAsset.getId(), childCustomerAsset)).isFalse();
+    }
+
+    @Test
+    public void denialExplainsThatTheUserIsNotTheOwner() {
+        RbacRole role = role(grants("ASSET", "READ"), Map.of(), false);
+        role.setOwnOnly(Map.of("ASSET", true));
+        givenRole(tenantAdmin, role);
+
+        assertThatThrownBy(() -> accessControlService.checkPermission(tenantAdmin, Resource.ASSET, Operation.READ,
+                ownCustomerAsset.getId(), ownCustomerAsset))
+                .isInstanceOf(ThingsboardException.class)
+                .hasMessageContaining("not the owner");
+    }
+
+    @Test
+    public void denialExplainsWhichOperationIsMissing() {
+        givenRole(tenantAdmin, role(grants("ASSET", "READ"), Map.of(), false));
+
+        assertThatThrownBy(() -> accessControlService.checkPermission(tenantAdmin, Resource.ASSET, Operation.WRITE,
+                ownCustomerAsset.getId(), ownCustomerAsset))
+                .isInstanceOf(ThingsboardException.class)
+                .hasMessageContaining("Write");
     }
 
     private static RbacRole classicGroupScopedRole() {

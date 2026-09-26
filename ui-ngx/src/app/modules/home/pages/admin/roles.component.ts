@@ -104,8 +104,12 @@ export class RolesComponent extends PageComponent implements OnInit {
     {id: 'viewer', label: 'Viewer'},
     {id: 'operator', label: 'Operator'},
     {id: 'manager', label: 'Manager'},
+    {id: 'selfManaged', label: 'Self-managed'},
     {id: 'admin', label: 'Admin'}
   ];
+
+  /** Operations of the "Self-managed" preset: the user manages the entities created by him/herself. */
+  readonly selfManagedOperations = ['CREATE', 'READ', 'WRITE', 'DELETE'];
 
   /** Operations offered for an entity type (fallback: create/read/write/delete). */
   operationsFor(resource: string): string[] {
@@ -123,6 +127,14 @@ export class RolesComponent extends PageComponent implements OnInit {
     const available = this.operationsFor(resource);
     const wanted = this.presetOperations(presetId);
     const draft = this.permissionDraft[resource] || (this.permissionDraft[resource] = {});
+    if (presetId === 'selfManaged') {
+      // PE like "user manages the entities created by him/herself": the basic operations on own entities only.
+      for (const operation of available) {
+        draft[operation] = this.selfManagedOperations.includes(operation);
+      }
+      this.ownOnlyDraft[resource] = true;
+      return;
+    }
     for (const operation of available) {
       draft[operation] = wanted.includes(operation)
         || (presetId === 'operator' && operation.startsWith('READ'))
@@ -408,7 +420,10 @@ export class RolesComponent extends PageComponent implements OnInit {
     for (const resource of Object.keys(role.permissions || {})) {
       const operations = role.permissions[resource] || [];
       if (operations.length) {
-        chips.push({label: `${resource} · ${operations.join(', ')}`, scoped: false});
+        chips.push({
+          label: `${resource} · ${operations.join(', ')}${this.ownScopeSuffix(role, resource)}`,
+          scoped: false
+        });
       }
     }
     for (const resource of Object.keys(role.scopedPermissions || {})) {
@@ -421,7 +436,7 @@ export class RolesComponent extends PageComponent implements OnInit {
       operations.forEach(operation => (byOperation[operation] || []).forEach(id => groupIds.add(id)));
       chips.push({
         label: `${resource} · ${operations.join(', ')} · ${this.translate.instant('admin.roles-groups-count',
-          {count: groupIds.size})}`,
+          {count: groupIds.size})}${this.ownScopeSuffix(role, resource)}`,
         scoped: true
       });
     }
@@ -429,6 +444,13 @@ export class RolesComponent extends PageComponent implements OnInit {
       chips.push({label: this.translate.instant('admin.roles-own-customer-only'), scoped: true});
     }
     return chips;
+  }
+
+  /** Marks a permission chip when the role is limited to the entities created by the user itself. */
+  private ownScopeSuffix(role: RbacRole, resource: string): string {
+    return role.ownOnly && role.ownOnly[resource]
+      ? ' · ' + this.translate.instant('admin.roles-own-chip')
+      : '';
   }
 
   userLabel(user: TenantUserInfo): string {

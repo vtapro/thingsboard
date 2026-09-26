@@ -342,6 +342,8 @@
         "roles-scope-groups": "Scope to groups (optional)",
         "roles-presets": "Presets",
         "roles-own-only": "Only entities created by the user (owner)",
+        "roles-own-only-warning": "Warning: the user only sees the entities created by him/herself. Entities created by other users stay hidden and can not be read or changed.",
+        "roles-own-chip": "own entities",
         "roles-select-all": "All",
         "roles-clear-all": "None",
         "roles-permissions-hint": "Select the operations per entity type. Leave the scope empty to apply the operation to all entities of the tenant, or pick entity groups to limit it.",

@@ -240,6 +240,18 @@
   align-self: flex-start;
 }
 
+.tb-roles-own-warning {
+  align-self: flex-start;
+  max-width: 560px;
+  padding: 6px 10px;
+  border-left: 3px solid #d68b00;
+  border-radius: 4px;
+  background: rgba(214, 139, 0, .1);
+  color: rgba(0, 0, 0, .75);
+  font-size: 12px;
+  line-height: 18px;
+}
+
 .tb-roles-scope {
   width: 100%;
   min-width: 0;

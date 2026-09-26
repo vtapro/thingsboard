@@ -107,7 +107,12 @@ export class GlobalHttpInterceptor implements HttpInterceptor {
       }
     } else if (errorResponse.status === 403) {
       if (!ignoreErrors) {
-        this.dialogService.forbidden();
+        const message = this.permissionDeniedMessage(errorResponse);
+        if (message) {
+          this.dialogService.permissionDenied(message);
+        } else {
+          this.dialogService.forbidden();
+        }
       }
     } else if (errorResponse.status === 0 || errorResponse.status === -1) {
         this.showError('Unable to connect');
@@ -187,5 +192,22 @@ export class GlobalHttpInterceptor implements HttpInterceptor {
     setTimeout(() => {
       this.store.dispatch(new ActionNotificationShow({message: error, type: 'error'}));
     }, timeout);
+  }
+
+  /**
+   * The RBAC layer explains why an operation is denied (missing operation, entity of another owner, entity outside
+   * the granted entity groups). Such a 403 is shown in a dialog with that reason instead of the generic
+   * "Access Forbidden" one.
+   */
+  private permissionDeniedMessage(errorResponse: HttpErrorResponse): string {
+    const body = errorResponse.error;
+    let message: string = null;
+    if (typeof body === 'string') {
+      message = body;
+    } else if (body && typeof body.message === 'string') {
+      message = body.message;
+    }
+    message = message ? message.trim() : null;
+    return message && message.length ? message : null;
   }
 }
