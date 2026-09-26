@@ -140,6 +140,15 @@ export class RolesComponent extends PageComponent implements OnInit {
     this.permissionDraft[resource] = {};
   }
 
+  /** "Only my entities" flag of the entity type (owner scope). */
+  isOwnOnly(resource: string): boolean {
+    return !!this.ownOnlyDraft[resource];
+  }
+
+  toggleOwnOnly(resource: string): void {
+    this.ownOnlyDraft[resource] = !this.ownOnlyDraft[resource];
+  }
+
   private presetOperations(presetId: string): string[] {
     switch (presetId) {
       case 'viewer':
@@ -178,6 +187,7 @@ export class RolesComponent extends PageComponent implements OnInit {
    * Permissions of the role being created, per entity type (resource). Each entity type is edited in its own tab.
    */
   private permissionDraft: { [resource: string]: { [operation: string]: boolean } } = {};
+  private ownOnlyDraft: { [resource: string]: boolean } = {};
   private groupScopeDraft: { [resource: string]: string[] } = {};
   private loadedUserGroupIds: string[] = [];
 
@@ -247,6 +257,7 @@ export class RolesComponent extends PageComponent implements OnInit {
     this.nameControl.setValue('');
     this.ownCustomerOnlyControl.setValue(false);
     this.permissionDraft = {};
+    this.ownOnlyDraft = {};
     this.groupScopeDraft = {};
   }
 
