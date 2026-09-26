@@ -16,6 +16,10 @@ import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroup;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroupSettings;
 import org.thingsboard.server.common.data.rbac.RbacRole;
+import org.thingsboard.server.common.data.rbac.RbacShare;
+import org.thingsboard.server.common.data.rbac.RbacShareSettings;
+import org.thingsboard.server.common.data.rbac.RbacUserGroup;
+import org.thingsboard.server.common.data.rbac.RbacUserGroupSettings;
 import com.fasterxml.jackson.databind.node.TextNode;
 import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
@@ -25,6 +29,8 @@ import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.dao.device.DeviceService;
 import org.thingsboard.server.dao.asset.AssetService;
 import org.thingsboard.server.dao.entityview.EntityViewService;
+import org.thingsboard.server.dao.settings.ShareService;
+import org.thingsboard.server.dao.settings.UserGroupService;
 import org.thingsboard.server.dao.settings.EntityGroupService;
 import org.thingsboard.server.dao.settings.RoleService;
 import org.thingsboard.server.service.security.model.SecurityUser;
@@ -64,10 +70,12 @@ public class TbRbacAccessControlServiceTest {
     private final DeviceService deviceService = mock(DeviceService.class);
     private final AssetService assetService = mock(AssetService.class);
     private final EntityViewService entityViewService = mock(EntityViewService.class);
+    private final ShareService shareService = mock(ShareService.class);
+    private final UserGroupService userGroupService = mock(UserGroupService.class);
 
     private final TbRbacAccessControlService accessControlService = new TbRbacAccessControlService(
             defaultAccessControlService, roleService, entityGroupService, customerHierarchyService, attributesService,
-            deviceService, assetService, entityViewService);
+            deviceService, assetService, entityViewService, shareService, userGroupService);
 
     private SecurityUser customerUser;
     private SecurityUser tenantAdmin;
@@ -332,6 +340,61 @@ public class TbRbacAccessControlServiceTest {
 
     private boolean canOnDevice(Operation operation) throws Exception {
         return accessControlService.hasPermission(tenantAdmin, Resource.DEVICE, operation, device.getId(), device);
+    }
+
+    /**
+     * A share grants exactly the operations it lists, whatever the role of the user allows: VIEW (READ + the read
+     * auxiliary operations), CONTROL (+ RPC_CALL, write telemetry), FULL (+ write, delete).
+     */
+    @Test
+    public void shareGrantsTheOperationsOfItsLevel() throws Exception {
+        givenRole(tenantAdmin, role(grants("DEVICE", "READ"), Map.of(), false));
+        givenShare("USER", tenantAdmin.getId().getId().toString(),
+                List.of("READ", "READ_ATTRIBUTES", "READ_TELEMETRY"));
+
+        assertThat(canOnDevice(Operation.READ_ATTRIBUTES)).isTrue();
+        assertThat(canOnDevice(Operation.READ_TELEMETRY)).isTrue();
+        assertThat(canOnDevice(Operation.RPC_CALL)).isFalse();
+        assertThat(canOnDevice(Operation.WRITE_TELEMETRY)).isFalse();
+        assertThat(canOnDevice(Operation.WRITE)).isFalse();
+        assertThat(canOnDevice(Operation.READ_CREDENTIALS)).isFalse();
+    }
+
+    @Test
+    public void shareOfAnotherUserGrantsNothing() throws Exception {
+        givenRole(tenantAdmin, role(grants("DEVICE", "READ"), Map.of(), false));
+        givenShare("USER", UUID.randomUUID().toString(), List.of("READ", "RPC_CALL"));
+
+        assertThat(canOnDevice(Operation.RPC_CALL)).isFalse();
+    }
+
+    @Test
+    public void shareWithAUserGroupGrantsTheOperation() throws Exception {
+        givenRole(tenantAdmin, role(grants("DEVICE", "READ"), Map.of(), false));
+        RbacUserGroup group = new RbacUserGroup();
+        group.setId("user-group-1");
+        group.setUserIds(List.of(tenantAdmin.getId().getId().toString()));
+        RbacUserGroupSettings groupSettings = new RbacUserGroupSettings();
+        groupSettings.setGroups(List.of(group));
+        when(userGroupService.getUserGroupSettings(TENANT_ID)).thenReturn(groupSettings);
+        givenShare("USER_GROUP", "user-group-1", List.of("READ", "RPC_CALL"));
+
+        assertThat(canOnDevice(Operation.RPC_CALL)).isTrue();
+        // the group share grants RPC_CALL only, not the write operations
+        assertThat(canOnDevice(Operation.WRITE)).isFalse();
+    }
+
+    private void givenShare(String assigneeType, String assigneeId, List<String> operations) {
+        RbacShare share = new RbacShare();
+        share.setId("share-1");
+        share.setEntityType("DEVICE");
+        share.setEntityId(device.getId().getId().toString());
+        share.setAssigneeType(assigneeType);
+        share.setAssigneeId(assigneeId);
+        share.setOperations(operations);
+        RbacShareSettings settings = new RbacShareSettings();
+        settings.setShares(List.of(share));
+        when(shareService.getShareSettings(TENANT_ID)).thenReturn(settings);
     }
 
     private static RbacRole classicGroupScopedRole() {

@@ -15,6 +15,10 @@ import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroup;
 import org.thingsboard.server.common.data.rbac.RbacRole;
+import org.thingsboard.server.common.data.rbac.RbacShare;
+import org.thingsboard.server.common.data.rbac.RbacUserGroup;
+import org.thingsboard.server.dao.settings.ShareService;
+import org.thingsboard.server.dao.settings.UserGroupService;
 import org.thingsboard.server.dao.settings.CustomerHierarchyService;
 import org.thingsboard.server.dao.settings.EntityGroupService;
 import org.thingsboard.server.dao.settings.RoleService;
@@ -85,6 +89,8 @@ public class TbRbacAccessControlService implements AccessControlService {
     private final DeviceService deviceService;
     private final AssetService assetService;
     private final EntityViewService entityViewService;
+    private final ShareService shareService;
+    private final UserGroupService userGroupService;
 
     /**
      * Server attribute that remembers which user created an entity (see DeviceController.saveRbacOwner).
@@ -102,6 +108,8 @@ public class TbRbacAccessControlService implements AccessControlService {
 
     private final Map<String, CacheEntry<Optional<RbacRole>>> effectiveRoleCache = new ConcurrentHashMap<>();
     private final Map<TenantId, CacheEntry<Optional<List<RbacEntityGroup>>>> entityGroupCache = new ConcurrentHashMap<>();
+    private final Map<TenantId, CacheEntry<Optional<List<RbacShare>>>> shareCache = new ConcurrentHashMap<>();
+    private final Map<TenantId, CacheEntry<Optional<List<RbacUserGroup>>>> userGroupCache = new ConcurrentHashMap<>();
 
     @Override
     public boolean hasPermission(SecurityUser user, Resource resource, Operation operation) throws ThingsboardException {
@@ -121,6 +129,18 @@ public class TbRbacAccessControlService implements AccessControlService {
 
     @Override
     public Set<UUID> getAllowedEntityIds(SecurityUser user, Resource resource, Operation operation) {
+        Set<UUID> allowed = roleAllowedEntityIds(user, resource, operation);
+        Set<UUID> shared = getSharedEntityIds(user, resource, operation);
+        if (shared.isEmpty() || allowed == null) {
+            // null means "the role does not filter the list of this resource"
+            return allowed;
+        }
+        Set<UUID> result = new HashSet<>(allowed);
+        result.addAll(shared);
+        return result;
+    }
+
+    private Set<UUID> roleAllowedEntityIds(SecurityUser user, Resource resource, Operation operation) {
         RbacRole role = getEffectiveRole(user);
         if (role == null || !isResourceManagedByRole(role, resource)) {
             return null;
@@ -178,6 +198,10 @@ public class TbRbacAccessControlService implements AccessControlService {
     @Override
     public <I extends EntityId, T extends HasTenantId> boolean hasPermission(SecurityUser user, Resource resource, Operation operation,
                                                                             I entityId, T entity) throws ThingsboardException {
+        if (isSharedWith(user, entityId, operation)) {
+            // an explicit share configured by the tenant administrator grants the operation to the user
+            return true;
+        }
         RbacRole role = getEffectiveRole(user);
         if (role == null || !isResourceManagedByRole(role, resource)) {
             return defaultAccessControlService.hasPermission(user, resource, operation, entityId, entity);
@@ -561,6 +585,104 @@ public class TbRbacAccessControlService implements AccessControlService {
         return cached(entityGroupCache, tenantId,
                 () -> Optional.ofNullable(entityGroupService.getEntityGroupSettings(tenantId).getGroups()))
                 .orElse(List.of());
+    }
+
+    private List<RbacShare> getShares(TenantId tenantId) {
+        return cached(shareCache, tenantId, () -> {
+            var settings = shareService.getShareSettings(tenantId);
+            return Optional.ofNullable(settings == null ? null : settings.getShares());
+        }).orElse(List.of());
+    }
+
+    private List<RbacUserGroup> getUserGroups(TenantId tenantId) {
+        return cached(userGroupCache, tenantId, () -> {
+            var settings = userGroupService.getUserGroupSettings(tenantId);
+            return Optional.ofNullable(settings == null ? null : settings.getGroups());
+        }).orElse(List.of());
+    }
+
+    private Set<String> getUserGroupIds(SecurityUser user) {
+        String userId = user.getId().getId().toString();
+        Set<String> ids = new HashSet<>();
+        for (RbacUserGroup group : getUserGroups(user.getTenantId())) {
+            if (group.getUserIds() != null && group.getUserIds().contains(userId)) {
+                ids.add(group.getId());
+            }
+        }
+        return ids;
+    }
+
+    /**
+     * True when one of the shares of the tenant grants the operation on this entity to the user or to a user group
+     * the user belongs to. The shares are configured by the tenant administrator only (see ShareController).
+     */
+    private boolean isSharedWith(SecurityUser user, EntityId entityId, Operation operation) {
+        if (user == null || user.getId() == null || entityId == null || entityId.getId() == null) {
+            return false;
+        }
+        String assignee = user.getId().getId().toString();
+        String entityType = entityId.getEntityType().name();
+        String entity = entityId.getId().toString();
+        Set<String> userGroupIds = null;
+        for (RbacShare share : getShares(user.getTenantId())) {
+            if (!entityType.equals(share.getEntityType()) || !entity.equals(share.getEntityId())
+                    || share.getOperations() == null || !share.getOperations().contains(operation.name())) {
+                continue;
+            }
+            if ("USER".equals(share.getAssigneeType())) {
+                if (assignee.equals(share.getAssigneeId())) {
+                    return true;
+                }
+            } else if ("USER_GROUP".equals(share.getAssigneeType())) {
+                if (userGroupIds == null) {
+                    userGroupIds = getUserGroupIds(user);
+                }
+                if (userGroupIds.contains(share.getAssigneeId())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Ids of the entities of the resource that are shared with the user with this operation, used to union the list
+     * pages of a user with a role that does not cover the shared entities.
+     */
+    private Set<UUID> getSharedEntityIds(SecurityUser user, Resource resource, Operation operation) {
+        Set<UUID> ids = new HashSet<>();
+        if (user == null || user.getId() == null) {
+            return ids;
+        }
+        String assignee = user.getId().getId().toString();
+        String entityType = resource.name();
+        Set<String> userGroupIds = null;
+        for (RbacShare share : getShares(user.getTenantId())) {
+            if (!entityType.equals(share.getEntityType()) || share.getOperations() == null
+                    || !share.getOperations().contains(operation.name())) {
+                continue;
+            }
+            boolean forUser;
+            if ("USER".equals(share.getAssigneeType())) {
+                forUser = assignee.equals(share.getAssigneeId());
+            } else if ("USER_GROUP".equals(share.getAssigneeType())) {
+                if (userGroupIds == null) {
+                    userGroupIds = getUserGroupIds(user);
+                }
+                forUser = userGroupIds.contains(share.getAssigneeId());
+            } else {
+                forUser = false;
+            }
+            if (forUser) {
+                try {
+                    ids.add(UUID.fromString(share.getEntityId()));
+                } catch (IllegalArgumentException e) {
+                    log.warn("[{}] Invalid entity id in the share {}: {}", user.getTenantId(), share.getId(),
+                            share.getEntityId());
+                }
+            }
+        }
+        return ids;
     }
 
     /**
