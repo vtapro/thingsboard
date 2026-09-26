@@ -18,6 +18,8 @@ import { AttributeScope, LatestTelemetry } from '@shared/models/telemetry/teleme
 import { NULL_UUID } from '@shared/models/id/has-uuid';
 import { UntypedFormGroup } from '@angular/forms';
 import { PageLink } from '@shared/models/page/page-link';
+import { hasRbacPermission } from '@core/services/rbac-permissions';
+import { EntityId } from '@shared/models/id/entity-id';
 
 @Directive()
 // eslint-disable-next-line @angular-eslint/directive-class-suffix
@@ -68,6 +70,23 @@ export abstract class EntityTabsComponent<T extends BaseData<HasId>,
 
   get entity(): T {
     return this.entityValue;
+  }
+
+  /**
+   * A detailed custom role may deny the attributes/telemetry of an entity type: the tab is not offered then,
+   * otherwise the WEB UI would call an API that answers 403.
+   */
+  get canReadAttributes(): boolean {
+    return hasRbacPermission(this.entityResource(), 'READ_ATTRIBUTES');
+  }
+
+  get canReadTelemetry(): boolean {
+    return hasRbacPermission(this.entityResource(), 'READ_TELEMETRY');
+  }
+
+  private entityResource(): string {
+    const entityId = this.entity?.id as EntityId;
+    return entityId ? entityId.entityType : null;
   }
 
   @Input()

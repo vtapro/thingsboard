@@ -5,26 +5,30 @@
 
 -->
 @if (entity) {
-  <mat-tab
-    label="{{ 'attribute.attributes' | translate }}" #attributesTab="matTab">
-    <tb-attribute-table [defaultAttributeScope]="attributeScopes.CLIENT_SCOPE"
-                        [active]="attributesTab.isActive"
-                        [entityId]="entity.id"
-                        [entityName]="entity.name">
-    </tb-attribute-table>
-  </mat-tab>
+    @if (canReadAttributes) {
+    <mat-tab
+        label="{{ 'attribute.attributes' | translate }}" #attributesTab="matTab">
+        <tb-attribute-table [defaultAttributeScope]="attributeScopes.CLIENT_SCOPE"
+                            [active]="attributesTab.isActive"
+                            [entityId]="entity.id"
+                            [entityName]="entity.name">
+        </tb-attribute-table>
+      </mat-tab>
+  }
 }
 @if (entity) {
-  <mat-tab
-    label="{{ 'attribute.latest-telemetry' | translate }}" #telemetryTab="matTab">
-    <tb-attribute-table [defaultAttributeScope]="latestTelemetryTypes.LATEST_TELEMETRY"
-                        disableAttributeScopeSelection
-                        disableAddTelemetry
-                        [active]="telemetryTab.isActive"
-                        [entityId]="entity.id"
-                        [entityName]="entity.name">
-    </tb-attribute-table>
-  </mat-tab>
+    @if (canReadTelemetry) {
+    <mat-tab
+        label="{{ 'attribute.latest-telemetry' | translate }}" #telemetryTab="matTab">
+        <tb-attribute-table [defaultAttributeScope]="latestTelemetryTypes.LATEST_TELEMETRY"
+                            disableAttributeScopeSelection
+                            disableAddTelemetry
+                            [active]="telemetryTab.isActive"
+                            [entityId]="entity.id"
+                            [entityName]="entity.name">
+        </tb-attribute-table>
+      </mat-tab>
+  }
 }
 @if (entity) {
   <mat-tab

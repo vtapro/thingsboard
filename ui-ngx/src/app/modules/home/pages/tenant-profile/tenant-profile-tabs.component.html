@@ -5,21 +5,25 @@
 
 -->
 @if (entity) {
-  <mat-tab label="{{ 'attribute.attributes' | translate }}" #attributesTab="matTab">
-    <tb-attribute-table [defaultAttributeScope]="attributeScopes.SERVER_SCOPE"
-                        [active]="attributesTab.isActive"
-                        [entityId]="entity.id"
-                        [entityName]="entity.name">
-    </tb-attribute-table>
-  </mat-tab>
-  <mat-tab label="{{ 'attribute.latest-telemetry' | translate }}" #telemetryTab="matTab">
-    <tb-attribute-table [defaultAttributeScope]="latestTelemetryTypes.LATEST_TELEMETRY"
-                        disableAttributeScopeSelection
-                        [active]="telemetryTab.isActive"
-                        [entityId]="entity.id"
-                        [entityName]="entity.name">
-    </tb-attribute-table>
-  </mat-tab>
+    @if (canReadAttributes) {
+    <mat-tab label="{{ 'attribute.attributes' | translate }}" #attributesTab="matTab">
+        <tb-attribute-table [defaultAttributeScope]="attributeScopes.SERVER_SCOPE"
+                            [active]="attributesTab.isActive"
+                            [entityId]="entity.id"
+                            [entityName]="entity.name">
+        </tb-attribute-table>
+      </mat-tab>
+  }
+    @if (canReadTelemetry) {
+    <mat-tab label="{{ 'attribute.latest-telemetry' | translate }}" #telemetryTab="matTab">
+        <tb-attribute-table [defaultAttributeScope]="latestTelemetryTypes.LATEST_TELEMETRY"
+                            disableAttributeScopeSelection
+                            [active]="telemetryTab.isActive"
+                            [entityId]="entity.id"
+                            [entityName]="entity.name">
+        </tb-attribute-table>
+      </mat-tab>
+  }
   @if (!isEdit) {
     @if (authUser.authority === authorities.TENANT_ADMIN) {
       <mat-tab #auditLogsTab="matTab"
