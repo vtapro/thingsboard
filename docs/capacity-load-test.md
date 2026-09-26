@@ -123,12 +123,13 @@ Nút cổ chai theo thứ tự tác động:
    (chỉ còn topic thật + topic của pod đang chạy), consumer group mồ côi cũng bị xoá.
 4. ✅ `TB_TRANSPORT_SESSIONS_INACTIVITY_TIMEOUT` (600000 ms) và `DEFAULT_INACTIVITY_TIMEOUT` (600 s)
    đã đồng bộ sẵn theo mặc định — ghi chú lại trong `01-config.yaml`.
-5. ✅ Bật Prometheus + Alertmanager + Grafana (`deploy/monitoring/`, hướng dẫn ở
-   [monitoring.md](monitoring.md)) với 6 alert: service down, JVM heap, CPU node, RAM node, pod
-   restart, lỗi 5xx. Alert theo Kafka lag / log timeout cần JMX exporter / Loki → Phase 1.
+5. ✅ Stack Prometheus + Alertmanager + Grafana (namespace `monitoring`) đã được **gỡ khỏi cụm và khỏi repo**
+   (2026-09-26). ThingsBoard vẫn expose `/actuator/prometheus`
+   (`METRICS_ENDPOINTS_EXPOSE: info,health,prometheus` trong `deploy/k3s/01-config.yaml`) nên chỉ cần trỏ một
+   Prometheus/Grafana **bên ngoài cụm** vào endpoint đó khi cần. Alert theo Kafka lag / log timeout cần
+   JMX exporter / Loki → Phase 1.
 
-Việc còn lại của Phase 0: đổi receiver Alertmanager sang Slack/Teams/email thật (xem
-[monitoring.md](monitoring.md) §5).
+Việc còn lại của Phase 0: dựng monitoring ngoài cụm (hoặc dịch vụ SaaS) nếu cần — repo không còn manifest.
 
 ### Phase 1 — thêm node trong cụm (mục tiêu 3.000–5.000 thiết bị × 1 msg/s)
 

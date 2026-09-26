@@ -569,8 +569,9 @@ Ba việc phải làm sau khi deploy:
 - **Cassandra**: RF=3, repair định kỳ, không để dung lượng vượt 50% mỗi node.
 - **Backup**: `pg_dump`/PITR cho PostgreSQL (chứa cả white labeling + RBAC trong `admin_settings`)
   và snapshot Cassandra cho telemetry.
-- **Monitoring**: bật `METRICS_ENABLED=true`, scrape `/actuator/prometheus` của mọi service; import
-  dashboard Grafana của ThingsBoard (`docker/monitoring` trong repo là bản tham chiếu).
+- **Monitoring**: bật `METRICS_ENABLED=true`, scrape `/actuator/prometheus` của mọi service (đã bật sẵn trong
+  `deploy/k3s/01-config.yaml`); dùng Prometheus/Grafana **bên ngoài cụm** — repo không còn manifest monitoring
+  (stack trong namespace `monitoring` đã được gỡ).
 - **TLS**: kết thúc TLS ở Ingress/ LB; MQTT nên có LB riêng (TCP passthrough) hoặc bật SSL trong
   transport (`SSL_ENABLED`, `SSL_*`).
 
