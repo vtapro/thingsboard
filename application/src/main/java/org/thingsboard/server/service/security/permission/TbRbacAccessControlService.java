@@ -192,7 +192,13 @@ public class TbRbacAccessControlService implements AccessControlService {
         if (isOwnOnlyResource(role, resource) && entityId != null && !isEntityOwner(user, entity)) {
             return false;
         }
-        return hasOperationGrant(user.getTenantId(), role, resource, operation, entityId);
+        // The detailed matrix is enforced here as well: the role has to grant the operation (or derive it from the
+        // basic operations when it is a "classic" role), otherwise only the entity-less checks would be strict.
+        Operation effective = resolveOperation(role, resource, operation);
+        if (effective == null) {
+            return false;
+        }
+        return hasOperationGrant(user.getTenantId(), role, resource, effective, entityId);
     }
 
     /**
@@ -383,7 +389,9 @@ public class TbRbacAccessControlService implements AccessControlService {
         if (defaultAccessControlService.hasPermission(user, resource, operation, entityId, entity)) {
             return true;
         }
-        if (!role.isOwnCustomerOnly() || !hasOperationGrant(user.getTenantId(), role, resource, operation, entityId)) {
+        Operation effective = resolveOperation(role, resource, operation);
+        if (!role.isOwnCustomerOnly() || effective == null
+                || !hasOperationGrant(user.getTenantId(), role, resource, effective, entityId)) {
             return false;
         }
         return userBelongsToCustomerSubtree(user, entity);
@@ -504,14 +512,15 @@ public class TbRbacAccessControlService implements AccessControlService {
 
     /**
      * The role grants the operation when the operation is granted globally, or when the operation is granted
-     * on one of the entity groups the entity belongs to.
+     * on one of the entity groups the entity belongs to. The caller passes the operation resolved by
+     * {@link #resolveOperation(RbacRole, Resource, Operation)}, so the auxiliary operations are already mapped to the
+     * operation that the role has to contain.
      */
     private boolean hasOperationGrant(TenantId tenantId, RbacRole role, Resource resource, Operation operation, EntityId entityId) {
-        Operation grantedOperation = grantedOperation(operation);
-        if (hasGlobalOperation(role, resource, grantedOperation)) {
+        if (hasGlobalOperation(role, resource, operation)) {
             return true;
         }
-        List<String> scopedGroups = getScopedGroups(role, resource, grantedOperation);
+        List<String> scopedGroups = getScopedGroups(role, resource, operation);
         return entityId != null && scopedGroups != null && !scopedGroups.isEmpty()
                 && entityBelongsToGroups(tenantId, entityId, scopedGroups);
     }

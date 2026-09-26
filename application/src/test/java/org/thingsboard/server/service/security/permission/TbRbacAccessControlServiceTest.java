@@ -6,6 +6,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.thingsboard.server.common.data.asset.Asset;
+import org.thingsboard.server.common.data.Device;
+import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.id.AssetId;
 import org.thingsboard.server.common.data.id.CustomerId;
@@ -72,6 +74,7 @@ public class TbRbacAccessControlServiceTest {
     private Asset ownCustomerAsset;
     private Asset childCustomerAsset;
     private Asset otherCustomerAsset;
+    private Device device;
 
     @BeforeEach
     public void setUp() {
@@ -80,6 +83,7 @@ public class TbRbacAccessControlServiceTest {
         ownCustomerAsset = asset(TENANT_ID, CUSTOMER_ID);
         childCustomerAsset = asset(TENANT_ID, CHILD_CUSTOMER_ID);
         otherCustomerAsset = asset(TENANT_ID, OTHER_CUSTOMER_ID);
+        device = device(TENANT_ID, CUSTOMER_ID);
         Mockito.reset(defaultAccessControlService, roleService, entityGroupService, customerHierarchyService);
     }
 
@@ -262,6 +266,74 @@ public class TbRbacAccessControlServiceTest {
                 .containsExactly(ownedAsset.getId().getId());
     }
 
+    /**
+     * The presets of the WEB UI (roles.component.ts, applyPreset) must keep their documented behaviour. Credentials
+     * are never part of a preset: the administrator has to tick them on purpose.
+     */
+    @Test
+    public void viewerPresetOnlyReadsTheDeviceAndItsData() throws Exception {
+        givenRole(tenantAdmin, role(grants("DEVICE", "READ"), Map.of(), false));
+
+        assertThat(canOnDevice(Operation.READ)).isTrue();
+        assertThat(canOnDevice(Operation.READ_ATTRIBUTES)).isTrue();
+        assertThat(canOnDevice(Operation.READ_TELEMETRY)).isTrue();
+        assertThat(canOnDevice(Operation.WRITE)).isFalse();
+        assertThat(canOnDevice(Operation.DELETE)).isFalse();
+        assertThat(canOnDevice(Operation.READ_CREDENTIALS)).isFalse();
+        assertThat(canOnDevice(Operation.RPC_CALL)).isFalse();
+    }
+
+    @Test
+    public void operatorPresetControlsTheDeviceWithoutCredentials() throws Exception {
+        givenRole(tenantAdmin, role(grants("DEVICE", "READ", "READ_ATTRIBUTES", "READ_TELEMETRY",
+                "WRITE_TELEMETRY", "RPC_CALL"), Map.of(), false));
+
+        assertThat(canOnDevice(Operation.READ_TELEMETRY)).isTrue();
+        assertThat(canOnDevice(Operation.WRITE_TELEMETRY)).isTrue();
+        assertThat(canOnDevice(Operation.RPC_CALL)).isTrue();
+        assertThat(canOnDevice(Operation.READ_CREDENTIALS)).isFalse();
+        assertThat(canOnDevice(Operation.CREATE)).isFalse();
+        assertThat(canOnDevice(Operation.WRITE)).isFalse();
+    }
+
+    @Test
+    public void managerPresetManagesTheDeviceAndItsData() throws Exception {
+        givenRole(tenantAdmin, role(grants("DEVICE", "CREATE", "READ", "WRITE", "DELETE", "READ_ATTRIBUTES",
+                "READ_TELEMETRY", "WRITE_ATTRIBUTES", "WRITE_TELEMETRY", "RPC_CALL", "CLAIM_DEVICES",
+                "ASSIGN_TO_CUSTOMER"), Map.of(), false));
+
+        assertThat(canOnDevice(Operation.CREATE)).isTrue();
+        assertThat(canOnDevice(Operation.WRITE)).isTrue();
+        assertThat(canOnDevice(Operation.DELETE)).isTrue();
+        assertThat(canOnDevice(Operation.WRITE_ATTRIBUTES)).isTrue();
+        assertThat(canOnDevice(Operation.RPC_CALL)).isTrue();
+        assertThat(canOnDevice(Operation.READ_CREDENTIALS)).isFalse();
+        assertThat(canOnDevice(Operation.WRITE_CREDENTIALS)).isFalse();
+    }
+
+    @Test
+    public void selfManagedPresetIsLimitedToTheOwnedDevice() throws Exception {
+        Device ownedDevice = device(TENANT_ID, CUSTOMER_ID);
+        ownedDevice.setAdditionalInfoField("rbacOwnerId", TextNode.valueOf(tenantAdmin.getId().getId().toString()));
+        RbacRole role = role(grants("DEVICE", "CREATE", "READ", "WRITE", "DELETE"), Map.of(), false);
+        role.setOwnOnly(Map.of("DEVICE", true));
+        givenRole(tenantAdmin, role);
+
+        assertThat(accessControlService.hasPermission(tenantAdmin, Resource.DEVICE, Operation.READ,
+                ownedDevice.getId(), ownedDevice)).isTrue();
+        assertThat(accessControlService.hasPermission(tenantAdmin, Resource.DEVICE, Operation.READ,
+                device.getId(), device)).isFalse();
+        // basic operations still imply the auxiliary read operations
+        assertThat(accessControlService.hasPermission(tenantAdmin, Resource.DEVICE, Operation.READ_TELEMETRY,
+                ownedDevice.getId(), ownedDevice)).isTrue();
+        assertThat(accessControlService.hasPermission(tenantAdmin, Resource.DEVICE, Operation.READ_CREDENTIALS,
+                ownedDevice.getId(), ownedDevice)).isFalse();
+    }
+
+    private boolean canOnDevice(Operation operation) throws Exception {
+        return accessControlService.hasPermission(tenantAdmin, Resource.DEVICE, operation, device.getId(), device);
+    }
+
     private static RbacRole classicGroupScopedRole() {
         return role(Map.of(), Map.of("ASSET", Map.of(
                 "CREATE", List.of("group-1"),
@@ -318,6 +390,18 @@ public class TbRbacAccessControlServiceTest {
 
     private static Map<String, List<String>> grants(String resource, String operation) {
         return Map.of(resource, List.of(operation));
+    }
+
+    private static Map<String, List<String>> grants(String resource, String... operations) {
+        return Map.of(resource, List.of(operations));
+    }
+
+    private static Device device(TenantId tenantId, CustomerId customerId) {
+        Device device = new Device(new DeviceId(UUID.randomUUID()));
+        device.setTenantId(tenantId);
+        device.setCustomerId(customerId);
+        device.setName("device-" + device.getId().getId());
+        return device;
     }
 
 }

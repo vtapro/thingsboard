@@ -136,9 +136,11 @@ export class RolesComponent extends PageComponent implements OnInit {
       return;
     }
     for (const operation of available) {
+      // credentials are sensitive: the presets never grant them, the administrator has to tick them on purpose
+      const readAuxiliary = operation.startsWith('READ') && !operation.endsWith('CREDENTIALS');
       draft[operation] = wanted.includes(operation)
-        || (presetId === 'operator' && operation.startsWith('READ'))
-        || (presetId === 'manager' && (operation.startsWith('READ') || operation === 'WRITE_TELEMETRY'));
+        || (presetId === 'operator' && readAuxiliary)
+        || (presetId === 'manager' && (readAuxiliary || operation === 'WRITE_TELEMETRY'));
     }
   }
 
