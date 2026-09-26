@@ -11,6 +11,10 @@ import { ActionNotificationShow } from '@core/notification/notification.actions'
 import { TranslateService } from '@ngx-translate/core';
 import { AssetInfo } from '@app/shared/models/asset.models';
 import { EntityTableConfig } from '@home/models/entity/entities-table-config.models';
+import { MatDialog } from '@angular/material/dialog';
+import { getCurrentAuthUser } from '@core/auth/auth.selectors';
+import { Authority } from '@shared/models/authority.enum';
+import { EntityShareDialogComponent } from '@home/components/entity/entity-share-dialog.component';
 
 @Component({
     selector: 'tb-asset',
@@ -29,8 +33,21 @@ export class AssetComponent extends EntityComponent<AssetInfo> {
               @Inject('entity') protected entityValue: AssetInfo,
               @Inject('entitiesTableConfig') protected entitiesTableConfigValue: EntityTableConfig<AssetInfo>,
               public fb: UntypedFormBuilder,
-              protected cd: ChangeDetectorRef) {
+              protected cd: ChangeDetectorRef,
+              private dialog: MatDialog) {
     super(store, fb, entityValue, entitiesTableConfigValue, cd);
+  }
+
+  /** Only the tenant administrator may share an entity (the API requires TENANT_ADMIN). */
+  get canShareEntity(): boolean {
+    return getCurrentAuthUser(this.store)?.authority === Authority.TENANT_ADMIN;
+  }
+
+  openShareDialog(): void {
+    this.dialog.open(EntityShareDialogComponent, {
+      data: {entityType: 'ASSET', entityId: this.entity.id.id},
+      width: '600px'
+    });
   }
 
   ngOnInit() {

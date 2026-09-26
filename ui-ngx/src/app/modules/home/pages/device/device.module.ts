@@ -4,7 +4,6 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SharedModule } from '@shared/shared.module';
 import { DeviceComponent } from '@modules/home/pages/device/device.component';
-import { EntityShareDialogComponent } from '@home/components/entity/entity-share-dialog.component';
 import { DeviceRoutingModule } from './device-routing.module';
 import { DeviceTableHeaderComponent } from '@modules/home/pages/device/device-table-header.component';
 import { DeviceCredentialsDialogComponent } from '@modules/home/pages/device/device-credentials-dialog.component';
@@ -36,7 +35,6 @@ import { DeviceCheckConnectivityDialogComponent } from './device-check-connectiv
     DeviceTransportConfigurationComponent,
     DeviceDataComponent,
     DeviceComponent,
-    EntityShareDialogComponent,
     DeviceTabsComponent,
     DeviceTableHeaderComponent,
     DeviceCredentialsDialogComponent,

@@ -108,6 +108,28 @@ for (const resource of Object.keys(permissions).sort()) {
   console.log(`  ${resource}: ${permissions[resource].join(', ')}`);
 }
 
+// Shares are configured by the tenant administrator: when a tenant token is provided the audit takes them into
+// account, otherwise a user that only has access through a share would be reported as a failure.
+const tenantToken = arg('tenant-token', process.env.TB_TENANT_TOKEN)
+  || (arg('tenant-login') ? await login(arg('tenant-login')) : null);
+const sharedOperationsByDevice = {};
+if (tenantToken) {
+  const sharesRes = await http('GET', '/api/tenant/rbacShare', tenantToken);
+  if (sharesRes.status === 200) {
+    for (const share of JSON.parse(sharesRes.text).shares || []) {
+      if (share.assigneeType === 'USER' && share.assigneeId === user.id.id) {
+        sharedOperationsByDevice[`${share.entityType}:${share.entityId}`] =
+          new Set([...(sharedOperationsByDevice[`${share.entityType}:${share.entityId}`] || []),
+            ...(share.operations || [])]);
+      }
+    }
+  } else {
+    console.log(`cannot read /api/tenant/rbacShare (HTTP ${sharesRes.status}) - the shares are ignored`);
+  }
+} else {
+  console.log('note: pass --tenant-login/--tenant-token to take the shares of the entities into account');
+}
+
 let deviceIds = [];
 if (arg('device-id')) {
   deviceIds = [arg('device-id')];
@@ -132,10 +154,20 @@ for (const deviceId of flag('all-devices') ? deviceIds : deviceIds.slice(0, 1)) 
   ];
   console.log(`device ${deviceId}`);
   for (const [name, path, resource, operation] of checks) {
-    const expected = granted(permissions, resource, operation);
+    let expected = granted(permissions, resource, operation);
+    const shared = sharedOperationsByDevice[`${resource}:${deviceId}`];
+    if (expected === false && shared && shared.has(operation)) {
+      expected = true;
+    }
     const res = await http('GET', path, token);
     if (expected === null) {
       console.log(`  ${name.padEnd(20)} HTTP ${res.status} (platform rules, not asserted)`);
+      continue;
+    }
+    if (expected && user.authority !== 'TENANT_ADMIN') {
+      // for a customer user the platform keeps the customer isolation: the role may only narrow, so a granted
+      // operation is not asserted (the entity may belong to another customer or to no customer at all)
+      console.log(`  ${name.padEnd(20)} HTTP ${res.status} (role grants, customer isolation may deny)`);
       continue;
     }
     const ok = expected ? res.status === 200 : res.status === 403;

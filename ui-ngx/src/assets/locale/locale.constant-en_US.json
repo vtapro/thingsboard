@@ -2389,6 +2389,7 @@
     },
     "share": {
         "title": "Share entity",
+        "button": "Share",
         "hint": "The share grants the selected access on this entity even when the role of the user does not allow it.",
         "level": "Access level",
         "none": "No access",

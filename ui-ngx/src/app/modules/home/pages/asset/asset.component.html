@@ -41,6 +41,12 @@
           [class.!hidden]="hideDelete() || isEdit">
     {{'asset.delete' | translate }}
   </button>
+  <button mat-stroked-button color="primary"
+          [disabled]="(isLoading$ | async)"
+          (click)="openShareDialog()"
+          [class.!hidden]="isEdit || !canShareEntity">
+    {{ 'share.button' | translate }}
+  </button>
   <div class="flex flex-row xs:flex-col">
     <button mat-stroked-button
             ngxClipboard

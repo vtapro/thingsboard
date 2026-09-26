@@ -14,6 +14,10 @@ import { Observable } from 'rxjs';
 import { DataKeyType } from '@shared/models/telemetry/telemetry.models';
 import { EntityId } from '@app/shared/models/id/entity-id';
 import { EntityTableConfig } from '@home/models/entity/entities-table-config.models';
+import { MatDialog } from '@angular/material/dialog';
+import { getCurrentAuthUser } from '@core/auth/auth.selectors';
+import { Authority } from '@shared/models/authority.enum';
+import { EntityShareDialogComponent } from '@home/components/entity/entity-share-dialog.component';
 
 @Component({
     selector: 'tb-entity-view',
@@ -41,8 +45,21 @@ export class EntityViewComponent extends EntityComponent<EntityViewInfo> {
               @Inject('entity') protected entityValue: EntityViewInfo,
               @Inject('entitiesTableConfig') protected entitiesTableConfigValue: EntityTableConfig<EntityViewInfo>,
               public fb: UntypedFormBuilder,
-              protected cd: ChangeDetectorRef) {
+              protected cd: ChangeDetectorRef,
+              private dialog: MatDialog) {
     super(store, fb, entityValue, entitiesTableConfigValue, cd);
+  }
+
+  /** Only the tenant administrator may share an entity (the API requires TENANT_ADMIN). */
+  get canShareEntity(): boolean {
+    return getCurrentAuthUser(this.store)?.authority === Authority.TENANT_ADMIN;
+  }
+
+  openShareDialog(): void {
+    this.dialog.open(EntityShareDialogComponent, {
+      data: {entityType: 'ENTITY_VIEW', entityId: this.entity.id.id},
+      width: '600px'
+    });
   }
 
   ngOnInit() {
