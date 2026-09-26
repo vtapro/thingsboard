@@ -252,6 +252,7 @@ export class RolesComponent extends PageComponent implements OnInit {
       permissions,
       scopedPermissions,
       userIds: [],
+      ownOnly: Object.fromEntries(Object.entries(this.ownOnlyDraft).filter(e => e[1])),
       ownCustomerOnly: !!this.ownCustomerOnlyControl.value
     }];
     this.nameControl.setValue('');
