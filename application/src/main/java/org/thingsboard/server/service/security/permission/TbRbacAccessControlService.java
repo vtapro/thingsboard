@@ -18,6 +18,7 @@ import org.thingsboard.server.common.data.rbac.RbacRole;
 import org.thingsboard.server.dao.settings.CustomerHierarchyService;
 import org.thingsboard.server.dao.settings.EntityGroupService;
 import org.thingsboard.server.dao.settings.RoleService;
+import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
 import java.util.List;
@@ -69,6 +70,7 @@ public class TbRbacAccessControlService implements AccessControlService {
     private final RoleService roleService;
     private final EntityGroupService entityGroupService;
     private final CustomerHierarchyService customerHierarchyService;
+    private final AttributesService attributesService;
 
     private final Map<String, CacheEntry<Optional<RbacRole>>> effectiveRoleCache = new ConcurrentHashMap<>();
     private final Map<TenantId, CacheEntry<Optional<List<RbacEntityGroup>>>> entityGroupCache = new ConcurrentHashMap<>();

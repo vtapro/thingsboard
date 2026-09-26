@@ -13,6 +13,15 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.thingsboard.server.common.data.kv.AttributeKvEntry;
+import org.thingsboard.server.common.data.kv.BaseAttributeKvEntry;
+import org.thingsboard.server.common.data.kv.StringDataEntry;
+import org.thingsboard.server.common.data.kv.AttributeKvEntry;
+import org.thingsboard.server.common.data.query.EntityDataSortOrder;
+import org.thingsboard.server.common.data.security.Authority;
+import org.thingsboard.server.common.data.AttributeScope;
+import org.thingsboard.server.dao.attributes.AttributesService;
+import org.thingsboard.server.service.security.model.SecurityUser;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -128,6 +137,7 @@ public class DeviceController extends BaseController {
     private final DeviceBulkImportService deviceBulkImportService;
 
     private final TbDeviceService tbDeviceService;
+    private final AttributesService attributesService;
 
     @ApiOperation(value = "Get Device (getDeviceById)",
             notes = "Fetch the Device object based on the provided Device Id. " +
@@ -187,7 +197,34 @@ public class DeviceController extends BaseController {
         } else {
             checkEntity(null, device, Resource.DEVICE);
         }
-        return tbDeviceService.save(device, accessToken, new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
+        boolean isNewDevice = device.getId() == null;
+        Device savedDevice = tbDeviceService.save(device, accessToken,
+                new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
+        if (isNewDevice && savedDevice != null) {
+            saveRbacOwner(savedDevice);
+        }
+        return savedDevice;
+    }
+
+    /**
+     * Remembers which user created the device (server attribute "rbacOwnerId"), so that a role with the
+     * "only entities created by the user" flag can be scoped to the devices of its own users.
+     * Tenant/System administrators create shared devices and therefore do not set an owner.
+     */
+    private void saveRbacOwner(Device savedDevice) throws ThingsboardException {
+        SecurityUser user = getCurrentUser();
+        if (user == null || user.getId() == null || user.getAuthority() == Authority.SYS_ADMIN
+                || user.getAuthority() == Authority.TENANT_ADMIN) {
+            return;
+        }
+        try {
+            AttributeKvEntry owner = new BaseAttributeKvEntry(
+                    new StringDataEntry("rbacOwnerId", user.getId().getId().toString()),
+                    System.currentTimeMillis());
+            attributesService.save(user.getTenantId(), savedDevice.getId(), AttributeScope.SERVER_SCOPE, owner);
+        } catch (Exception e) {
+            log.warn("[{}] Failed to store the owner of the device {}", user.getTenantId(), savedDevice.getId(), e);
+        }
     }
 
     @ApiOperation(value = "Create Device (saveDevice) with credentials ",

@@ -15,6 +15,7 @@ import org.thingsboard.server.common.data.rbac.RbacEntityGroupSettings;
 import org.thingsboard.server.common.data.rbac.RbacRole;
 import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.dao.settings.CustomerHierarchyService;
+import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.dao.settings.EntityGroupService;
 import org.thingsboard.server.dao.settings.RoleService;
 import org.thingsboard.server.service.security.model.SecurityUser;
@@ -49,9 +50,10 @@ public class TbRbacAccessControlServiceTest {
     private final RoleService roleService = mock(RoleService.class);
     private final EntityGroupService entityGroupService = mock(EntityGroupService.class);
     private final CustomerHierarchyService customerHierarchyService = mock(CustomerHierarchyService.class);
+    private final AttributesService attributesService = mock(AttributesService.class);
 
     private final TbRbacAccessControlService accessControlService = new TbRbacAccessControlService(
-            defaultAccessControlService, roleService, entityGroupService, customerHierarchyService);
+            defaultAccessControlService, roleService, entityGroupService, customerHierarchyService, attributesService);
 
     private SecurityUser customerUser;
     private SecurityUser tenantAdmin;
