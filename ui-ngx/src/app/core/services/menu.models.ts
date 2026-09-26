@@ -3,6 +3,7 @@
 import { AuthState } from '@core/auth/auth.models';
 import { Authority } from '@shared/models/authority.enum';
 import { deepClone } from '@core/utils';
+import { getRbacPermissions } from '@core/services/rbac-permissions';
 
 export declare type MenuSectionType = 'link' | 'toggle' | 'divider';
 
@@ -1092,12 +1093,6 @@ export const buildUserMenu = (authState: AuthState): Array<MenuSection> => {
   return sections.concat(buildCustomMenuSections(authState));
 };
 
-let rbacPermissions: { [resource: string]: string[] } | null = null;
-
-export const setRbacPermissions = (permissions: { [resource: string]: string[] } | null): void => {
-  rbacPermissions = permissions;
-};
-
 /**
  * Overrides the label of a menu section, used by the white labeling to rename add-ons (e.g. Trendz).
  * Passing {@code null} restores the original label.
@@ -1131,6 +1126,7 @@ const menuSectionResource: { [id: string]: string } = {
 };
 
 const hasMenuPermission = (id: string): boolean => {
+  const rbacPermissions = getRbacPermissions();
   if (!rbacPermissions) {
     return true;
   }

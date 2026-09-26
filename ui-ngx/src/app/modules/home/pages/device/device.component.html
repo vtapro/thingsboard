@@ -32,13 +32,13 @@
   <button mat-stroked-button color="primary"
           [disabled]="(isLoading$ | async)"
           (click)="onEntityAction($event, 'manageCredentials')"
-          [class.!hidden]="isEdit">
+          [class.!hidden]="isEdit || !canViewCredentials">
     {{ ((deviceScope === 'customer_user' || deviceScope === 'edge_customer_user') ? 'device.view-credentials' : 'device.manage-credentials') | translate }}
   </button>
   <button mat-stroked-button color="primary"
           [disabled]="(isLoading$ | async)"
           (click)="onEntityAction($event, 'checkConnectivity')"
-          [class.!hidden]="isEdit || hideConnectivityDialog">
+          [class.!hidden]="isEdit || hideConnectivityDialog || !canCallRpc">
     {{ 'device.connectivity.check-connectivity' | translate }}
   </button>
   <button mat-stroked-button color="primary"

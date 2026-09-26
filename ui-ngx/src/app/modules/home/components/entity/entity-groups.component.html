@@ -22,6 +22,7 @@
           {{ 'entity-group.add' | translate }}
         </button>
       </div>
+    <div class="tb-entity-groups-table-wrap">
     <table mat-table [dataSource]="displayedGroups" class="mat-elevation-z0 tb-entity-groups-table">
       <ng-container matColumnDef="select">
         <th mat-header-cell *matHeaderCellDef>
@@ -79,6 +80,7 @@
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
       <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
     </table>
+    </div>
     @if (!groups.length) {
       <div class="tb-entity-groups-empty">{{ 'entity-group.no-groups' | translate }}</div>
     }

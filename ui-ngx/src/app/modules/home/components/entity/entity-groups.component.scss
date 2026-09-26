@@ -88,11 +88,14 @@
   padding-top: 12px;
 }
 
-.tb-entity-groups-table {
-  width: 100%;
+.tb-entity-groups-table-wrap {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
+}
+
+.tb-entity-groups-table {
+  width: 100%;
 }
 
 mat-paginator {

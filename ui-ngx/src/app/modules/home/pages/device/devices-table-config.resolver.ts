@@ -36,6 +36,7 @@ import { CustomerService } from '@core/http/customer.service';
 import { Customer } from '@app/shared/models/customer.model';
 import { NULL_UUID } from '@shared/models/id/has-uuid';
 import { BroadcastService } from '@core/services/broadcast.service';
+import { hasRbacPermission } from '@core/services/rbac-permissions';
 import { DeviceTableHeaderComponent } from '@modules/home/pages/device/device-table-header.component';
 import { MatDialog } from '@angular/material/dialog';
 import {
@@ -309,7 +310,7 @@ export class DevicesTableConfigResolver  {
         {
           name: this.translate.instant('device.manage-credentials'),
           icon: 'security',
-          isEnabled: () => true,
+          isEnabled: () => hasRbacPermission('DEVICE', 'READ_CREDENTIALS'),
           onAction: ($event, entity) => this.manageCredentials($event, entity)
         }
       );
@@ -331,7 +332,7 @@ export class DevicesTableConfigResolver  {
         {
           name: this.translate.instant('device.manage-credentials'),
           icon: 'security',
-          isEnabled: () => true,
+          isEnabled: () => hasRbacPermission('DEVICE', 'READ_CREDENTIALS'),
           onAction: ($event, entity) => this.manageCredentials($event, entity)
         }
       );
@@ -341,7 +342,7 @@ export class DevicesTableConfigResolver  {
         {
           name: this.translate.instant('device.view-credentials'),
           icon: 'security',
-          isEnabled: () => true,
+          isEnabled: () => hasRbacPermission('DEVICE', 'READ_CREDENTIALS'),
           onAction: ($event, entity) => this.manageCredentials($event, entity)
         }
       );

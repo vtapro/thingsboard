@@ -24,6 +24,7 @@ import { OtaUpdateType } from '@shared/models/ota-package.models';
 import { distinctUntilChanged } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { WhiteLabelingService } from '@core/http/white-labeling.service';
+import { hasRbacPermission } from '@core/services/rbac-permissions';
 
 @Component({
     selector: 'tb-device',
@@ -42,6 +43,16 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> {
   otaUpdateType = OtaUpdateType;
 
   hideConnectivityDialog = false;
+
+  /** The credentials dialog loads the credentials of the device, so it requires READ_CREDENTIALS on DEVICE. */
+  get canViewCredentials(): boolean {
+    return hasRbacPermission('DEVICE', 'READ_CREDENTIALS');
+  }
+
+  /** The connectivity dialog sends an RPC to the device. */
+  get canCallRpc(): boolean {
+    return hasRbacPermission('DEVICE', 'RPC_CALL');
+  }
 
   constructor(protected store: Store<AppState>,
               protected translate: TranslateService,

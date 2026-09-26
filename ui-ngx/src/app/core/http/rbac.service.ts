@@ -3,12 +3,13 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { defaultHttpOptionsFromConfig } from '@core/http/http-utils';
-import { setRbacPermissions } from '@core/services/menu.models';
+import { setRbacPermissions } from '@core/services/rbac-permissions';
 
 interface RbacRole {
   id: string;
   name: string;
   permissions: { [resource: string]: string[] };
+  scopedPermissions?: { [resource: string]: { [operation: string]: string[] } };
   userIds: string[];
 }
 
@@ -31,16 +32,23 @@ export class RbacService {
         return;
       }
       const merged: { [resource: string]: string[] } = {};
+      const addOperation = (resource: string, operation: string) => {
+        const operations = merged[resource] || (merged[resource] = []);
+        if (!operations.includes(operation)) {
+          operations.push(operation);
+        }
+      };
       for (const role of roles) {
-        const permissions = role.permissions || {};
-        for (const resource of Object.keys(permissions)) {
-          const operations = merged[resource] || [];
-          for (const operation of permissions[resource] || []) {
-            if (!operations.includes(operation)) {
-              operations.push(operation);
+        for (const [resource, operations] of Object.entries(role.permissions || {})) {
+          (operations || []).forEach(operation => addOperation(resource, operation));
+        }
+        // a role may be limited to entity groups: its operations are stored per operation -> group ids
+        for (const [resource, byOperation] of Object.entries(role.scopedPermissions || {})) {
+          Object.entries(byOperation || {}).forEach(([operation, groups]) => {
+            if (groups && groups.length) {
+              addOperation(resource, operation);
             }
-          }
-          merged[resource] = operations;
+          });
         }
       }
       setRbacPermissions(Object.keys(merged).length ? merged : null);
@@ -48,4 +56,3 @@ export class RbacService {
   }
 
 }
-
