@@ -81,6 +81,11 @@ export class RolesComponent extends PageComponent implements OnInit {
    */
   readonly groupScopedResources = GROUP_ENTITY_TYPES;
   readonly entityTypes = GROUP_ENTITY_TYPES;
+  /**
+   * Entity types a user may create itself, so the "only entities created by the user" scope is meaningful. The other
+   * ones (dashboard, customer, user, rule chain, ...) are created by the tenant administrator only.
+   */
+  readonly ownScopedResources = GROUP_ENTITY_TYPES;
   /** Legacy trio, still used for roles created before the detailed matrix. */
   readonly operations = ['READ', 'WRITE', 'DELETE'];
 
@@ -158,6 +163,11 @@ export class RolesComponent extends PageComponent implements OnInit {
   /** "Only my entities" flag of the entity type (owner scope). */
   isOwnOnly(resource: string): boolean {
     return !!this.ownOnlyDraft[resource];
+  }
+
+  /** True when the owner scope may be configured for the entity type. */
+  supportsOwnScope(resource: string): boolean {
+    return this.ownScopedResources.includes(resource);
   }
 
   /** Loads an existing role into the form so its permissions/users can be edited. */
@@ -316,7 +326,8 @@ export class RolesComponent extends PageComponent implements OnInit {
       scopedPermissions,
       // keep the users already assigned to the role when editing it
       userIds: editedId ? (this.roles.find(r => r.id === editedId)?.userIds || []) : [],
-      ownOnly: Object.fromEntries(Object.entries(this.ownOnlyDraft).filter(e => e[1])),
+      ownOnly: Object.fromEntries(Object.entries(this.ownOnlyDraft)
+        .filter(e => e[1] && this.supportsOwnScope(e[0]))),
       ownCustomerOnly: !!this.ownCustomerOnlyControl.value
     };
     this.roles = editedId

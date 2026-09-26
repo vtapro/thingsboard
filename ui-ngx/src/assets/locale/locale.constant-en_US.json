@@ -344,6 +344,7 @@
         "roles-own-only": "Only entities created by the user (owner)",
         "roles-own-only-warning": "Warning: the user only sees the entities created by him/herself. Entities created by other users stay hidden and can not be read or changed.",
         "roles-own-chip": "own entities",
+        "roles-own-scope-not-supported": "The owner scope is available for the entity types a user may create (devices, assets, entity views). This entity type is created by the tenant administrator only.",
         "roles-select-all": "All",
         "roles-clear-all": "None",
         "roles-permissions-hint": "Select the operations per entity type. Leave the scope empty to apply the operation to all entities of the tenant, or pick entity groups to limit it.",
