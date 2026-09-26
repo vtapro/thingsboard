@@ -56,9 +56,9 @@
                         }
                         <span class="flex-1"></span>
                         <button type="button" mat-button (click)="selectAllOperations(resource)"
-                                translate>admin.roles-select-all</button>
+                                >{{ 'admin.roles-select-all' | translate }}</button>
                         <button type="button" mat-button (click)="clearAllOperations(resource)"
-                                translate>admin.roles-clear-all</button>
+                                >{{ 'admin.roles-clear-all' | translate }}</button>
                       </div>
                       <div class="tb-roles-ops">
                         @for (operation of operationsFor(resource); track operation) {

@@ -22,6 +22,11 @@ import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.common.data.AttributeScope;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.thingsboard.server.common.data.BaseDataWithAdditionalInfo;
+import org.thingsboard.server.common.data.Device;
+import org.thingsboard.server.common.data.page.PageData;
+import org.thingsboard.server.common.data.page.PageLink;
+import org.thingsboard.server.dao.device.DeviceService;
+import java.util.HashMap;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
 import java.util.List;
@@ -75,11 +80,21 @@ public class TbRbacAccessControlService implements AccessControlService {
     private final EntityGroupService entityGroupService;
     private final CustomerHierarchyService customerHierarchyService;
     private final AttributesService attributesService;
+    private final DeviceService deviceService;
 
     /**
      * Server attribute that remembers which user created an entity (see DeviceController.saveRbacOwner).
      */
     public static final String RBAC_OWNER_ATTRIBUTE = "rbacOwnerId";
+
+    /**
+     * Owner index of the devices of a tenant: device id -> owner user id. It is rebuilt at most once
+     * per {@link #OWNER_INDEX_TTL_MS} and invalidated when a device is created, so listing devices
+     * for a role with the "own entities only" flag does not read the attributes entity by entity.
+     */
+    private final Map<TenantId, OwnerIndex> ownerIndexCache = new ConcurrentHashMap<>();
+    private static final long OWNER_INDEX_TTL_MS = 60_000L;
+    private static final int OWNER_INDEX_PAGE_SIZE = 1000;
 
     private final Map<String, CacheEntry<Optional<RbacRole>>> effectiveRoleCache = new ConcurrentHashMap<>();
     private final Map<TenantId, CacheEntry<Optional<List<RbacEntityGroup>>>> entityGroupCache = new ConcurrentHashMap<>();
@@ -109,6 +124,15 @@ public class TbRbacAccessControlService implements AccessControlService {
         Operation effective = resolveOperation(role, resource, operation);
         if (effective == null) {
             return Set.of();
+        }
+        if (isOwnOnlyResource(role, resource)) {
+            // "Only entities created by the user": the list is limited to the entities owned by this user.
+            Set<UUID> ownedIds = getOwnedEntityIds(user);
+            List<String> ownScopedGroups = getScopedGroups(role, resource, effective);
+            if (ownScopedGroups != null && !ownScopedGroups.isEmpty()) {
+                ownedIds.retainAll(groupEntityIds(user.getTenantId(), ownScopedGroups));
+            }
+            return ownedIds;
         }
         if (hasGlobalOperation(role, resource, effective)) {
             return null;
@@ -181,6 +205,77 @@ public class TbRbacAccessControlService implements AccessControlService {
         JsonNode owner = info == null ? null : info.get(RBAC_OWNER_ATTRIBUTE);
         return owner != null && !owner.isNull()
                 && user.getId() != null && user.getId().getId().toString().equals(owner.asText());
+    }
+
+    /**
+     * Ids of the entities that were created by the given user (used to filter the list pages).
+     */
+    private Set<UUID> getOwnedEntityIds(SecurityUser user) {
+        OwnerIndex index = ownerIndexCache.get(user.getTenantId());
+        long now = System.currentTimeMillis();
+        if (index == null || now - index.createdTs > OWNER_INDEX_TTL_MS) {
+            index = new OwnerIndex(now, loadOwnerIndex(user.getTenantId()));
+            ownerIndexCache.put(user.getTenantId(), index);
+        }
+        String userId = user.getId().getId().toString();
+        Set<UUID> result = new HashSet<>();
+        index.owners.forEach((entityId, owner) -> {
+            if (userId.equals(owner)) {
+                result.add(entityId);
+            }
+        });
+        return result;
+    }
+
+    private Map<UUID, String> loadOwnerIndex(TenantId tenantId) {
+        Map<UUID, String> owners = new HashMap<>();
+        PageLink pageLink = new PageLink(OWNER_INDEX_PAGE_SIZE);
+        try {
+            boolean hasNext;
+            do {
+                PageData<Device> page = deviceService.findDevicesByTenantId(tenantId, pageLink);
+                for (Device device : page.getData()) {
+                    JsonNode info = device.getAdditionalInfo();
+                    JsonNode owner = info == null ? null : info.get(RBAC_OWNER_ATTRIBUTE);
+                    if (owner != null && !owner.isNull() && !owner.asText().isBlank()) {
+                        owners.put(device.getId().getId(), owner.asText());
+                    }
+                }
+                hasNext = page.hasNext();
+                if (hasNext) {
+                    pageLink = pageLink.nextPageLink();
+                }
+            } while (hasNext);
+        } catch (Exception e) {
+            log.warn("[{}] Failed to build the entity owner index", tenantId, e);
+        }
+        return owners;
+    }
+
+    /**
+     * Drops the cached owner index of the tenant (called when a device is created).
+     */
+    public void invalidateOwnerIndex(TenantId tenantId) {
+        ownerIndexCache.remove(tenantId);
+    }
+
+    private record OwnerIndex(long createdTs, Map<UUID, String> owners) {
+    }
+
+    private Set<UUID> groupEntityIds(TenantId tenantId, List<String> groupIds) {
+        Set<UUID> ids = new HashSet<>();
+        for (RbacEntityGroup group : getEntityGroups(tenantId)) {
+            if (groupIds.contains(group.getId()) && group.getEntityIds() != null) {
+                for (String entityId : group.getEntityIds()) {
+                    try {
+                        ids.add(UUID.fromString(entityId));
+                    } catch (IllegalArgumentException e) {
+                        log.warn("Entity group [{}] contains an invalid entity id [{}]", group.getId(), entityId);
+                    }
+                }
+            }
+        }
+        return ids;
     }
 
     @Override
