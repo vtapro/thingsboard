@@ -23,6 +23,7 @@ interface RbacRole {
   scopedPermissions?: { [resource: string]: { [operation: string]: string[] } };
   userIds: string[];
   ownCustomerOnly?: boolean;
+  ownOnly?: { [resource: string]: boolean };
 }
 
 interface PermissionChip {
@@ -145,6 +146,42 @@ export class RolesComponent extends PageComponent implements OnInit {
     return !!this.ownOnlyDraft[resource];
   }
 
+  /** Loads an existing role into the form so its permissions/users can be edited. */
+  editRole(role: RbacRole): void {
+    this.editingRoleId = role.id;
+    this.nameControl.setValue(role.name);
+    this.ownCustomerOnlyControl.setValue(!!role.ownCustomerOnly);
+    this.permissionDraft = {};
+    this.ownOnlyDraft = {...(role.ownOnly || {})};
+    this.groupScopeDraft = {};
+    Object.entries(role.permissions || {}).forEach(([resource, operations]) => {
+      const draft = this.permissionDraft[resource] = {};
+      operations.forEach(operation => draft[operation] = true);
+    });
+    Object.entries(role.scopedPermissions || {}).forEach(([resource, byOperation]) => {
+      const draft = this.permissionDraft[resource] || (this.permissionDraft[resource] = {});
+      Object.entries(byOperation).forEach(([operation, groups]) => {
+        draft[operation] = true;
+        this.groupScopeDraft[resource] = groups as string[];
+      });
+    });
+    if (role.userIds) {
+      this.setRoleUsers(role, role.userIds);
+    }
+  }
+
+  get isEditingRole(): boolean {
+    return !!this.editingRoleId;
+  }
+
+  cancelEditRole(): void {
+    this.editingRoleId = null;
+    this.nameControl.setValue('');
+    this.permissionDraft = {};
+    this.ownOnlyDraft = {};
+    this.groupScopeDraft = {};
+  }
+
   toggleOwnOnly(resource: string): void {
     this.ownOnlyDraft[resource] = !this.ownOnlyDraft[resource];
   }
@@ -188,6 +225,8 @@ export class RolesComponent extends PageComponent implements OnInit {
    */
   private permissionDraft: { [resource: string]: { [operation: string]: boolean } } = {};
   private ownOnlyDraft: { [resource: string]: boolean } = {};
+  /** Id of the role being edited (null = creating a new role). */
+  private editingRoleId: string = null;
   private groupScopeDraft: { [resource: string]: string[] } = {};
   private loadedUserGroupIds: string[] = [];
 
@@ -252,6 +291,7 @@ export class RolesComponent extends PageComponent implements OnInit {
       permissions,
       scopedPermissions,
       userIds: [],
+      ...(this.editingRoleId ? {id: this.editingRoleId} : {}),
       ownOnly: Object.fromEntries(Object.entries(this.ownOnlyDraft).filter(e => e[1])),
       ownCustomerOnly: !!this.ownCustomerOnlyControl.value
     }];
@@ -259,6 +299,7 @@ export class RolesComponent extends PageComponent implements OnInit {
     this.ownCustomerOnlyControl.setValue(false);
     this.permissionDraft = {};
     this.ownOnlyDraft = {};
+    this.editingRoleId = null;
     this.groupScopeDraft = {};
   }
 

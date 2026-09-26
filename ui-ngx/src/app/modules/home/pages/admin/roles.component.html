@@ -139,6 +139,10 @@
                   <ng-container matColumnDef="actions">
                     <th mat-header-cell *matHeaderCellDef></th>
                     <td mat-cell *matCellDef="let role">
+                      <button mat-icon-button type="button" (click)="editRole(role)"
+                              matTooltip="{{ 'action.edit' | translate }}">
+                        <mat-icon>edit</mat-icon>
+                      </button>
                       <button mat-icon-button type="button" (click)="removeRole(role)"
                               [matTooltip]="'admin.roles-delete-title' | translate: {name: role.name}">
                         <mat-icon>delete_outline</mat-icon>
