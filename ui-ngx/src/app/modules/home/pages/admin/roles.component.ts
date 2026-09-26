@@ -285,16 +285,20 @@ export class RolesComponent extends PageComponent implements OnInit {
       }));
       return;
     }
-    this.roles = [...this.roles, {
-      id: this.generateId(),
+    const editedId = this.editingRoleId;
+    const savedRole: RbacRole = {
+      id: editedId || this.generateId(),
       name,
       permissions,
       scopedPermissions,
-      userIds: [],
-      ...(this.editingRoleId ? {id: this.editingRoleId} : {}),
+      // keep the users already assigned to the role when editing it
+      userIds: editedId ? (this.roles.find(r => r.id === editedId)?.userIds || []) : [],
       ownOnly: Object.fromEntries(Object.entries(this.ownOnlyDraft).filter(e => e[1])),
       ownCustomerOnly: !!this.ownCustomerOnlyControl.value
-    }];
+    };
+    this.roles = editedId
+      ? this.roles.map(r => r.id === editedId ? savedRole : r)
+      : [...this.roles, savedRole];
     this.nameControl.setValue('');
     this.ownCustomerOnlyControl.setValue(false);
     this.permissionDraft = {};
