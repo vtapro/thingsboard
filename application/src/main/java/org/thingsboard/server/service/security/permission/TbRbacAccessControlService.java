@@ -153,7 +153,8 @@ public class TbRbacAccessControlService implements AccessControlService {
             // "Only entities created by the user": the list is limited to the entities owned by this user.
             Set<UUID> ownedIds = getOwnedEntityIds(user, resource);
             List<String> ownScopedGroups = getScopedGroups(role, resource, effective);
-            if (ownScopedGroups != null && !ownScopedGroups.isEmpty()) {
+            if (ownScopedGroups != null && !ownScopedGroups.isEmpty()
+                    && !containsAllGroup(user.getTenantId(), resource, ownScopedGroups)) {
                 ownedIds.retainAll(groupEntityIds(user.getTenantId(), ownScopedGroups));
             }
             return ownedIds;
@@ -163,6 +164,10 @@ public class TbRbacAccessControlService implements AccessControlService {
         }
         List<String> scopedGroups = getScopedGroups(role, resource, effective);
         if (scopedGroups == null || scopedGroups.isEmpty()) {
+            return null;
+        }
+        if (containsAllGroup(user.getTenantId(), resource, scopedGroups)) {
+            // the role is scoped to the "All" group of the entity type: everything matches, so there is no filter
             return null;
         }
         Set<UUID> allowedIds = new HashSet<>();
@@ -329,7 +334,7 @@ public class TbRbacAccessControlService implements AccessControlService {
     private Set<UUID> groupEntityIds(TenantId tenantId, List<String> groupIds) {
         Set<UUID> ids = new HashSet<>();
         for (RbacEntityGroup group : getEntityGroups(tenantId)) {
-            if (groupIds.contains(group.getId()) && group.getEntityIds() != null) {
+            if (groupIds.contains(group.getId()) && !group.isAllGroup() && group.getEntityIds() != null) {
                 for (String entityId : group.getEntityIds()) {
                     try {
                         ids.add(UUID.fromString(entityId));
@@ -570,13 +575,31 @@ public class TbRbacAccessControlService implements AccessControlService {
     private boolean entityBelongsToGroups(TenantId tenantId, EntityId entityId, List<String> groupIds) {
         try {
             String id = entityId.getId().toString();
+            String entityType = entityId.getEntityType().name();
             for (RbacEntityGroup group : getEntityGroups(tenantId)) {
-                if (groupIds.contains(group.getId()) && group.getEntityIds() != null && group.getEntityIds().contains(id)) {
-                    return true;
+                if (groupIds.contains(group.getId())) {
+                    if (group.isAllGroup() && entityType.equals(group.getEntityType())) {
+                        // the "All" group of the entity type always matches
+                        return true;
+                    }
+                    if (group.getEntityIds() != null && group.getEntityIds().contains(id)) {
+                        return true;
+                    }
                 }
             }
         } catch (Exception e) {
             log.warn("Failed to resolve entity groups for entity [{}]: {}", entityId, e.getMessage());
+        }
+        return false;
+    }
+
+    /** True when one of the groups is the "All" group of the resource (it matches every entity of that type). */
+    private boolean containsAllGroup(TenantId tenantId, Resource resource, List<String> groupIds) {
+        for (RbacEntityGroup group : getEntityGroups(tenantId)) {
+            if (groupIds.contains(group.getId()) && group.isAllGroup()
+                    && resource.name().equals(group.getEntityType())) {
+                return true;
+            }
         }
         return false;
     }

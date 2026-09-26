@@ -32,6 +32,12 @@ public class RbacEntityGroup implements Serializable {
     @Schema(description = "When the group is public it is available to all customers of the tenant")
     private boolean publicGroup;
 
+    /**
+     * True for the "All" group of an entity type: it always contains every entity of that type (like the default
+     * group of ThingsBoard PE), its membership is not editable and it is not counted as a regular group.
+     */
+    private boolean allGroup;
+
     @Schema(description = "Ids of the entities that belong to the group")
     private List<String> entityIds = new ArrayList<>();
 

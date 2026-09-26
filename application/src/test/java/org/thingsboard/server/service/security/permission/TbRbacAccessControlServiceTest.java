@@ -342,6 +342,26 @@ public class TbRbacAccessControlServiceTest {
         return accessControlService.hasPermission(tenantAdmin, Resource.DEVICE, operation, device.getId(), device);
     }
 
+    /** The "All" group of PE: a role scoped to it matches every entity of the entity type. */
+    @Test
+    public void scopedToAllGroupMatchesEveryEntityOfTheType() throws Exception {
+        RbacEntityGroup allGroup = new RbacEntityGroup();
+        allGroup.setId("all-1");
+        allGroup.setEntityType("ASSET");
+        allGroup.setAllGroup(true);
+        RbacEntityGroupSettings groupSettings = new RbacEntityGroupSettings();
+        groupSettings.setGroups(List.of(allGroup));
+        when(entityGroupService.getEntityGroupSettings(TENANT_ID)).thenReturn(groupSettings);
+        givenRole(tenantAdmin, role(Map.of(), Map.of("ASSET", Map.of("READ", List.of("all-1"))), false));
+
+        assertThat(accessControlService.hasPermission(tenantAdmin, Resource.ASSET, Operation.READ,
+                ownCustomerAsset.getId(), ownCustomerAsset)).isTrue();
+        assertThat(accessControlService.hasPermission(tenantAdmin, Resource.ASSET, Operation.READ,
+                otherCustomerAsset.getId(), otherCustomerAsset)).isTrue();
+        // the role covers every asset of the tenant, so the list is not filtered
+        assertThat(accessControlService.getAllowedEntityIds(tenantAdmin, Resource.ASSET, Operation.READ)).isNull();
+    }
+
     /**
      * A share grants exactly the operations it lists, whatever the role of the user allows: VIEW (READ + the read
      * auxiliary operations), CONTROL (+ RPC_CALL, write telemetry), FULL (+ write, delete).
