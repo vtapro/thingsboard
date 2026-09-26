@@ -22,6 +22,7 @@ import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.common.data.AttributeScope;
 import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.service.security.model.SecurityUser;
+import com.fasterxml.jackson.databind.node.TextNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -197,13 +198,12 @@ public class DeviceController extends BaseController {
         } else {
             checkEntity(null, device, Resource.DEVICE);
         }
-        boolean isNewDevice = device.getId() == null;
-        Device savedDevice = tbDeviceService.save(device, accessToken,
-                new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
-        if (isNewDevice && savedDevice != null) {
-            saveRbacOwner(savedDevice);
+        if (device.getId() == null) {
+            // remember which user created the device (used by the RBAC "own devices" scope)
+            saveRbacOwner(device);
         }
-        return savedDevice;
+        return tbDeviceService.save(device, accessToken,
+                new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
     }
 
     /**
@@ -211,20 +211,15 @@ public class DeviceController extends BaseController {
      * "only entities created by the user" flag can be scoped to the devices of its own users.
      * Tenant/System administrators create shared devices and therefore do not set an owner.
      */
-    private void saveRbacOwner(Device savedDevice) throws ThingsboardException {
+    private void saveRbacOwner(Device device) throws ThingsboardException {
         SecurityUser user = getCurrentUser();
         if (user == null || user.getId() == null || user.getAuthority() == Authority.SYS_ADMIN
                 || user.getAuthority() == Authority.TENANT_ADMIN) {
             return;
         }
-        try {
-            AttributeKvEntry owner = new BaseAttributeKvEntry(
-                    new StringDataEntry("rbacOwnerId", user.getId().getId().toString()),
-                    System.currentTimeMillis());
-            attributesService.save(user.getTenantId(), savedDevice.getId(), AttributeScope.SERVER_SCOPE, owner);
-        } catch (Exception e) {
-            log.warn("[{}] Failed to store the owner of the device {}", user.getTenantId(), savedDevice.getId(), e);
-        }
+        // stored inside the entity itself: single write, no extra read and available in every list response
+        device.setAdditionalInfoField("rbacOwnerId",
+                TextNode.valueOf(user.getId().getId().toString()));
     }
 
     @ApiOperation(value = "Create Device (saveDevice) with credentials ",

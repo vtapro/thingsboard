@@ -20,6 +20,8 @@ import org.thingsboard.server.dao.settings.EntityGroupService;
 import org.thingsboard.server.dao.settings.RoleService;
 import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.common.data.AttributeScope;
+import com.fasterxml.jackson.databind.JsonNode;
+import org.thingsboard.server.common.data.BaseDataWithAdditionalInfo;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
 import java.util.List;
@@ -155,7 +157,7 @@ public class TbRbacAccessControlService implements AccessControlService {
             return false;
         }
         // "Only entities created by the user": the entity has to be owned by this user.
-        if (isOwnOnlyResource(role, resource) && entityId != null && !isEntityOwner(user, entityId)) {
+        if (isOwnOnlyResource(role, resource) && entityId != null && !isEntityOwner(user, entity)) {
             return false;
         }
         return hasOperationGrant(user.getTenantId(), role, resource, operation, entityId);
@@ -171,16 +173,14 @@ public class TbRbacAccessControlService implements AccessControlService {
     /**
      * The entity belongs to the user when its server attribute "rbacOwnerId" is the user id.
      */
-    private boolean isEntityOwner(SecurityUser user, EntityId entityId) {
-        try {
-            return attributesService.find(user.getTenantId(), entityId, AttributeScope.SERVER_SCOPE, RBAC_OWNER_ATTRIBUTE)
-                    .get(5, TimeUnit.SECONDS)
-                    .map(attribute -> user.getId().getId().toString().equals(attribute.getStrValue().orElse(null)))
-                    .orElse(false);
-        } catch (Exception e) {
-            log.warn("[{}] Failed to read the owner of the entity {}", user.getTenantId(), entityId, e);
+    private static boolean isEntityOwner(SecurityUser user, Object entity) {
+        if (!(entity instanceof BaseDataWithAdditionalInfo<?> data)) {
             return false;
         }
+        JsonNode info = data.getAdditionalInfo();
+        JsonNode owner = info == null ? null : info.get(RBAC_OWNER_ATTRIBUTE);
+        return owner != null && !owner.isNull()
+                && user.getId() != null && user.getId().getId().toString().equals(owner.asText());
     }
 
     @Override
