@@ -143,6 +143,10 @@ public class AssetController extends BaseController {
                            @RequestParam(name = "uniquifyStrategy", defaultValue = "RANDOM") UniquifyStrategy uniquifyStrategy) throws Exception {
         asset.setTenantId(getTenantId());
         checkEntity(asset.getId(), asset, Resource.ASSET);
+        if (asset.getId() == null) {
+            // remember which user created the asset (used by the RBAC "own entities" scope)
+            saveRbacOwner(asset);
+        }
         return tbAssetService.save(asset, new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
     }
 

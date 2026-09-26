@@ -133,6 +133,8 @@ public class EntityViewController extends BaseController {
         if (entityView.getId() == null) {
             accessControlService
                     .checkPermission(getCurrentUser(), Resource.ENTITY_VIEW, Operation.CREATE, null, entityView);
+            // remember which user created the entity view (used by the RBAC "own entities" scope)
+            saveRbacOwner(entityView);
         } else {
             existingEntityView = checkEntityViewId(entityView.getId(), Operation.WRITE);
         }

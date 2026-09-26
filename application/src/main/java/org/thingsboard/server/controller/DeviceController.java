@@ -206,25 +206,6 @@ public class DeviceController extends BaseController {
                 new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
     }
 
-    /**
-     * Remembers which user created the device (server attribute "rbacOwnerId"), so that a role with the
-     * "only entities created by the user" flag can be scoped to the devices of its own users.
-     * Tenant/System administrators create shared devices and therefore do not set an owner.
-     */
-    private void saveRbacOwner(Device device) throws ThingsboardException {
-        SecurityUser user = getCurrentUser();
-        if (user == null || user.getId() == null || user.getAuthority() == Authority.SYS_ADMIN
-                || user.getAuthority() == Authority.TENANT_ADMIN) {
-            return;
-        }
-        // stored inside the entity itself: single write, no extra read and available in every list response
-        device.setAdditionalInfoField("rbacOwnerId",
-                TextNode.valueOf(user.getId().getId().toString()));
-        if (user.getEmail() != null) {
-            device.setAdditionalInfoField("rbacOwnerEmail", TextNode.valueOf(user.getEmail()));
-        }
-    }
-
     @ApiOperation(value = "Create Device (saveDevice) with credentials ",
             notes = "Create or update the Device. When creating device, platform generates Device Id as " + UUID_WIKI_LINK +
                     "Requires to provide the Device Credentials object as well as an existing device profile ID or use \"default\".\n" +

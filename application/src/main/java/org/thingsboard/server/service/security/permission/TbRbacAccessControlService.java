@@ -26,6 +26,8 @@ import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.dao.device.DeviceService;
+import org.thingsboard.server.dao.asset.AssetService;
+import org.thingsboard.server.dao.entityview.EntityViewService;
 import java.util.HashMap;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
@@ -81,6 +83,8 @@ public class TbRbacAccessControlService implements AccessControlService {
     private final CustomerHierarchyService customerHierarchyService;
     private final AttributesService attributesService;
     private final DeviceService deviceService;
+    private final AssetService assetService;
+    private final EntityViewService entityViewService;
 
     /**
      * Server attribute that remembers which user created an entity (see DeviceController.saveRbacOwner).
@@ -92,7 +96,7 @@ public class TbRbacAccessControlService implements AccessControlService {
      * per {@link #OWNER_INDEX_TTL_MS} and invalidated when a device is created, so listing devices
      * for a role with the "own entities only" flag does not read the attributes entity by entity.
      */
-    private final Map<TenantId, OwnerIndex> ownerIndexCache = new ConcurrentHashMap<>();
+    private final Map<String, OwnerIndex> ownerIndexCache = new ConcurrentHashMap<>();
     private static final long OWNER_INDEX_TTL_MS = 60_000L;
     private static final int OWNER_INDEX_PAGE_SIZE = 1000;
 
@@ -127,7 +131,7 @@ public class TbRbacAccessControlService implements AccessControlService {
         }
         if (isOwnOnlyResource(role, resource)) {
             // "Only entities created by the user": the list is limited to the entities owned by this user.
-            Set<UUID> ownedIds = getOwnedEntityIds(user);
+            Set<UUID> ownedIds = getOwnedEntityIds(user, resource);
             List<String> ownScopedGroups = getScopedGroups(role, resource, effective);
             if (ownScopedGroups != null && !ownScopedGroups.isEmpty()) {
                 ownedIds.retainAll(groupEntityIds(user.getTenantId(), ownScopedGroups));
@@ -214,12 +218,13 @@ public class TbRbacAccessControlService implements AccessControlService {
     /**
      * Ids of the entities that were created by the given user (used to filter the list pages).
      */
-    private Set<UUID> getOwnedEntityIds(SecurityUser user) {
-        OwnerIndex index = ownerIndexCache.get(user.getTenantId());
+    private Set<UUID> getOwnedEntityIds(SecurityUser user, Resource resource) {
+        String cacheKey = user.getTenantId().getId() + ":" + resource.name();
+        OwnerIndex index = ownerIndexCache.get(cacheKey);
         long now = System.currentTimeMillis();
         if (index == null || now - index.createdTs > OWNER_INDEX_TTL_MS) {
-            index = new OwnerIndex(now, loadOwnerIndex(user.getTenantId()));
-            ownerIndexCache.put(user.getTenantId(), index);
+            index = new OwnerIndex(now, loadOwnerIndex(user.getTenantId(), resource));
+            ownerIndexCache.put(cacheKey, index);
         }
         String userId = user.getId().getId().toString();
         Set<UUID> result = new HashSet<>();
@@ -231,18 +236,25 @@ public class TbRbacAccessControlService implements AccessControlService {
         return result;
     }
 
-    private Map<UUID, String> loadOwnerIndex(TenantId tenantId) {
+    /**
+     * Index of the entities of one entity type that carry the server attribute "rbacOwnerId" (see saveRbacOwner in
+     * BaseController), used to filter the list pages of a role with the "only entities created by the user" flag.
+     */
+    private Map<UUID, String> loadOwnerIndex(TenantId tenantId, Resource resource) {
         Map<UUID, String> owners = new HashMap<>();
         PageLink pageLink = new PageLink(OWNER_INDEX_PAGE_SIZE);
         try {
             boolean hasNext;
             do {
-                PageData<Device> page = deviceService.findDevicesByTenantId(tenantId, pageLink);
-                for (Device device : page.getData()) {
-                    JsonNode info = device.getAdditionalInfo();
+                PageData<? extends BaseDataWithAdditionalInfo<?>> page = findOwnerPage(tenantId, resource, pageLink);
+                if (page == null) {
+                    return owners;
+                }
+                for (BaseDataWithAdditionalInfo<?> entity : page.getData()) {
+                    JsonNode info = entity.getAdditionalInfo();
                     JsonNode owner = info == null ? null : info.get(RBAC_OWNER_ATTRIBUTE);
                     if (owner != null && !owner.isNull() && !owner.asText().isBlank()) {
-                        owners.put(device.getId().getId(), owner.asText());
+                        owners.put(entity.getId().getId(), owner.asText());
                     }
                 }
                 hasNext = page.hasNext();
@@ -251,16 +263,34 @@ public class TbRbacAccessControlService implements AccessControlService {
                 }
             } while (hasNext);
         } catch (Exception e) {
-            log.warn("[{}] Failed to build the entity owner index", tenantId, e);
+            log.warn("[{}] Failed to build the {} owner index", tenantId, resource, e);
         }
         return owners;
+    }
+
+    /**
+     * One page of the entities of the resource. Only the entity types that store their owner in the additional info
+     * support the "only entities created by the user" scope.
+     */
+    private PageData<? extends BaseDataWithAdditionalInfo<?>> findOwnerPage(TenantId tenantId, Resource resource,
+                                                                           PageLink pageLink) {
+        return switch (resource) {
+            case DEVICE -> deviceService.findDevicesByTenantId(tenantId, pageLink);
+            case ASSET -> assetService.findAssetsByTenantId(tenantId, pageLink);
+            case ENTITY_VIEW -> entityViewService.findEntityViewByTenantId(tenantId, pageLink);
+            default -> {
+                log.warn("[{}] The resource {} does not support the \"own entities\" scope", tenantId, resource);
+                yield null;
+            }
+        };
     }
 
     /**
      * Drops the cached owner index of the tenant (called when a device is created).
      */
     public void invalidateOwnerIndex(TenantId tenantId) {
-        ownerIndexCache.remove(tenantId);
+        String prefix = tenantId.getId() + ":";
+        ownerIndexCache.keySet().removeIf(key -> key.startsWith(prefix));
     }
 
     private record OwnerIndex(long createdTs, Map<UUID, String> owners) {

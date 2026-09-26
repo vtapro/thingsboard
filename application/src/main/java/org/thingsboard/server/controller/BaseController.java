@@ -4,6 +4,7 @@ package org.thingsboard.server.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import com.google.common.util.concurrent.ListenableFuture;
 import jakarta.mail.MessagingException;
 import jakarta.servlet.ServletOutputStream;
@@ -29,6 +30,8 @@ import org.thingsboard.common.util.DonAsynchron;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.cluster.TbClusterService;
 import org.thingsboard.server.common.data.Customer;
+import org.thingsboard.server.common.data.BaseDataWithAdditionalInfo;
+import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.common.data.Dashboard;
 import org.thingsboard.server.common.data.DashboardInfo;
 import org.thingsboard.server.common.data.Device;
@@ -612,6 +615,23 @@ public abstract class BaseController {
             return (SecurityUser) authentication.getPrincipal();
         } else {
             throw new ThingsboardException("You aren't authorized to perform this operation!", ThingsboardErrorCode.AUTHENTICATION);
+        }
+    }
+
+    /**
+     * Remembers which user created the entity (server attribute "rbacOwnerId" + "rbacOwnerEmail" stored inside the
+     * entity), so that a custom role with the "only entities created by the user" flag can be limited to the entities
+     * of its own users. Tenant/System administrators create shared entities and therefore do not set an owner.
+     */
+    protected void saveRbacOwner(BaseDataWithAdditionalInfo<?> entity) throws ThingsboardException {
+        SecurityUser user = getCurrentUser();
+        if (user == null || user.getId() == null || user.getAuthority() == Authority.SYS_ADMIN
+                || user.getAuthority() == Authority.TENANT_ADMIN) {
+            return;
+        }
+        entity.setAdditionalInfoField("rbacOwnerId", TextNode.valueOf(user.getId().getId().toString()));
+        if (user.getEmail() != null) {
+            entity.setAdditionalInfoField("rbacOwnerEmail", TextNode.valueOf(user.getEmail()));
         }
     }
 

@@ -14,10 +14,15 @@ import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroup;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroupSettings;
 import org.thingsboard.server.common.data.rbac.RbacRole;
+import com.fasterxml.jackson.databind.node.TextNode;
+import org.thingsboard.server.common.data.page.PageData;
+import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.dao.settings.CustomerHierarchyService;
 import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.dao.device.DeviceService;
+import org.thingsboard.server.dao.asset.AssetService;
+import org.thingsboard.server.dao.entityview.EntityViewService;
 import org.thingsboard.server.dao.settings.EntityGroupService;
 import org.thingsboard.server.dao.settings.RoleService;
 import org.thingsboard.server.service.security.model.SecurityUser;
@@ -55,9 +60,12 @@ public class TbRbacAccessControlServiceTest {
     private final CustomerHierarchyService customerHierarchyService = mock(CustomerHierarchyService.class);
     private final AttributesService attributesService = mock(AttributesService.class);
     private final DeviceService deviceService = mock(DeviceService.class);
+    private final AssetService assetService = mock(AssetService.class);
+    private final EntityViewService entityViewService = mock(EntityViewService.class);
 
     private final TbRbacAccessControlService accessControlService = new TbRbacAccessControlService(
-            defaultAccessControlService, roleService, entityGroupService, customerHierarchyService, attributesService, deviceService);
+            defaultAccessControlService, roleService, entityGroupService, customerHierarchyService, attributesService,
+            deviceService, assetService, entityViewService);
 
     private SecurityUser customerUser;
     private SecurityUser tenantAdmin;
@@ -232,6 +240,26 @@ public class TbRbacAccessControlServiceTest {
                 ownCustomerAsset.getId(), ownCustomerAsset))
                 .isInstanceOf(ThingsboardException.class)
                 .hasMessageContaining("Write");
+    }
+
+    @Test
+    public void ownOnlyRoleIsScopedToTheAssetsCreatedByTheUser() throws Exception {
+        Asset ownedAsset = asset(TENANT_ID, CUSTOMER_ID);
+        ownedAsset.setAdditionalInfoField("rbacOwnerId", TextNode.valueOf(tenantAdmin.getId().getId().toString()));
+        RbacRole role = role(grants("ASSET", "READ"), Map.of(), false);
+        role.setOwnOnly(Map.of("ASSET", true));
+        givenRole(tenantAdmin, role);
+        when(assetService.findAssetsByTenantId(eq(TENANT_ID), any(PageLink.class)))
+                .thenReturn(new PageData<>(List.of(ownedAsset), 1, 1, false));
+
+        // the asset created by the user is readable, an asset without owner is not
+        assertThat(accessControlService.hasPermission(tenantAdmin, Resource.ASSET, Operation.READ,
+                ownedAsset.getId(), ownedAsset)).isTrue();
+        assertThat(accessControlService.hasPermission(tenantAdmin, Resource.ASSET, Operation.READ,
+                ownCustomerAsset.getId(), ownCustomerAsset)).isFalse();
+        // the list of the entity type is filtered with the owner index of that entity type
+        assertThat(accessControlService.getAllowedEntityIds(tenantAdmin, Resource.ASSET, Operation.READ))
+                .containsExactly(ownedAsset.getId().getId());
     }
 
     private static RbacRole classicGroupScopedRole() {
