@@ -19,6 +19,7 @@ import org.thingsboard.server.dao.settings.CustomerHierarchyService;
 import org.thingsboard.server.dao.settings.EntityGroupService;
 import org.thingsboard.server.dao.settings.RoleService;
 import org.thingsboard.server.dao.attributes.AttributesService;
+import org.thingsboard.server.common.data.AttributeScope;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
 import java.util.List;
@@ -29,6 +30,7 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import static org.thingsboard.server.common.data.security.Authority.SYS_ADMIN;
@@ -71,6 +73,11 @@ public class TbRbacAccessControlService implements AccessControlService {
     private final EntityGroupService entityGroupService;
     private final CustomerHierarchyService customerHierarchyService;
     private final AttributesService attributesService;
+
+    /**
+     * Server attribute that remembers which user created an entity (see DeviceController.saveRbacOwner).
+     */
+    public static final String RBAC_OWNER_ATTRIBUTE = "rbacOwnerId";
 
     private final Map<String, CacheEntry<Optional<RbacRole>>> effectiveRoleCache = new ConcurrentHashMap<>();
     private final Map<TenantId, CacheEntry<Optional<List<RbacEntityGroup>>>> entityGroupCache = new ConcurrentHashMap<>();
@@ -147,7 +154,33 @@ public class TbRbacAccessControlService implements AccessControlService {
         if (entity != null && !user.getTenantId().equals(entity.getTenantId())) {
             return false;
         }
+        // "Only entities created by the user": the entity has to be owned by this user.
+        if (isOwnOnlyResource(role, resource) && entityId != null && !isEntityOwner(user, entityId)) {
+            return false;
+        }
         return hasOperationGrant(user.getTenantId(), role, resource, operation, entityId);
+    }
+
+    /**
+     * True when the role limits this resource to the entities created by the user itself.
+     */
+    private static boolean isOwnOnlyResource(RbacRole role, Resource resource) {
+        return role.getOwnOnly() != null && Boolean.TRUE.equals(role.getOwnOnly().get(resource.name()));
+    }
+
+    /**
+     * The entity belongs to the user when its server attribute "rbacOwnerId" is the user id.
+     */
+    private boolean isEntityOwner(SecurityUser user, EntityId entityId) {
+        try {
+            return attributesService.find(user.getTenantId(), entityId, AttributeScope.SERVER_SCOPE, RBAC_OWNER_ATTRIBUTE)
+                    .get(5, TimeUnit.SECONDS)
+                    .map(attribute -> user.getId().getId().toString().equals(attribute.getStrValue().orElse(null)))
+                    .orElse(false);
+        } catch (Exception e) {
+            log.warn("[{}] Failed to read the owner of the entity {}", user.getTenantId(), entityId, e);
+            return false;
+        }
     }
 
     @Override
