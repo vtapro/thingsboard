@@ -316,6 +316,9 @@
         "roles-permissions": "Permissions",
         "roles-users": "Users",
         "roles-add": "Add role",
+        "roles-update": "Update role",
+        "roles-no-role-selected": "Select a role in the first column to assign users to it.",
+        "roles-save-hint": "Save stores the roles above for the whole tenant.",
         "roles-entity-groups": "Entity groups",
         "roles-entity-type": "Entity type",
         "roles-entity-ids": "Entity ids (comma separated)",
@@ -2384,6 +2387,7 @@
     },
     "device": {
         "device": "Device",
+        "owner": "Owner",
         "device-required": "Device is required.",
         "devices": "Devices",
         "management": "Device management",

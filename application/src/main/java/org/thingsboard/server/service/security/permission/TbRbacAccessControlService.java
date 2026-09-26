@@ -343,17 +343,28 @@ public class TbRbacAccessControlService implements AccessControlService {
     }
 
     /**
-     * The operations of the legacy role model: the auxiliary operations of the same entity are derived.
+     * The basic operations of an entity type. A role that only uses operations from this set is a "classic" role and
+     * keeps the derived behaviour (see {@link #grantedOperation(Operation)}), so the entity details pages keep
+     * working. CREATE belongs here because the permission matrix of the WEB UI stores the four basic operations as
+     * soon as the administrator grants full access to an entity type.
      */
-    private static final Set<String> LEGACY_OPERATIONS = Set.of("READ", "WRITE", "DELETE");
+    private static final Set<String> CLASSIC_OPERATIONS = Set.of("CREATE", "READ", "WRITE", "DELETE");
+
+    /**
+     * Credentials are never derived from READ/WRITE: they expose the access token of a device, so the administrator
+     * has to grant them explicitly (or with {@code ALL}).
+     */
+    private static final Set<Operation> CREDENTIAL_OPERATIONS =
+            Set.of(Operation.READ_CREDENTIALS, Operation.WRITE_CREDENTIALS);
 
     /**
      * Resolves the operation that must be present in the role for the requested {@code operation}:
      * <ul>
      *   <li>role without any operation for this resource -> not restricted here;</li>
      *   <li>role with the requested operation (or ALL) -> granted;</li>
-     *   <li>role that only declares READ/WRITE/DELETE (legacy) -> keep the derived behaviour, so
-     *       existing roles are not affected by the detailed matrix;</li>
+     *   <li>role that only declares the basic operations CREATE/READ/WRITE/DELETE -> keep the derived behaviour,
+     *       so existing roles are not affected by the detailed matrix;</li>
+     *   <li>credentials -> never derived, they have to be listed explicitly;</li>
      *   <li>role with detailed operations -> granted only when listed explicitly.</li>
      * </ul>
      *
@@ -367,8 +378,11 @@ public class TbRbacAccessControlService implements AccessControlService {
         if (configured.contains(operation.name()) || configured.contains(Operation.ALL.name())) {
             return operation;
         }
-        boolean legacyRole = configured.stream().allMatch(LEGACY_OPERATIONS::contains);
-        if (legacyRole) {
+        if (CREDENTIAL_OPERATIONS.contains(operation)) {
+            return null;
+        }
+        boolean classicRole = configured.stream().allMatch(CLASSIC_OPERATIONS::contains);
+        if (classicRole) {
             Operation derived = grantedOperation(operation);
             return configured.contains(derived.name()) ? derived : null;
         }

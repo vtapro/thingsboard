@@ -221,6 +221,10 @@ export class DevicesTableConfigResolver  {
         new EntityTableColumn<DeviceInfo>('customerTitle', 'customer.customer', '25%'),
         new EntityTableColumn<DeviceInfo>('customerIsPublic', 'device.public', '60px',
           entity => checkBoxCell(entity.customerIsPublic), () => ({})),
+        // owner of the device (RBAC "only entities created by the user"); tenant admins create shared devices
+        new EntityTableColumn<DeviceInfo>('owner', 'device.owner', '200px',
+          entity => (entity.additionalInfo && (entity.additionalInfo.rbacOwnerEmail || entity.additionalInfo.rbacOwnerId))
+            || '-', () => ({}), false),
       );
     }
     columns.push(

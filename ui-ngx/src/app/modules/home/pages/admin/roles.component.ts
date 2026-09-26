@@ -174,6 +174,11 @@ export class RolesComponent extends PageComponent implements OnInit {
     return !!this.editingRoleId;
   }
 
+  /** Role currently selected in the first column (undefined when a new role is being created). */
+  get selectedRole(): RbacRole {
+    return this.roles.find(role => role.id === this.editingRoleId);
+  }
+
   cancelEditRole(): void {
     this.editingRoleId = null;
     this.nameControl.setValue('');
@@ -202,7 +207,6 @@ export class RolesComponent extends PageComponent implements OnInit {
     }
   }
 
-  readonly roleColumns = ['name', 'permissions', 'users', 'actions'];
   readonly groupColumns = ['name', 'entityType', 'description', 'public', 'members', 'actions'];
   readonly userGroupColumns = ['name', 'userIds', 'roleIds', 'actions'];
   readonly hierarchyColumns = ['child', 'parent', 'actions'];
@@ -226,7 +230,7 @@ export class RolesComponent extends PageComponent implements OnInit {
   private permissionDraft: { [resource: string]: { [operation: string]: boolean } } = {};
   private ownOnlyDraft: { [resource: string]: boolean } = {};
   /** Id of the role being edited (null = creating a new role). */
-  private editingRoleId: string = null;
+  editingRoleId: string = null;
   private groupScopeDraft: { [resource: string]: string[] } = {};
   private loadedUserGroupIds: string[] = [];
 
@@ -255,11 +259,16 @@ export class RolesComponent extends PageComponent implements OnInit {
       .subscribe(settings => this.roles = settings?.roles || []);
   }
 
-  addRole() {
+  /**
+   * Adds the role being configured to the list of the tenant (or replaces it in place when it is being edited).
+   * Nothing is persisted yet: the settings are sent to the backend by saveAll() / save().
+   * The saved role stays selected so the permission matrix and the users column keep showing it.
+   */
+  saveRole(): boolean {
     const name = (this.nameControl.value || '').trim();
     if (!name) {
       this.nameControl.markAsTouched();
-      return;
+      return false;
     }
     const permissions: { [resource: string]: string[] } = {};
     const scopedPermissions: { [resource: string]: { [operation: string]: string[] } } = {};
@@ -283,7 +292,7 @@ export class RolesComponent extends PageComponent implements OnInit {
         message: this.translate.instant('admin.roles-no-permissions'),
         type: 'warn'
       }));
-      return;
+      return false;
     }
     const editedId = this.editingRoleId;
     const savedRole: RbacRole = {
@@ -299,12 +308,9 @@ export class RolesComponent extends PageComponent implements OnInit {
     this.roles = editedId
       ? this.roles.map(r => r.id === editedId ? savedRole : r)
       : [...this.roles, savedRole];
-    this.nameControl.setValue('');
-    this.ownCustomerOnlyControl.setValue(false);
-    this.permissionDraft = {};
-    this.ownOnlyDraft = {};
-    this.editingRoleId = null;
-    this.groupScopeDraft = {};
+    this.editingRoleId = savedRole.id;
+    this.nameControl.setValue(savedRole.name);
+    return true;
   }
 
   removeRole(role: RbacRole) {
@@ -317,6 +323,9 @@ export class RolesComponent extends PageComponent implements OnInit {
     ).subscribe(result => {
       if (result) {
         this.roles = this.roles.filter(r => r.id !== role.id);
+        if (this.editingRoleId === role.id) {
+          this.cancelEditRole();
+        }
       }
     });
   }
@@ -334,6 +343,17 @@ export class RolesComponent extends PageComponent implements OnInit {
       },
       error: (error: HttpErrorResponse) => this.notifySaveFailed('admin.roles-save-failed', error)
     });
+  }
+
+  /**
+   * Single save action of the Roles tab: commits a role that is still being configured (when its name is filled),
+   * then persists every role of the tenant.
+   */
+  saveAll() {
+    if ((this.nameControl.value || '').trim() && !this.saveRole()) {
+      return;
+    }
+    this.save();
   }
 
   isOperationGranted(resource: string, operation: string): boolean {

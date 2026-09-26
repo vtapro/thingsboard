@@ -220,6 +220,9 @@ public class DeviceController extends BaseController {
         // stored inside the entity itself: single write, no extra read and available in every list response
         device.setAdditionalInfoField("rbacOwnerId",
                 TextNode.valueOf(user.getId().getId().toString()));
+        if (user.getEmail() != null) {
+            device.setAdditionalInfoField("rbacOwnerEmail", TextNode.valueOf(user.getEmail()));
+        }
     }
 
     @ApiOperation(value = "Create Device (saveDevice) with credentials ",

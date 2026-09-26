@@ -33,13 +33,24 @@
 
 .tb-roles-page {
   padding: 16px;
-  max-width: 1440px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 
 .tb-roles-card {
   display: flex;
   flex-direction: column;
+}
+
+/*
+ * The generic settings card is capped at 60% / 80% of the content area (settings-card.scss).
+ * The roles page needs the whole width, otherwise the three columns are squeezed against the left edge.
+ * The extra .tb-roles-page ancestor keeps this rule above the settings-card one (same file, loaded after).
+ */
+.tb-roles-page .mat-mdc-card.settings-card.tb-roles-card {
+  width: 100%;
+  margin: 8px 0;
 }
 
 .tb-roles-header {
@@ -69,6 +80,93 @@
   flex-direction: column;
   gap: 16px;
   padding-bottom: 8px;
+}
+
+/* Roles tab: role list | permission matrix | users + save */
+.tb-roles-3col {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+  /*
+   * auto-fit: the columns share whatever width the screen gives them.
+   * 3 columns on a wide screen, 2 in the middle range, 1 on a narrow one - without breakpoints.
+   * 340px is the smallest width a column may have before one of them wraps to the next row.
+   */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+}
+
+.tb-roles-col {
+  min-width: 0;
+
+  > .mat-mdc-card-content,
+  > .tb-roles-col-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+.tb-roles-inline-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tb-roles-role-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* follows the window height, so the list uses the available room on tall screens */
+  max-height: clamp(240px, calc(100vh - 430px), 720px);
+  overflow: auto;
+
+  .tb-roles-role-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+
+    &:hover {
+      background: rgba(0, 0, 0, .04);
+    }
+
+    &.tb-selected {
+      background: rgba(25, 118, 210, .12);
+    }
+
+    .tb-roles-role-main {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 120px;
+      min-width: 0;
+    }
+
+    .tb-roles-role-name {
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tb-roles-role-actions {
+      display: flex;
+      align-items: center;
+      margin-left: auto;
+    }
+
+    .tb-roles-role-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      flex: 1 1 100%;
+      max-height: 42px;
+      overflow: hidden;
+    }
+  }
 }
 
 .tb-roles-section {
@@ -125,23 +223,27 @@
 
 .tb-roles-resource {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 24px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
   padding: 12px 16px 16px;
 }
 
 .tb-roles-ops {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 16px;
   align-items: center;
 }
 
+.tb-roles-own {
+  align-self: flex-start;
+}
+
 .tb-roles-scope {
-  min-width: 260px;
+  width: 100%;
+  min-width: 0;
   max-width: 420px;
-  flex: 1 1 260px;
 }
 
 .tb-roles-resource-name {
@@ -244,6 +346,10 @@
 @media #{$mat-xs} {
   .tb-roles-page {
     padding: 8px;
+  }
+
+  .tb-roles-ops {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .tb-roles-name,

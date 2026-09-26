@@ -186,6 +186,48 @@ public class TbRbacAccessControlServiceTest {
         verify(roleService, times(1)).getEffectiveRole(eq(TENANT_ID), any());
     }
 
+    @Test
+    public void classicRoleKeepsTheEntityDetailsPageWorking() throws Exception {
+        // Role created with the permission matrix of the WEB UI: the four basic operations, scoped to a group.
+        givenGroupWithChildCustomerAsset();
+        givenRole(customerUser, classicGroupScopedRole());
+
+        assertThat(accessControlService.hasPermission(customerUser, Resource.ASSET, Operation.READ,
+                childCustomerAsset.getId(), childCustomerAsset)).isTrue();
+        // the device/asset details page also reads the attributes and the telemetry of the entity
+        assertThat(accessControlService.hasPermission(customerUser, Resource.ASSET, Operation.READ_ATTRIBUTES,
+                childCustomerAsset.getId(), childCustomerAsset)).isTrue();
+        assertThat(accessControlService.hasPermission(customerUser, Resource.ASSET, Operation.READ_TELEMETRY,
+                childCustomerAsset.getId(), childCustomerAsset)).isTrue();
+    }
+
+    @Test
+    public void credentialsAreNeverDerivedFromRead() throws Exception {
+        givenGroupWithChildCustomerAsset();
+        givenRole(customerUser, classicGroupScopedRole());
+
+        assertThat(accessControlService.hasPermission(customerUser, Resource.ASSET, Operation.READ_CREDENTIALS,
+                childCustomerAsset.getId(), childCustomerAsset)).isFalse();
+    }
+
+    private static RbacRole classicGroupScopedRole() {
+        return role(Map.of(), Map.of("ASSET", Map.of(
+                "CREATE", List.of("group-1"),
+                "READ", List.of("group-1"),
+                "WRITE", List.of("group-1"),
+                "DELETE", List.of("group-1"))), false);
+    }
+
+    private void givenGroupWithChildCustomerAsset() {
+        RbacEntityGroup group = new RbacEntityGroup();
+        group.setId("group-1");
+        group.setEntityType("ASSET");
+        group.setEntityIds(List.of(childCustomerAsset.getId().getId().toString()));
+        RbacEntityGroupSettings groupSettings = new RbacEntityGroupSettings();
+        groupSettings.setGroups(List.of(group));
+        when(entityGroupService.getEntityGroupSettings(TENANT_ID)).thenReturn(groupSettings);
+    }
+
     private void givenRole(SecurityUser user, RbacRole role) {
         when(roleService.getEffectiveRole(eq(user.getTenantId()), eq(user.getId().getId().toString()))).thenReturn(role);
     }
