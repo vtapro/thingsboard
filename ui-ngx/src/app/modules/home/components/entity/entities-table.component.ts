@@ -19,6 +19,8 @@ import {
 import { PageComponent } from '@shared/components/page.component';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
+import { getCurrentAuthState } from '@core/auth/auth.selectors';
+import { Authority } from '@shared/models/authority.enum';
 import { MAX_SAFE_PAGE_SIZE, PageLink, PageQueryParam, TimePageLink } from '@shared/models/page/page-link';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator } from '@angular/material/paginator';
@@ -75,7 +77,10 @@ export class EntitiesTableComponent extends PageComponent implements IEntitiesTa
   }
 
   groupsTabEnabled(): boolean {
-    return [EntityType.DEVICE, EntityType.ASSET, EntityType.ENTITY_VIEW].includes(this.groupsEntityType());
+    // entity groups are managed by the tenant administrator only (the API requires TENANT_ADMIN)
+    const authority = getCurrentAuthState(this.store).authUser?.authority;
+    return authority === Authority.TENANT_ADMIN
+      && [EntityType.DEVICE, EntityType.ASSET, EntityType.ENTITY_VIEW].includes(this.groupsEntityType());
   }
 
   translations: EntityTypeTranslation;

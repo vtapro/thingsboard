@@ -13,10 +13,12 @@
   <mat-tab #alarmRules="matTab" label="{{'alarm-rule.alarm-rules' | translate }}">
     <tb-alarm-rules-table [active]="alarmRules.isActive" [entityId]="entity.id" [entityName]="entity.name" [ownerId]="entity.tenantId"></tb-alarm-rules-table>
   </mat-tab>
-  <mat-tab #auditLogsTab="matTab"
-           label="{{ 'audit-log.audit-logs' | translate }}">
-    <tb-audit-log-table detailsMode="true" [active]="auditLogsTab.isActive" [auditLogMode]="auditLogModes.ENTITY" [entityId]="entity.id"></tb-audit-log-table>
-  </mat-tab>
+  @if (authUser.authority === authorities.TENANT_ADMIN) {
+    <mat-tab #auditLogsTab="matTab"
+             label="{{ 'audit-log.audit-logs' | translate }}">
+      <tb-audit-log-table detailsMode="true" [active]="auditLogsTab.isActive" [auditLogMode]="auditLogModes.ENTITY" [entityId]="entity.id"></tb-audit-log-table>
+    </mat-tab>
+  }
   @if (authUser.authority === authorities.TENANT_ADMIN) {
     <mat-tab label="{{ 'version-control.version-control' | translate }}" #versionControlTab="matTab">
       <tb-version-control detailsMode="true"
