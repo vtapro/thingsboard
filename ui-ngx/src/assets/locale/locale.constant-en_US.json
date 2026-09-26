@@ -2387,9 +2387,23 @@
         "edit-json": "Edit JSON",
         "toggle-edit-mode": "Toggle edit mode"
     },
+    "share": {
+        "title": "Share entity",
+        "hint": "The share grants the selected access on this entity even when the role of the user does not allow it.",
+        "level": "Access level",
+        "none": "No access",
+        "view": "View",
+        "control": "Control",
+        "full": "Full access",
+        "user-group": "user group",
+        "empty": "No user or user group found.",
+        "save-success": "The shares were saved",
+        "save-failed": "Failed to save the shares"
+    },
     "device": {
         "device": "Device",
         "owner": "Owner",
+        "share": "Share",
         "device-required": "Device is required.",
         "devices": "Devices",
         "management": "Device management",

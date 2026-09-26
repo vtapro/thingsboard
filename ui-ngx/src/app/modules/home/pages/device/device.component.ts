@@ -25,6 +25,10 @@ import { distinctUntilChanged } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { WhiteLabelingService } from '@core/http/white-labeling.service';
 import { hasRbacPermission } from '@core/services/rbac-permissions';
+import { MatDialog } from '@angular/material/dialog';
+import { getCurrentAuthUser } from '@core/auth/auth.selectors';
+import { Authority } from '@shared/models/authority.enum';
+import { EntityShareDialogComponent } from '@home/components/entity/entity-share-dialog.component';
 
 @Component({
     selector: 'tb-device',
@@ -54,6 +58,18 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> {
     return hasRbacPermission('DEVICE', 'RPC_CALL');
   }
 
+  /** Only the tenant administrator may share an entity (the API requires TENANT_ADMIN). */
+  get canShareEntity(): boolean {
+    return getCurrentAuthUser(this.store)?.authority === Authority.TENANT_ADMIN;
+  }
+
+  openShareDialog(): void {
+    this.dialog.open(EntityShareDialogComponent, {
+      data: {entityType: 'DEVICE', entityId: this.entity.id.id},
+      width: '600px'
+    });
+  }
+
   constructor(protected store: Store<AppState>,
               protected translate: TranslateService,
               @Inject('entity') protected entityValue: DeviceInfo,
@@ -61,6 +77,7 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> {
               public fb: UntypedFormBuilder,
               protected cd: ChangeDetectorRef,
               private destroyRef: DestroyRef,
+              private dialog: MatDialog,
               private whiteLabelingService: WhiteLabelingService) {
     super(store, fb, entityValue, entitiesTableConfigValue, cd);
     this.whiteLabelingService.settings$.pipe(

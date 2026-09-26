@@ -1,0 +1,36 @@
+// SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+// SPDX-License-Identifier: Apache-2.0
+.tb-share-hint {
+  color: rgba(0, 0, 0, .6);
+  font-size: 12px;
+  line-height: 18px;
+  margin-bottom: 12px;
+  max-width: 520px;
+}
+
+.tb-share-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.tb-share-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tb-share-level {
+  flex: 0 0 200px;
+  width: 200px;
+}
+
+.tb-share-loading,
+.tb-share-empty {
+  padding: 24px 0;
+  text-align: center;
+  color: rgba(0, 0, 0, .54);
+}
