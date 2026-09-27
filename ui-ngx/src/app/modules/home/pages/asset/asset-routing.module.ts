@@ -11,6 +11,7 @@ import { EntityDetailsPageComponent } from '@home/components/entity/entity-detai
 import { BreadCrumbConfig } from '@shared/components/breadcrumb';
 import { ConfirmOnExitGuard } from '@core/guards/confirm-on-exit.guard';
 import { entityDetailsPageBreadcrumbLabelFunction } from '@home/pages/home-pages.models';
+import { entityGroupBreadcrumbLabelFunction } from '@home/pages/home-pages.models';
 import { MenuId } from '@core/services/menu.models';
 
 export const assetRoutes: Routes = [
@@ -35,12 +36,27 @@ export const assetRoutes: Routes = [
         }
       },
       {
-        path: 'groups/:groupId',
-        component: EntityGroupEntitiesComponent,
+        path: 'groups',
         data: {
-          auth: [Authority.TENANT_ADMIN],
-          entityType: 'ASSET'
-        }
+          breadcrumb: {
+            label: 'entity-group.groups',
+            icon: 'layers'
+          } as BreadCrumbConfig<any>
+        },
+        children: [
+          {
+            path: ':groupId',
+            component: EntityGroupEntitiesComponent,
+            data: {
+              auth: [Authority.TENANT_ADMIN],
+              entityType: 'ASSET',
+              breadcrumb: {
+                labelFunction: entityGroupBreadcrumbLabelFunction,
+                icon: 'layers'
+              } as BreadCrumbConfig<any>
+            }
+          }
+        ]
       },
       {
         path: ':entityId',

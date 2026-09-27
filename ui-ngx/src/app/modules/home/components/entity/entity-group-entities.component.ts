@@ -8,8 +8,8 @@ import { TranslateService } from '@ngx-translate/core';
 import { PageComponent } from '@shared/components/page.component';
 import { AppState } from '@core/core.state';
 import { defaultHttpOptionsFromConfig } from '@core/http/http-utils';
-import { forkJoin, Observable, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { entityDataToEntityInfo, EntityData, EntityKeyType } from '@shared/models/query/query.models';
+import { PageData } from '@shared/models/page/page-data';
 
 interface EntityGroup {
   id: string;
@@ -28,9 +28,6 @@ interface GroupEntity {
   assetProfileName?: string;
   type?: string;
 }
-
-const MAX_PAGES = 50;
-const BY_ID_CHUNK = 10;
 
 /**
  * Entities of one entity group, like the "All: Devices" page of ThingsBoard PE.
@@ -122,7 +119,8 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
   }
 
   back(): void {
-    this.router.navigateByUrl(this.listUrl());
+    // go back to the GROUPS tab of the entity page
+    this.router.navigate([this.listUrl()], {queryParams: {tab: 'groups'}});
   }
 
   addEntity(): void {
@@ -173,17 +171,6 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
     }
   }
 
-  private byIdApi(id: string): string {
-    switch (this.entityType) {
-      case 'ASSET':
-        return `/api/asset/${id}`;
-      case 'ENTITY_VIEW':
-        return `/api/entityView/${id}`;
-      default:
-        return `/api/device/${id}`;
-    }
-  }
-
   private loadPage(): void {
     if (!this.group) {
       return;
@@ -212,30 +199,56 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
         this.loading = false;
         return;
       }
-      this.loadEntitiesByIds(ids).subscribe(entities => {
-        const sorted = entities.filter(entity => !!entity)
-          .sort((a, b) => (b.createdTime || 0) - (a.createdTime || 0));
-        this.totalElements = sorted.length;
-        const from = this.pageIndex * this.pageSize;
-        this.entities = sorted.slice(from, from + this.pageSize);
-        this.loading = false;
-      });
+      this.loadGroupPage(ids);
     }
   }
 
-  /** Loads the entities of a regular group by id, in small chunks to keep the API calls reasonable. */
-  private loadEntitiesByIds(ids: string[]): Observable<GroupEntity[]> {
-    const chunks: string[][] = [];
-    for (let i = 0; i < Math.min(ids.length, MAX_PAGES * BY_ID_CHUNK); i += BY_ID_CHUNK) {
-      chunks.push(ids.slice(i, i + BY_ID_CHUNK));
-    }
-    const requests = chunks.map(chunk => forkJoin(chunk.map(id =>
-      this.http.get<GroupEntity>(this.byIdApi(id), defaultHttpOptionsFromConfig(undefined))
-        .pipe(catchError(() => of(null))))));
-    return forkJoin(requests).pipe(
-      map(results => ([] as (GroupEntity | null)[]).concat(...results)
-        .filter((entity): entity is GroupEntity => !!entity))
-    );
+  /**
+   * A regular group is listed with the entity query API and an "entity list" filter: the backend filters by the ids
+   * of the group and pages/sorts the result, so a large group is handled the same way as the "All" group.
+   */
+  private loadGroupPage(ids: string[]): void {
+    const query: any = {
+      entityFilter: {
+        type: 'entityList',
+        entityType: this.entityType,
+        entityList: ids
+      },
+      pageLink: {
+        pageSize: this.pageSize,
+        page: this.pageIndex,
+        sortOrder: {
+          key: {type: EntityKeyType.ENTITY_FIELD, key: 'createdTime'},
+          direction: 'DESC'
+        }
+      },
+      entityFields: [
+        {type: EntityKeyType.ENTITY_FIELD, key: 'name'},
+        {type: EntityKeyType.ENTITY_FIELD, key: 'createdTime'},
+        {type: EntityKeyType.ENTITY_FIELD, key: 'label'}
+      ],
+      latestValues: [],
+      keyFilters: []
+    };
+    this.http.post<PageData<EntityData>>('/api/entitiesQuery/find', query,
+      defaultHttpOptionsFromConfig(undefined)).subscribe(page => {
+      this.entities = (page?.data || []).map(entityData => {
+        const info = entityDataToEntityInfo(entityData);
+        const fields = (entityData.latest && entityData.latest[EntityKeyType.ENTITY_FIELD]) || {};
+        return {
+          id: info.id as any,
+          createdTime: Number(fields.createdTime?.value) || 0,
+          name: info.name,
+          label: ((fields.label?.value as string) || info.label) as string
+        };
+      });
+      this.totalElements = page?.totalElements || 0;
+      this.loading = false;
+    }, () => {
+      this.entities = [];
+      this.totalElements = 0;
+      this.loading = false;
+    });
   }
 
 }

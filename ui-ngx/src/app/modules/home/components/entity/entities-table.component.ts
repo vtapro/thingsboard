@@ -150,6 +150,10 @@ export class EntitiesTableComponent extends PageComponent implements IEntitiesTa
   }
 
   ngOnInit() {
+    // the group detail page links back with ?tab=groups
+    if (this.route.snapshot.queryParams?.tab === 'groups' && this.groupsTabEnabled()) {
+      this.groupsTab = true;
+    }
     if (this.entitiesTableConfig) {
       this.init(this.entitiesTableConfig);
     } else {
