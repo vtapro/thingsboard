@@ -91,6 +91,12 @@
   overflow: auto;
 }
 
+/* the paginator of the tables stays at the bottom of the card, the rows scroll above it */
+mat-paginator {
+  flex: 0 0 auto;
+  background: transparent;
+}
+
 @media #{$mat-xs} {
   .tb-roles-page {
     padding: 8px;

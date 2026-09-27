@@ -101,7 +101,8 @@
               @if (!groups.length) {
                 <div class="tb-roles-empty" translate>admin.roles-entity-groups-empty</div>
               } @else {
-                <table mat-table [dataSource]="groups" class="tb-roles-table">
+                <div class="tb-roles-list-wrap">
+                <table mat-table [dataSource]="pagedGroups" class="tb-roles-table">
                   <ng-container matColumnDef="name">
                     <th mat-header-cell *matHeaderCellDef translate>admin.roles-name</th>
                     <td mat-cell *matCellDef="let group">
@@ -154,6 +155,13 @@
                   <tr mat-header-row *matHeaderRowDef="groupColumns"></tr>
                   <tr mat-row *matRowDef="let row; columns: groupColumns;"></tr>
                 </table>
+                </div>
+                <mat-paginator [length]="groups.length"
+                               [pageIndex]="groupPageIndex"
+                               [pageSize]="groupPageSize"
+                               [pageSizeOptions]="pageSizeOptions"
+                               (page)="onGroupPageChange($event)"
+                               showFirstLastButtons></mat-paginator>
               }
             </section>
           </div>
@@ -177,7 +185,8 @@
               @if (!userGroups.length) {
                 <div class="tb-roles-empty" translate>admin.roles-user-groups-empty</div>
               } @else {
-                <table mat-table [dataSource]="userGroups" class="tb-roles-table">
+                <div class="tb-roles-list-wrap">
+                <table mat-table [dataSource]="pagedUserGroups" class="tb-roles-table">
                   <ng-container matColumnDef="name">
                     <th mat-header-cell *matHeaderCellDef translate>admin.roles-name</th>
                     <td mat-cell *matCellDef="let group">
@@ -244,6 +253,13 @@
                   <tr mat-header-row *matHeaderRowDef="userGroupColumns"></tr>
                   <tr mat-row *matRowDef="let row; columns: userGroupColumns;"></tr>
                 </table>
+                </div>
+                <mat-paginator [length]="userGroups.length"
+                               [pageIndex]="userGroupPageIndex"
+                               [pageSize]="userGroupPageSize"
+                               [pageSizeOptions]="pageSizeOptions"
+                               (page)="onUserGroupPageChange($event)"
+                               showFirstLastButtons></mat-paginator>
               }
             </section>
           </div>
@@ -267,7 +283,8 @@
               @if (!hierarchyRows.length) {
                 <div class="tb-roles-empty" translate>admin.roles-hierarchy-empty</div>
               } @else {
-                <table mat-table [dataSource]="hierarchyRows" class="tb-roles-table">
+                <div class="tb-roles-list-wrap">
+                <table mat-table [dataSource]="pagedHierarchyRows" class="tb-roles-table">
                   <ng-container matColumnDef="child">
                     <th mat-header-cell *matHeaderCellDef translate>admin.roles-child-customer</th>
                     <td mat-cell *matCellDef="let row">
@@ -293,6 +310,13 @@
                   <tr mat-header-row *matHeaderRowDef="hierarchyColumns"></tr>
                   <tr mat-row *matRowDef="let row; columns: hierarchyColumns;"></tr>
                 </table>
+                </div>
+                <mat-paginator [length]="hierarchyRows.length"
+                               [pageIndex]="hierarchyPageIndex"
+                               [pageSize]="hierarchyPageSize"
+                               [pageSizeOptions]="pageSizeOptions"
+                               (page)="onHierarchyPageChange($event)"
+                               showFirstLastButtons></mat-paginator>
               }
             </section>
           </div>

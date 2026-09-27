@@ -4,6 +4,7 @@ import { Component, OnInit } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { MatDialog } from '@angular/material/dialog';
+import { PageEvent } from '@angular/material/paginator';
 import { TranslateService } from '@ngx-translate/core';
 import { AppState } from '@core/core.state';
 import { getCurrentAuthState } from '@core/auth/auth.selectors';
@@ -118,6 +119,15 @@ export class RolesComponent extends PageComponent implements OnInit {
   readonly groupColumns = ['name', 'entityType', 'description', 'public', 'members', 'actions'];
   readonly userGroupColumns = ['name', 'userIds', 'roleIds', 'actions'];
   readonly hierarchyColumns = ['child', 'parent', 'actions'];
+  readonly pageSizeOptions = [10, 20, 50];
+
+  /** Paging of the entity groups, the user groups and the customer hierarchy tables. */
+  groupPageIndex = 0;
+  groupPageSize = 10;
+  userGroupPageIndex = 0;
+  userGroupPageSize = 10;
+  hierarchyPageIndex = 0;
+  hierarchyPageSize = 10;
 
   /** Free text used to filter the user (and role) selects of the user groups tab. */
   userGroupUserSearch = '';
@@ -338,7 +348,31 @@ export class RolesComponent extends PageComponent implements OnInit {
 
   loadGroups() {
     this.http.get<{groups: RbacEntityGroup[]}>('/api/tenant/entityGroup',
-      defaultHttpOptionsFromConfig(undefined)).subscribe(settings => this.groups = settings?.groups || []);
+      defaultHttpOptionsFromConfig(undefined)).subscribe(settings => {
+      this.groups = settings?.groups || [];
+      this.clampGroupPage();
+    });
+  }
+
+  /** Rows of the current page of the entity groups table. */
+  get pagedGroups(): RbacEntityGroup[] {
+    const start = this.groupPageIndex * this.groupPageSize;
+    return this.groups.slice(start, start + this.groupPageSize);
+  }
+
+  onGroupPageChange(event: PageEvent): void {
+    this.groupPageIndex = event.pageIndex;
+    this.groupPageSize = event.pageSize;
+  }
+
+  private clampGroupPage(): void {
+    this.groupPageIndex = this.clampPageIndex(this.groupPageIndex, this.groups.length, this.groupPageSize);
+  }
+
+  /** Keeps a page index valid after rows were added or removed. */
+  private clampPageIndex(pageIndex: number, length: number, pageSize: number): number {
+    const lastPage = Math.max(0, Math.ceil(length / pageSize) - 1);
+    return Math.min(pageIndex, lastPage);
   }
 
   addGroup() {
@@ -402,6 +436,7 @@ export class RolesComponent extends PageComponent implements OnInit {
           defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
           next: settings => {
             this.groups = settings?.groups || [];
+            this.clampGroupPage();
             this.notifySaved('entity-group.delete-success');
           },
           error: (error: HttpErrorResponse) => {
@@ -421,6 +456,7 @@ export class RolesComponent extends PageComponent implements OnInit {
       defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
       next: settings => {
         this.groups = settings?.groups || [];
+        this.clampGroupPage();
         this.notifySaved('entity-group.save-success');
       },
       error: (error: HttpErrorResponse) => {
@@ -441,7 +477,24 @@ export class RolesComponent extends PageComponent implements OnInit {
       defaultHttpOptionsFromConfig(undefined)).subscribe(settings => {
       this.userGroups = settings?.groups || [];
       this.loadedUserGroupIds = this.userGroups.map(group => group.id);
+      this.clampUserGroupPage();
     });
+  }
+
+  /** Rows of the current page of the user groups table. */
+  get pagedUserGroups(): RbacUserGroup[] {
+    const start = this.userGroupPageIndex * this.userGroupPageSize;
+    return this.userGroups.slice(start, start + this.userGroupPageSize);
+  }
+
+  onUserGroupPageChange(event: PageEvent): void {
+    this.userGroupPageIndex = event.pageIndex;
+    this.userGroupPageSize = event.pageSize;
+  }
+
+  private clampUserGroupPage(): void {
+    this.userGroupPageIndex = this.clampPageIndex(this.userGroupPageIndex, this.userGroups.length,
+      this.userGroupPageSize);
   }
 
   addUserGroup() {
@@ -513,6 +566,7 @@ export class RolesComponent extends PageComponent implements OnInit {
           next: settings => {
             this.userGroups = settings?.groups || groups;
             this.loadedUserGroupIds = this.userGroups.map(group => group.id);
+            this.clampUserGroupPage();
             this.notifySaved('admin.roles-user-groups-save-success');
           },
           error: (error: HttpErrorResponse) => {
@@ -539,7 +593,24 @@ export class RolesComponent extends PageComponent implements OnInit {
       defaultHttpOptionsFromConfig(undefined)).subscribe(hierarchy => {
       const parents = hierarchy?.parents || {};
       this.hierarchyRows = Object.keys(parents).map(childId => ({childId, parentId: parents[childId]}));
+      this.clampHierarchyPage();
     });
+  }
+
+  /** Rows of the current page of the customer hierarchy table. */
+  get pagedHierarchyRows(): Array<{childId: string; parentId: string}> {
+    const start = this.hierarchyPageIndex * this.hierarchyPageSize;
+    return this.hierarchyRows.slice(start, start + this.hierarchyPageSize);
+  }
+
+  onHierarchyPageChange(event: PageEvent): void {
+    this.hierarchyPageIndex = event.pageIndex;
+    this.hierarchyPageSize = event.pageSize;
+  }
+
+  private clampHierarchyPage(): void {
+    this.hierarchyPageIndex = this.clampPageIndex(this.hierarchyPageIndex, this.hierarchyRows.length,
+      this.hierarchyPageSize);
   }
 
   customerLabel(customerId: string): string {
