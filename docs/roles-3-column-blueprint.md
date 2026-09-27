@@ -3,7 +3,19 @@
 Áp dụng cho `ui-ngx/src/app/modules/home/pages/admin/roles.component.html` + `.scss`.
 Mục tiêu: hết cảnh cuộn dài, mỗi cột một nhóm chức năng, chỉ còn **1 nút Save**.
 
-Trạng thái: **đã triển khai**. Trang Roles dùng hết bề ngang và các cột auto-fit theo màn hình.
+Trạng thái: **đã thay thế**. Bản 3 cột ở dưới là bước trung gian: sau khi dùng thử, trang Roles được chuyển sang
+**danh sách gọn + dialog** (xem mục "Thiết kế hiện tại" cuối tài liệu) vì 3 cột vẫn làm nội dung bị chật/cuộn.
+
+## Thiết kế hiện tại (thay cho 3 cột)
+
+- Tab **Roles**: một bảng `Name | Permissions | Users` với nút Edit/Delete trên từng dòng; nút **Add role** mở
+  dialog (`role-dialog.component`).
+- Dialog role bố cục **2 cột**: cột trái = General (tên, Own customer only), Users (có ô Search lọc theo tên/email)
+  và Granted permissions (tóm tắt quyền đang chọn); cột phải = ma trận quyền theo entity type (presets, tick từng
+  operation, own-scope, scope theo entity group).
+- Tab **Entity groups / User groups / Customer hierarchy**: mỗi tab là một danh sách, thêm/sửa qua dialog, xóa có
+  xác nhận; tab User groups có ô Search cho cả select user và select role.
+- Trang dùng hết chiều cao màn hình (`:host` overflow hidden + flex), chỉ nội dung không vừa mới cuộn bên trong.
 
 ## 1. SCSS (thêm vào roles.component.scss)
 
