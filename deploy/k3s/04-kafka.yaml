@@ -10,6 +10,15 @@
 # TB_QUEUE_KAFKA_REPLICATION_FACTOR=1 in 01-config.yaml. To move to a 3 broker HA setup later:
 # scale to 3 replicas, give each pod its own node id / quorum voters (or install Strimzi) and
 # raise the replication factor. Topics are created by ThingsBoard itself on first start.
+#
+# Note on the dead topics / consumer groups left behind by every rollout: ThingsBoard creates one
+# topic "tb_core.notifications.<pod>" (and similar ones) per pod instance, and Kafka keeps the
+# committed offsets of the consumer group of a pod for the default offsets.retention.minutes
+# (7 days). Neither is used for the cluster membership - that is discovered through the ZooKeeper
+# nodes of 05-zookeeper.yaml - so the leftovers are harmless housekeeping debt, not a correctness
+# problem, and the broker defaults are left untouched on purpose. To reclaim the space run the
+# optional 96-kafka-cleanup.yaml job (it deletes only topics of pods that are not running, and only
+# consumer groups that are "Empty").
 apiVersion: v1
 kind: Service
 metadata:

@@ -470,7 +470,7 @@ Toàn bộ biến dưới đây do `thingsboard.yml` định nghĩa, đặt qua 
 | `ZOOKEEPER_SESSION_TIMEOUT_MS` | `30000` | tăng khi mạng chập chờn để tránh rebalance liên tục |
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://tb-postgres:5432/thingsboard` | |
 | `spring.jpa.hibernate.ddl-auto` | đã là `none` trong `thingsboard.yml` | schema chỉ do job install tạo/cập nhật |
-| `DATABASE_TS_TYPE` / `DATABASE_TS_LATEST_TYPE` | `cassandra` | hybrid: entities ở Postgres, telemetry ở Cassandra |
+| `DATABASE_TS_TYPE` / `DATABASE_TS_LATEST_TYPE` | `cassandra` | hybrid: entities ở Postgres, telemetry (kể cả latest) ở Cassandra; bắt buộc có bản vá §8.1 khi `DATABASE_TS_LATEST_TYPE=cassandra` |
 | `CASSANDRA_URL` / `CASSANDRA_KEYSPACE_NAME` | `tb-cassandra:9042` / `thingsboard` | |
 | `CASSANDRA_USE_CREDENTIALS` + `CASSANDRA_USERNAME`/`_PASSWORD` | `true` + secret | |
 | `METRICS_ENABLED` + `METRICS_ENDPOINTS_EXPOSE` | `true` + `info,health,prometheus` | `health` cần cho probe, `prometheus` cho scrape |
@@ -621,6 +621,53 @@ Hệ quả khi production dùng `DATABASE_TS_TYPE=cassandra`:
 Vì file nằm trong module `dao` (mã gốc ThingsBoard), khi merge upstream cần giữ lại hai đoạn này;
 header SPDX của file vẫn nguyên vẹn. Sau khi deploy image mới, widget dashboard chọn được data key
 như bản dùng PostgreSQL.
+
+### 8.1 Đã vá: widget dashboard hiển thị "N/A" dù telemetry có dữ liệu
+
+Nguyên nhân gốc (kiểm chứng trực tiếp trên cụm production ngày **2026-09-27**):
+
+- Cấu hình hybrid đang dùng: `DATABASE_TS_TYPE=cassandra` + `DATABASE_TS_LATEST_TYPE=cassandra`,
+  nên **toàn bộ** telemetry (lịch sử và latest) nằm trong Cassandra (`ts_kv_latest_cf`), còn bảng
+  `ts_kv_latest` của PostgreSQL rỗng (đo được: `0` dòng).
+- Widget "latest" của dashboard đăng ký qua WebSocket bằng `ENTITY_DATA` + `latestCmd`. Với mỗi
+  entity, server truy vấn entity data từ PostgreSQL; câu SQL `LEFT JOIN` bảng `ts_kv_latest`
+  (`EntityKeyMapping.buildLatestJoin`) nên **mọi key timeseries được yêu cầu đều có mặt trong kết
+  quả**, kể cả khi không có dòng dữ liệu — với giá trị placeholder `ts = 0, value = ""`
+  (`EntityDataAdapter.toEntityData`).
+- `DefaultTbEntityDataSubscriptionService.handleLatestCmd` chỉ tải các key "còn thiếu" từ
+  Cassandra (`missingTsKeys.removeAll(tsEntityData.keySet())`). Vì key đã "có" (placeholder) nên
+  **không có truy vấn Cassandra nào được phát**, frame WS mang đúng placeholder
+  `{"temperature":{"ts":0,"value":""}}` và widget hiển thị "N/A".
+- Vì vậy đây không phải lỗi Cassandra, Kafka hay partition: dữ liệu vẫn ghi và đọc bình thường qua
+  REST (`GET /api/plugins/telemetry/DEVICE/{id}/values/timeseries`).
+
+Bản vá nằm trong `application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbEntityDataSubscriptionService.java`:
+chỉ coi một key là "đã có" khi giá trị thật sự có `ts > 0`, nhờ đó placeholder được tải lại từ
+Cassandra trước khi gửi cho client — đúng mục đích của nhánh `if (!tsInSqlDB)` ("Fetch the latest
+values for telemetry keys in case they are not copied from NoSQL to SQL DB in hybrid mode").
+
+Giữ `DATABASE_TS_LATEST_TYPE=cassandra` để telemetry (kể cả latest) nằm gọn trong cụm k3s. Không
+đổi sang `DATABASE_TS_LATEST_TYPE=sql`: khi đó mỗi cặp `(entity, key)` phải ghi thêm một bản vào
+PostgreSQL managed ở ngoài cụm, biến database đó thành điểm nghẽn của luồng ghi telemetry.
+
+### 8.2 Kafka: consumer group rỗng **không** cần dọn thủ công
+
+- ThingsBoard tạo một topic (và một consumer group) cho **mỗi pod** cho các queue
+  notification/response (`tb_core.notifications.<pod>`, `js_executor` responses, transport
+  responses, ...). Khi pod bị xoá, topic và group vẫn còn lại.
+- Những group này **không** tham gia việc khám phá thành viên cụm. Membership nằm ở ZooKeeper:
+  `ZkDiscoveryService` tạo node `EPHEMERAL_SEQUENTIAL` và ZooKeeper tự xoá node khi pod chết. Trong
+  repo này `listConsumerGroups` chỉ xuất hiện trong test (`TbKafkaAdminTest`), không có ở runtime.
+- Kafka tự dọn group rỗng sau `offsets.retention.minutes` (mặc định **7 ngày**). Không cần cấu hình
+  thêm, và **không nên** rút ngắn: ThingsBoard đặt `queue.kafka.auto_offset_reset=earliest`
+  (`TbKafkaSettings`), nên nếu offset của một group bị mất trong lúc pod ngừng chạy lâu, consumer sẽ
+  đọc lại topic từ đầu.
+- Việc duy nhất đáng làm là housekeeping (không ảnh hưởng tính đúng): chạy
+  `deploy/k3s/96-kafka-cleanup.yaml` (chỉ xoá topic của pod không còn chạy và group ở trạng thái
+  `Empty`) khi số topic chết tăng cao.
+- Kiểm chứng **2026-09-27**: ZooKeeper có đúng **10** node = 10 pod Java đang chạy; sau khi xoá các
+  group `Empty` của pod đã xoá, log `Found common server` của `HashPartitionService` liệt kê đúng
+  các pod đang chạy.
 
 ## 9. Bằng chứng: code không bị cắt bỏ nhánh production
 

@@ -63,6 +63,7 @@ import org.thingsboard.server.service.ws.telemetry.cmd.v2.UnsubscribeCmd;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -702,10 +703,8 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
             for (EntityData entityData : ctx.getData().getData()) {
                 Map<EntityKeyType, Map<String, TsValue>> latestEntityData = entityData.getLatest();
                 Map<String, TsValue> tsEntityData = latestEntityData.get(EntityKeyType.TIME_SERIES);
-                Set<String> missingTsKeys = new LinkedHashSet<>(allTsKeys);
-                if (tsEntityData != null) {
-                    missingTsKeys.removeAll(tsEntityData.keySet());
-                } else {
+                Set<String> missingTsKeys = getMissingTsKeys(allTsKeys, tsEntityData);
+                if (tsEntityData == null) {
                     tsEntityData = new HashMap<>();
                     latestEntityData.put(EntityKeyType.TIME_SERIES, tsEntityData);
                 }
@@ -763,6 +762,27 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
 
     private Map<String, TsValue> toTsValue(List<TsKvEntry> data) {
         return data.stream().collect(Collectors.toMap(TsKvEntry::getKey, value -> new TsValue(value.getTs(), value.getValueAsString())));
+    }
+
+    /**
+     * Returns the requested telemetry keys whose latest value has to be fetched from the timeseries DB.
+     * <p>
+     * The entity data is selected from the SQL DB by left joining the 'ts_kv_latest' table, so in hybrid
+     * mode (the latest values are kept in Cassandra) every requested key is present in the map even when
+     * there is no latest value in the SQL DB - with a placeholder value (ts = 0, empty value). Such keys
+     * must be treated as missing, otherwise the placeholders are sent to the widgets and they display
+     * "N/A" although the telemetry is stored.
+     */
+    static Set<String> getMissingTsKeys(Collection<String> allTsKeys, @Nullable Map<String, TsValue> tsEntityData) {
+        Set<String> missingTsKeys = new LinkedHashSet<>(allTsKeys);
+        if (tsEntityData != null) {
+            tsEntityData.forEach((key, value) -> {
+                if (value != null && value.getTs() > 0) {
+                    missingTsKeys.remove(key);
+                }
+            });
+        }
+        return missingTsKeys;
     }
 
     @Override

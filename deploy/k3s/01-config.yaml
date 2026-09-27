@@ -62,6 +62,11 @@ data:
   # created/upgraded by the tb-install job only.
   # Cassandra in the cluster (06-cassandra.yaml): telemetry and latest telemetry. The traffic stays
   # inside the namespace (NetworkPolicy), so no TLS is needed between the services and the node.
+  # Keeping the latest values in Cassandra (instead of the hybrid default 'sql', which would write
+  # one extra row per (entity, key) into the managed PostgreSQL) relies on the fork patch described
+  # in docs/production-k3s.md §8.1: without it the dashboards show "N/A" for latest values, because
+  # the entity data query returns a ts=0 placeholder from the empty SQL 'ts_kv_latest' table and the
+  # subscription service then never fetches the value from Cassandra.
   DATABASE_TS_TYPE: cassandra
   DATABASE_TS_LATEST_TYPE: cassandra
   CASSANDRA_URL: tb-cassandra:9042
