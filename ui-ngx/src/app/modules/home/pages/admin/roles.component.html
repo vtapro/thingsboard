@@ -78,13 +78,13 @@
                     <tr mat-row *matRowDef="let row; columns: roleColumns;"></tr>
                   </table>
                 </div>
+              }
                 <mat-paginator [length]="roles.length"
                                [pageIndex]="rolePageIndex"
                                [pageSize]="rolePageSize"
                                [pageSizeOptions]="pageSizeOptions"
                                (page)="onRolePageChange($event)"
                                showFirstLastButtons></mat-paginator>
-              }
             </section>
           </div>
         </mat-tab>
@@ -162,13 +162,13 @@
                   <tr mat-row *matRowDef="let row; columns: groupColumns;"></tr>
                 </table>
                 </div>
+              }
                 <mat-paginator [length]="groups.length"
                                [pageIndex]="groupPageIndex"
                                [pageSize]="groupPageSize"
                                [pageSizeOptions]="pageSizeOptions"
                                (page)="onGroupPageChange($event)"
                                showFirstLastButtons></mat-paginator>
-              }
             </section>
           </div>
         </mat-tab>
@@ -260,13 +260,13 @@
                   <tr mat-row *matRowDef="let row; columns: userGroupColumns;"></tr>
                 </table>
                 </div>
+              }
                 <mat-paginator [length]="userGroups.length"
                                [pageIndex]="userGroupPageIndex"
                                [pageSize]="userGroupPageSize"
                                [pageSizeOptions]="pageSizeOptions"
                                (page)="onUserGroupPageChange($event)"
                                showFirstLastButtons></mat-paginator>
-              }
             </section>
           </div>
         </mat-tab>
@@ -317,13 +317,13 @@
                   <tr mat-row *matRowDef="let row; columns: hierarchyColumns;"></tr>
                 </table>
                 </div>
+              }
                 <mat-paginator [length]="hierarchyRows.length"
                                [pageIndex]="hierarchyPageIndex"
                                [pageSize]="hierarchyPageSize"
                                [pageSizeOptions]="pageSizeOptions"
                                (page)="onHierarchyPageChange($event)"
                                showFirstLastButtons></mat-paginator>
-              }
             </section>
           </div>
         </mat-tab>
