@@ -37,6 +37,15 @@
 
 .tb-group-entities-table {
   width: 100%;
+
+  /* the rows open the entity details panel, like the entities table of the entity type */
+  tr.mat-mdc-row {
+    cursor: pointer;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+  }
 }
 
 .tb-group-entities-name {

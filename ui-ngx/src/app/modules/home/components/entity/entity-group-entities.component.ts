@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { Store } from '@ngrx/store';
@@ -8,12 +8,18 @@ import { TranslateService } from '@ngx-translate/core';
 import { PageComponent } from '@shared/components/page.component';
 import { AppState } from '@core/core.state';
 import { defaultHttpOptionsFromConfig } from '@core/http/http-utils';
+import { DialogService } from '@core/services/dialog.service';
 import { entityDataToEntityInfo, EntityData, EntityKeyType } from '@shared/models/query/query.models';
 import { PageData } from '@shared/models/page/page-data';
+import { BaseData, HasId } from '@shared/models/base-data';
+import { EntityId } from '@shared/models/id/entity-id';
+import { EntityType } from '@shared/models/entity-type.models';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { MatDialog } from '@angular/material/dialog';
 import { AddEntityDialogComponent } from './add-entity-dialog.component';
+import { EntityDetailsPanelComponent } from './entity-details-panel.component';
+import { EntityAction } from '@home/models/entity/entity-component.models';
 
 import { EntityGroupInfo } from './entity-group.resolver';
 
@@ -49,12 +55,18 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
   pageIndex = 0;
   pageSize = 10;
   totalElements = 0;
+  /** Entity whose details are shown in the side panel (like the "All" table of the entity type). */
+  isDetailsOpen = false;
+  selectedEntityId: EntityId = null;
+
+  @ViewChild('entityDetailsPanel') entityDetailsPanel: EntityDetailsPanelComponent;
 
   constructor(protected store: Store<AppState>,
               private http: HttpClient,
               private route: ActivatedRoute,
               private router: Router,
               private dialog: MatDialog,
+              private dialogService: DialogService,
               private translate: TranslateService) {
     super(store);
     this.entityType = this.route.snapshot.data.entityType;
@@ -84,7 +96,8 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
   }
 
   private pageTitle = '';
-  private tableConfig: any;
+  /** Entity table config of the entity type (resolved by the router), needed by the details panel. */
+  tableConfig: any;
 
   get entityNameLabel(): string {
     return this.translate.instant(this.nameKey());
@@ -108,6 +121,48 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
     this.pageIndex = event.pageIndex;
     this.pageSize = event.pageSize;
     this.loadPage();
+  }
+
+  /** Clicking a row opens the entity details panel (PE opens the same panel from the entities of a group). */
+  onRowClick(entity: GroupEntity): void {
+    const entityId: EntityId = {id: entity.id, entityType: this.entityType as EntityType};
+    if (this.selectedEntityId?.id === entityId.id) {
+      this.isDetailsOpen = !this.isDetailsOpen;
+      return;
+    }
+    this.selectedEntityId = entityId;
+    this.isDetailsOpen = true;
+  }
+
+  closeEntityDetails(): void {
+    this.isDetailsOpen = false;
+  }
+
+  /** The entity was changed (renamed, profile changed, ...) from the details panel: refresh the list. */
+  onEntityUpdated(): void {
+    this.reload();
+  }
+
+  /** The details panel asks the page to delete the entity. */
+  onEntityAction(action: EntityAction<BaseData<HasId>>): void {
+    if (action.action !== 'delete' || !this.tableConfig) {
+      return;
+    }
+    this.dialogService.confirm(
+      this.tableConfig.deleteEntityTitle(action.entity),
+      this.tableConfig.deleteEntityContent(action.entity),
+      this.translate.instant('action.no'),
+      this.translate.instant('action.yes'),
+      true
+    ).subscribe(result => {
+      if (result) {
+        this.tableConfig.deleteEntity(action.entity.id).subscribe(() => {
+          this.isDetailsOpen = false;
+          this.selectedEntityId = null;
+          this.reload();
+        });
+      }
+    });
   }
 
   reload(): void {
