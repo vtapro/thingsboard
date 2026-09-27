@@ -1,25 +1,59 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
 .tb-role-dialog-content {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
   padding-top: 4px;
 }
 
-.tb-role-dialog-identity {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+/*
+ * Two columns: the identity/users/summary of the role on the left, the permission matrix on the right, so the
+ * whole dialog is visible without scrolling on a normal screen. Below 900px the columns are stacked.
+ */
+.tb-role-dialog-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
   gap: 8px 24px;
+  align-items: start;
+
+  @media (max-width: 900px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
-.tb-role-dialog-name {
-  flex: 1 1 320px;
-  min-width: 240px;
-  max-width: 480px;
+.tb-role-dialog-side,
+.tb-role-dialog-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tb-role-dialog-side {
+  gap: 16px;
+}
+
+.tb-role-dialog-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 
 .tb-role-dialog-own-customer {
-  flex: 0 0 auto;
+  align-self: flex-start;
+}
+
+.tb-role-dialog-summary-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tb-role-dialog-summary-ops {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 20px;
+  color: rgba(0, 0, 0, 0.7);
+  overflow-wrap: anywhere;
 }

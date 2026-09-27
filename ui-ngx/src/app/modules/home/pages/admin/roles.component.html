@@ -191,8 +191,17 @@
                       <mat-form-field class="tb-roles-users-select" subscriptSizing="dynamic" appearance="outline">
                         <mat-select multiple [value]="group.userIds || []"
                                     (selectionChange)="setUserGroupUsers(group, $event.value)">
-                          @for (user of users; track user.id.id) {
+                          <div class="tb-roles-select-search" (click)="$event.stopPropagation()">
+                            <mat-icon>search</mat-icon>
+                            <input #groupUserSearch type="text" [attr.placeholder]="'action.search' | translate"
+                                   (input)="userGroupUserSearch = groupUserSearch.value"
+                                   (keydown)="$event.stopPropagation()">
+                          </div>
+                          @for (user of filteredUsers(); track user.id.id) {
                             <mat-option [value]="user.id.id">{{ userLabel(user) }}</mat-option>
+                          }
+                          @if (!filteredUsers().length) {
+                            <div class="tb-roles-select-empty">{{ 'admin.roles-no-user-found' | translate }}</div>
                           }
                         </mat-select>
                       </mat-form-field>
@@ -204,8 +213,17 @@
                       <mat-form-field class="tb-roles-users-select" subscriptSizing="dynamic" appearance="outline">
                         <mat-select multiple [value]="group.roleIds || []"
                                     (selectionChange)="setUserGroupRoles(group, $event.value)">
-                          @for (role of roles; track role.id) {
+                          <div class="tb-roles-select-search" (click)="$event.stopPropagation()">
+                            <mat-icon>search</mat-icon>
+                            <input #groupRoleSearch type="text" [attr.placeholder]="'action.search' | translate"
+                                   (input)="userGroupRoleSearch = groupRoleSearch.value"
+                                   (keydown)="$event.stopPropagation()">
+                          </div>
+                          @for (role of filteredRoles(); track role.id) {
                             <mat-option [value]="role.id">{{ role.name }}</mat-option>
+                          }
+                          @if (!filteredRoles().length) {
+                            <div class="tb-roles-select-empty">{{ 'admin.roles-no-role-found' | translate }}</div>
                           }
                         </mat-select>
                       </mat-form-field>

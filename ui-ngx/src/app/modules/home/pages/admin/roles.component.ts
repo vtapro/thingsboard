@@ -119,6 +119,10 @@ export class RolesComponent extends PageComponent implements OnInit {
   readonly userGroupColumns = ['name', 'userIds', 'roleIds', 'actions'];
   readonly hierarchyColumns = ['child', 'parent', 'actions'];
 
+  /** Free text used to filter the user (and role) selects of the user groups tab. */
+  userGroupUserSearch = '';
+  userGroupRoleSearch = '';
+
   roles: RbacRole[] = [];
   users: TenantUserInfo[] = [];
   groups: RbacEntityGroup[] = [];
@@ -174,7 +178,7 @@ export class RolesComponent extends PageComponent implements OnInit {
         groupScopedResources: this.groupScopedResources,
         ownScopedResources: this.ownScopedResources
       },
-      width: '960px',
+      width: '1080px',
       maxWidth: '94vw',
       maxHeight: '92vh',
       autoFocus: false
@@ -290,6 +294,24 @@ export class RolesComponent extends PageComponent implements OnInit {
       .filter(user => !!user)
       .map(user => user.email);
     return names.length ? names.join(', ') : this.translate.instant('admin.roles-users-count', {count});
+  }
+
+  /** Users matching the search box of the user select of the user groups tab. */
+  filteredUsers(): TenantUserInfo[] {
+    const term = (this.userGroupUserSearch || '').trim().toLowerCase();
+    if (!term) {
+      return this.users;
+    }
+    return this.users.filter(user => this.userLabel(user).toLowerCase().includes(term));
+  }
+
+  /** Roles matching the search box of the role select of the user groups tab. */
+  filteredRoles(): RbacRole[] {
+    const term = (this.userGroupRoleSearch || '').trim().toLowerCase();
+    if (!term) {
+      return this.roles;
+    }
+    return this.roles.filter(role => role.name.toLowerCase().includes(term));
   }
 
   loadUsers() {

@@ -62,6 +62,8 @@ export class RoleDialogComponent {
   nameControl = new FormControl('', [Validators.required]);
   ownCustomerOnlyControl = new FormControl(false);
   userIds: string[] = [];
+  /** Free text used to filter the list of users of the "Assign users" select. */
+  userSearch = '';
 
   /** Permissions of the role being edited, per entity type (resource). Each entity type has its own tab. */
   private permissionDraft: { [resource: string]: { [operation: string]: boolean } } = {};
@@ -143,6 +145,19 @@ export class RoleDialogComponent {
     return this.resources.some(resource => this.hasAnyOperation(resource));
   }
 
+  /** Live summary of the permissions ticked so far, one entry per entity type. */
+  grantedSummary(): Array<{resource: string; operations: string}> {
+    return this.resources
+      .filter(resource => this.hasAnyOperation(resource))
+      .map(resource => ({
+        resource,
+        operations: this.operationsFor(resource)
+          .filter(operation => this.isOperationGranted(resource, operation))
+          .map(operation => this.operationLabel(operation))
+          .join(', ')
+      }));
+  }
+
   /** Applies a preset (Viewer / Operator / Manager / Self-managed / Admin) to the entity type. */
   applyPreset(resource: string, presetId: string): void {
     const available = this.operationsFor(resource);
@@ -210,6 +225,15 @@ export class RoleDialogComponent {
   userLabel(user: RoleDialogUser): string {
     const name = [user.firstName, user.lastName].filter(Boolean).join(' ');
     return name ? `${name} (${user.email})` : user.email;
+  }
+
+  /** Users matching the search box of the select (name or email). */
+  filteredUsers(): RoleDialogUser[] {
+    const term = (this.userSearch || '').trim().toLowerCase();
+    if (!term) {
+      return this.users;
+    }
+    return this.users.filter(user => this.userLabel(user).toLowerCase().includes(term));
   }
 
   cancel(): void {

@@ -8,23 +8,66 @@
   {{ (isEdit ? 'admin.roles-update' : 'admin.roles-add') | translate }}
 </h2>
 <mat-dialog-content class="tb-role-dialog-content">
-  <div class="tb-role-dialog-identity">
-    <mat-form-field class="tb-role-dialog-name" subscriptSizing="dynamic" appearance="outline">
-      <mat-label translate>admin.roles-name</mat-label>
-      <input matInput [formControl]="nameControl" required>
-      @if (nameControl.invalid) {
-        <mat-error translate>admin.roles-name-required</mat-error>
-      }
-    </mat-form-field>
-    <mat-checkbox class="tb-role-dialog-own-customer" [formControl]="ownCustomerOnlyControl">
-      {{ 'admin.roles-own-customer-only' | translate }}
-    </mat-checkbox>
-  </div>
+  <div class="tb-role-dialog-grid">
 
-  <div class="tb-roles-section-title" translate>admin.roles-permissions</div>
-  <div class="tb-roles-hint" translate>admin.roles-permissions-hint</div>
+    <!-- left column: identity of the role, assignment and a live summary of the granted permissions -->
+    <div class="tb-role-dialog-side">
+      <div class="tb-role-dialog-group">
+        <div class="tb-roles-section-title" translate>admin.roles-general</div>
+        <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
+          <mat-label translate>admin.roles-name</mat-label>
+          <input matInput [formControl]="nameControl" required>
+          @if (nameControl.invalid) {
+            <mat-error translate>admin.roles-name-required</mat-error>
+          }
+        </mat-form-field>
+        <mat-checkbox class="tb-role-dialog-own-customer" [formControl]="ownCustomerOnlyControl">
+          {{ 'admin.roles-own-customer-only' | translate }}
+        </mat-checkbox>
+      </div>
 
-  <mat-tab-group class="tb-roles-resource-tabs" mat-stretch-tabs="false" mat-align-tabs="start">
+      <div class="tb-role-dialog-group">
+        <div class="tb-roles-section-title" translate>admin.roles-users</div>
+        <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
+          <mat-label translate>admin.roles-assign-users</mat-label>
+          <mat-select multiple [value]="userIds" (selectionChange)="userIds = $event.value">
+            <div class="tb-roles-select-search" (click)="$event.stopPropagation()">
+              <mat-icon>search</mat-icon>
+              <input #userSearchInput type="text" [attr.placeholder]="'action.search' | translate"
+                     (input)="userSearch = userSearchInput.value"
+                     (keydown)="$event.stopPropagation()">
+            </div>
+            @for (user of filteredUsers(); track user.id.id) {
+              <mat-option [value]="user.id.id">{{ userLabel(user) }}</mat-option>
+            }
+            @if (!filteredUsers().length) {
+              <div class="tb-roles-select-empty">{{ 'admin.roles-no-user-found' | translate }}</div>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="tb-role-dialog-group tb-role-dialog-summary">
+        <div class="tb-roles-section-title" translate>admin.roles-summary</div>
+        @if (!grantedSummary().length) {
+          <div class="tb-roles-hint" translate>admin.roles-no-permissions</div>
+        } @else {
+          @for (item of grantedSummary(); track item.resource) {
+            <div class="tb-role-dialog-summary-row">
+              <span class="tb-roles-chip tb-roles-chip-scoped">{{ item.resource }}</span>
+              <span class="tb-role-dialog-summary-ops">{{ item.operations }}</span>
+            </div>
+          }
+        }
+      </div>
+    </div>
+
+    <!-- right column: the permission matrix of the role -->
+    <div class="tb-role-dialog-main">
+      <div class="tb-roles-section-title" translate>admin.roles-permissions</div>
+      <div class="tb-roles-hint" translate>admin.roles-permissions-hint</div>
+
+      <mat-tab-group class="tb-roles-resource-tabs" mat-stretch-tabs="false" mat-align-tabs="start">
     @for (resource of resources; track resource) {
       <mat-tab>
         <ng-template mat-tab-label>
@@ -88,16 +131,8 @@
       </mat-tab>
     }
   </mat-tab-group>
-
-  <div class="tb-roles-section-title" translate>admin.roles-users</div>
-  <mat-form-field class="tb-roles-users-select" subscriptSizing="dynamic" appearance="outline">
-    <mat-label translate>admin.roles-assign-users</mat-label>
-    <mat-select multiple [value]="userIds" (selectionChange)="userIds = $event.value">
-      @for (user of users; track user.id.id) {
-        <mat-option [value]="user.id.id">{{ userLabel(user) }}</mat-option>
-      }
-    </mat-select>
-  </mat-form-field>
+    </div>
+  </div>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
   <button mat-button type="button" (click)="cancel()">
