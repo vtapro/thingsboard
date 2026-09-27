@@ -122,6 +122,8 @@ export class RolesComponent extends PageComponent implements OnInit {
   readonly pageSizeOptions = [10, 20, 50];
 
   /** Paging of the entity groups, the user groups and the customer hierarchy tables. */
+  rolePageIndex = 0;
+  rolePageSize = 10;
   groupPageIndex = 0;
   groupPageSize = 10;
   userGroupPageIndex = 0;
@@ -164,7 +166,25 @@ export class RolesComponent extends PageComponent implements OnInit {
 
   loadRoles() {
     this.http.get<{roles: RbacRole[]}>('/api/tenant/role', defaultHttpOptionsFromConfig(undefined))
-      .subscribe(settings => this.roles = settings?.roles || []);
+      .subscribe(settings => {
+      this.roles = settings?.roles || [];
+      this.clampRolePage();
+    });
+  }
+
+  /** Rows of the current page of the roles table. */
+  get pagedRoles(): RbacRole[] {
+    const start = this.rolePageIndex * this.rolePageSize;
+    return this.roles.slice(start, start + this.rolePageSize);
+  }
+
+  onRolePageChange(event: PageEvent): void {
+    this.rolePageIndex = event.pageIndex;
+    this.rolePageSize = event.pageSize;
+  }
+
+  private clampRolePage(): void {
+    this.rolePageIndex = this.clampPageIndex(this.rolePageIndex, this.roles.length, this.rolePageSize);
   }
 
   /** Opens the role dialog (without a role = create a new one), then persists the whole list of roles. */
@@ -239,6 +259,7 @@ export class RolesComponent extends PageComponent implements OnInit {
       defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
       next: settings => {
         this.roles = settings?.roles || roles;
+        this.clampRolePage();
         this.notifySaved('admin.roles-save-success');
       },
       error: (error: HttpErrorResponse) => {
