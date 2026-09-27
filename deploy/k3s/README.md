@@ -10,8 +10,11 @@ deployments, each one started with a different `TB_SERVICE_TYPE`. Local developm
 using PostgreSQL + `in-memory` queue (see `docs/local-dev.md`); Kafka, ZooKeeper and Cassandra
 are required here only.
 
-PostgreSQL and Cassandra are **managed clusters on two dedicated servers outside k3s** (TLS
-enabled, public host names configured in `01-config.yaml`). ZooKeeper (and Kafka, unless an
+Only PostgreSQL is a **managed cluster on a dedicated server outside k3s** (TLS enabled, public
+host name configured in `01-config.yaml`). Cassandra, Kafka and ZooKeeper run **inside the
+cluster** (`04-kafka.yaml`, `05-zookeeper.yaml`, `06-cassandra.yaml`), so telemetry never leaves
+the cluster: the CQL traffic used to cross the public network to a managed Cassandra, which added
+a WAN round trip (and TLS) to every telemetry read and write. ZooKeeper (and Kafka, unless an
 existing broker is used — see `docs/production-k3s.md` §3.1b) run **inside the cluster**
 (`04-kafka.yaml`, `05-zookeeper.yaml`) together with the ThingsBoard services. There is no Redis:
 the cache is in-process (caffeine) with short TTLs.
@@ -30,16 +33,23 @@ numbers and the small-cluster tuning are in `docs/production-k3s.md` section 3.3
 | `02-secret.example.yaml` | template of the `Secret` — create the real one with `kubectl`, never commit values |
 | `04-kafka.yaml` | in-cluster Kafka (KRaft, single broker, local-path PVC) |
 | `05-zookeeper.yaml` | in-cluster ZooKeeper (discovery of the ThingsBoard cluster) |
+| `06-cassandra.yaml` | in-cluster Cassandra (telemetry + latest telemetry, local-path PVC) |
+| `06b-cassandra-init.yaml` | one shot job that creates the `greeniq` keyspace |
+| `09-cache-specs.yaml` | cache specs shared by the services (no Redis) |
 | `10-install-job.yaml` | one shot schema install/upgrade (`RUN_INSTALL_ONLY=true`) |
 | `20-tb-core.yaml` | REST API + entity/telemetry handling, 2 replicas, HPA |
 | `21-tb-rule-engine.yaml` | rule engine, 2 replicas, HPA |
 | `22-tb-mqtt-transport.yaml` | MQTT transport, 2 replicas + `LoadBalancer` |
 | `23-tb-http-transport.yaml` | HTTP transport, 2 replicas |
 | `24-protocol-transports.yaml` | optional CoAP / LwM2M / SNMP transports |
+| `25-tb-web-ui.yaml` | web UI |
+| `26-tb-js-executor.yaml` | JS executor (rule engine scripts) |
+| `30-haproxy.yaml` | HAProxy: `app.greeniq.vn` (HTTP/HTTPS) and the public MQTT port |
+| `40-hpa.yaml` | horizontal pod autoscalers (CPU based, min 1 pod) |
 | `30-ingress.yaml` | ingress for the web UI and `/api` |
 
-The two managed databases must accept the public IPs of the k3s nodes (whitelist them in the
-provider console) and are reached over TLS. See `docs/production-k3s.md` section 3 for the
+The managed PostgreSQL must accept the public IPs of the k3s nodes (whitelist them in the
+provider console) and is reached over TLS. See `docs/production-k3s.md` section 3 for the
 credentials, the TLS switches and the connectivity check.
 
 Before applying anything, read `docs/production-k3s.md`: it lists the image build (GHCR), the
@@ -55,15 +65,19 @@ kubectl apply -f deploy/k3s/01-config.yaml
 # in-cluster infrastructure: ZooKeeper, and Kafka unless an existing broker is used
 kubectl apply -f deploy/k3s/05-zookeeper.yaml
 kubectl apply -f deploy/k3s/04-kafka.yaml
+kubectl apply -f deploy/k3s/06-cassandra.yaml
 kubectl -n thingsboard rollout status statefulset/tb-zookeeper --timeout=5m
 kubectl -n thingsboard rollout status statefulset/tb-kafka --timeout=5m
+kubectl -n thingsboard rollout status statefulset/tb-cassandra --timeout=10m
+
+# keyspace of the telemetry database (idempotent, once per cluster)
+kubectl apply -f deploy/k3s/06b-cassandra-init.yaml
+kubectl -n thingsboard wait --for=condition=complete job/tb-cassandra-init --timeout=5m
 
 # secrets (never committed) — copy 02-secret.example.yaml and replace every value
 kubectl -n thingsboard create secret generic tb-secrets \
   --from-literal=SPRING_DATASOURCE_USERNAME=postgres \
   --from-literal=SPRING_DATASOURCE_PASSWORD='<password>' \
-  --from-literal=CASSANDRA_USERNAME=cassandra \
-  --from-literal=CASSANDRA_PASSWORD='<password>' \
   --from-literal=REDIS_PASSWORD='<password>'
 
 # the manifests already point to ghcr.io/vtapro/greeniq-thingsboard:v4.4.0.0;

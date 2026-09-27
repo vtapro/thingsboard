@@ -170,6 +170,13 @@ vào ServiceAccount của namespace).
 
 ## 3. Data plane: 2 database managed ngoài cụm + hạ tầng trong cụm
 
+> **Cập nhật (2026-09-27):** Cassandra **đã chuyển vào trong cụm k3s** — `deploy/k3s/06-cassandra.yaml`
+> (StatefulSet 1 node, PVC local-path, service `tb-cassandra`) + `06b-cassandra-init.yaml` (tạo keyspace
+> `greeniq`). ThingsBoard trỏ `CASSANDRA_URL=tb-cassandra:9042`, `CASSANDRA_USE_CREDENTIALS=false`
+> (đúng như hướng dẫn cài đặt Ubuntu của ThingsBoard) và **không dùng TLS** cho CQL vì traffic chỉ đi
+> trong namespace (NetworkPolicy). Toàn bộ mô tả CloudClusters/TLS/truststore bên dưới chỉ còn dùng khi
+> muốn quay lại Cassandra managed ở ngoài cụm.
+
 PostgreSQL và Cassandra là **2 cluster managed, nằm ngoài k3s**, đều bật SSL:
 
 | | Endpoint | Port | Ghi chú |
