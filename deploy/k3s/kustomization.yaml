@@ -17,6 +17,9 @@ resources:
   # in-cluster infrastructure
   - 04-kafka.yaml
   - 05-zookeeper.yaml
+  # telemetry database inside the cluster (the managed one outside k3s was removed)
+  - 06-cassandra.yaml
+  - 06b-cassandra-init.yaml
   # Kafka/ZooKeeper accept connections only from pods of this namespace
   - 07-network-policies.yaml
   # cache.specs shared by every service (the transport yml has none, and there is no Redis)

@@ -40,6 +40,7 @@ interface TenantUserInfo {
   email: string;
   firstName?: string;
   lastName?: string;
+  authority?: string;
 }
 
 interface RbacEntityGroup {
@@ -144,6 +145,12 @@ export class RolesComponent extends PageComponent implements OnInit {
 
   private loadedUserGroupIds: string[] = [];
 
+  /**
+   * Users that can not be a member of a role: the tenant administrators (and the system administrators) always
+   * keep the full set of permissions of the platform, a role is meant for the users of the tenant only.
+   */
+  private nonAssignableUserIds = new Set<string>();
+
   constructor(protected store: Store<AppState>,
               private http: HttpClient,
               private translate: TranslateService,
@@ -199,7 +206,10 @@ export class RolesComponent extends PageComponent implements OnInit {
   private openRoleDialog(role?: RbacRole) {
     this.dialog.open<RoleDialogComponent, any, RoleDialogResult>(RoleDialogComponent, {
       data: {
-        role,
+        // never show a (legacy) tenant administrator assignment in the dialog
+        role: role
+          ? {...role, userIds: (role.userIds || []).filter(id => !this.nonAssignableUserIds.has(id))}
+          : undefined,
         users: this.users,
         resources: this.resources,
         operationsByResource: this.operationsByResource,
@@ -230,7 +240,8 @@ export class RolesComponent extends PageComponent implements OnInit {
         scopedPermissions: result.scopedPermissions,
         ownOnly: result.ownOnly,
         ownCustomerOnly: result.ownCustomerOnly,
-        userIds: result.userIds
+        // a tenant administrator is never a member of a role (the dialog does not offer them either)
+        userIds: (result.userIds || []).filter(id => !this.nonAssignableUserIds.has(id))
       };
       const roles = role
         ? this.roles.map(r => r.id === role.id ? savedRole : r)
@@ -316,11 +327,13 @@ export class RolesComponent extends PageComponent implements OnInit {
   }
 
   roleUsersLabel(role: RbacRole): string {
-    const count = (role.userIds || []).length;
+    // tenant administrators are not members of a role, ignore the (old) assignments of them
+    const userIds = (role.userIds || []).filter(id => !this.nonAssignableUserIds.has(id));
+    const count = userIds.length;
     if (!count) {
       return this.translate.instant('admin.roles-no-users');
     }
-    const names = (role.userIds || [])
+    const names = userIds
       .map(id => this.users.find(user => user.id.id === id))
       .filter(user => !!user)
       .map(user => user.email);
@@ -360,7 +373,10 @@ export class RolesComponent extends PageComponent implements OnInit {
         if (data?.hasNext && loadedPages < MAX_USER_PAGES) {
           this.loadUsersPage(page + 1, loaded, loadedPages + 1);
         } else {
-          this.users = loaded;
+          this.nonAssignableUserIds = new Set(loaded
+            .filter(user => user.authority === 'TENANT_ADMIN' || user.authority === 'SYS_ADMIN')
+            .map(user => user.id.id));
+          this.users = loaded.filter(user => !this.nonAssignableUserIds.has(user.id.id));
         }
       });
   }

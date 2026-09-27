@@ -43,11 +43,26 @@ Apply-Manifest "00-namespace.yaml"
 Apply-Manifest "01-config.yaml"
 Apply-Manifest "05-zookeeper.yaml"
 Apply-Manifest "04-kafka.yaml"
+Apply-Manifest "06-cassandra.yaml"
 Apply-Manifest "07-network-policies.yaml"
 
 Write-Host "==> cho Kafka va ZooKeeper ready"
 & $Kubectl -n $Namespace rollout status statefulset/tb-zookeeper --timeout=5m | Out-Host
 & $Kubectl -n $Namespace rollout status statefulset/tb-kafka --timeout=5m | Out-Host
+
+Write-Host "==> cho Cassandra trong cum ready (lan dau co the mat 2-3 phut)"
+& $Kubectl -n $Namespace rollout status statefulset/tb-cassandra --timeout=10m | Out-Host
+if ($LASTEXITCODE -ne 0) { throw "tb-cassandra khong ready" }
+
+# Tao role/keyspace cho Cassandra trong cum (idempotent) - phai chay truoc khi service ket noi.
+Write-Host "==> chay job tb-cassandra-init (role + keyspace)"
+& $Kubectl -n $Namespace delete job tb-cassandra-init --ignore-not-found | Out-Host
+Apply-Manifest "06b-cassandra-init.yaml"
+& $Kubectl -n $Namespace wait --for=condition=complete job/tb-cassandra-init --timeout=5m | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    & $Kubectl -n $Namespace logs job/tb-cassandra-init --tail=60 | Out-Host
+    throw "tb-cassandra-init khong hoan thanh"
+}
 
 if ($OnlyInfrastructure) {
     Write-Host "==> chi ha tang, dung o day (--OnlyInfrastructure)"

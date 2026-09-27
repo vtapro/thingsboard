@@ -1,0 +1,173 @@
+#
+# SPDX-FileCopyrightText: Copyright The ThingsBoard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Cassandra in the cluster: telemetry (ts_kv_cf) and latest telemetry (ts_kv_latest_cf).
+#
+# Why in-cluster: the managed Cassandra outside k3s added a WAN hop (and TLS) to every telemetry
+# read/write, which is the hot path of the platform.
+#
+# Topology: one node, replication factor 1 (like the previous single managed node). To grow:
+#   1. raise .spec.replicas below,
+#   2. the keyspace "greeniq" is created with NetworkTopologyStrategy and one replica per DC, so a
+#      second/third node only helps after raising the replication factor:
+#        ALTER KEYSPACE greeniq WITH replication = {'class': 'NetworkTopologyStrategy', 'DC1': 3};
+#   3. a Cassandra node needs its own volume: with the local-path provisioner each replica is bound
+#      to the node it first started on, so a lost node means a lost replica - use a replicated
+#      storage class (Longhorn, Ceph, ...) if the data must survive a node failure.
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-cassandra
+  namespace: thingsboard
+  labels:
+    app: tb-cassandra
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  selector:
+    app: tb-cassandra
+  ports:
+    - name: cql
+      port: 9042
+      targetPort: 9042
+---
+# Headless service: gives every pod a stable name (tb-cassandra-0.tb-cassandra-headless...),
+# which is what a Cassandra cluster uses as seeds when it is scaled out.
+apiVersion: v1
+kind: Service
+metadata:
+  name: tb-cassandra-headless
+  namespace: thingsboard
+  labels:
+    app: tb-cassandra
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  clusterIP: None
+  selector:
+    app: tb-cassandra
+  ports:
+    - name: cql
+      port: 9042
+      targetPort: 9042
+    - name: intra
+      port: 7000
+      targetPort: 7000
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tb-cassandra
+  namespace: thingsboard
+  labels:
+    app: tb-cassandra
+    app.kubernetes.io/name: tb-cassandra
+    app.kubernetes.io/part-of: thingsboard
+spec:
+  serviceName: tb-cassandra-headless
+  replicas: 1
+  podManagementPolicy: OrderedReady
+  selector:
+    matchLabels:
+      app: tb-cassandra
+  template:
+    metadata:
+      labels:
+        app: tb-cassandra
+    spec:
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: cassandra
+          image: cassandra:4.1
+          imagePullPolicy: IfNotPresent
+          # No authentication, exactly like the "Install Cassandra" chapter of the ThingsBoard
+          # Ubuntu guide (CASSANDRA_USE_CREDENTIALS=false on the ThingsBoard side): the CQL port is
+          # only reachable from this namespace (see the NetworkPolicy at the end of this file), and
+          # the 06b-cassandra-init job only has to create the keyspace.
+          ports:
+            - containerPort: 9042
+              name: cql
+            - containerPort: 7000
+              name: intra
+            - containerPort: 7199
+              name: jmx
+          env:
+            - name: CASSANDRA_CLUSTER_NAME
+              value: tb-cassandra
+            # must stay in sync with CASSANDRA_LOCAL_DATACENTER in 01-config.yaml
+            - name: CASSANDRA_DC
+              value: DC1
+            - name: CASSANDRA_RACK
+              value: rack1
+            - name: CASSANDRA_ENDPOINT_SNITCH
+              value: GossipingPropertyFileSnitch
+            - name: CASSANDRA_SEEDS
+              value: tb-cassandra-0.tb-cassandra-headless.thingsboard.svc.cluster.local
+            # note: JVM heap/GC are left to the image defaults (heap = half of the container memory
+            # limit, GC chosen for the Java version); overriding JVM_OPTS there breaks the start with
+            # "Multiple garbage collectors selected".
+          # the first start of a node creates the system keyspaces and takes a couple of minutes
+          startupProbe:
+            tcpSocket:
+              port: 9042
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: 9042
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            tcpSocket:
+              port: 9042
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: "1"
+              memory: 3Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/cassandra
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 20Gi
+---
+# Only pods of this namespace may reach the CQL port.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tb-cassandra
+  namespace: thingsboard
+spec:
+  podSelector:
+    matchLabels:
+      app: tb-cassandra
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: thingsboard
+      ports:
+        - protocol: TCP
+          port: 9042
+        - protocol: TCP
+          port: 7000

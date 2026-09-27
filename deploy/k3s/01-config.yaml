@@ -6,9 +6,9 @@
 # Shared configuration of every ThingsBoard service.
 # Anything that is a secret lives in the tb-secrets Secret instead.
 #
-# Topology: PostgreSQL and Cassandra are managed database clusters outside k3s (each one on its
-# own server, with TLS enabled and reached through its public host name); Kafka and ZooKeeper run
-# inside the cluster (04-kafka.yaml, 05-zookeeper.yaml).
+# Topology: PostgreSQL is a managed database cluster outside k3s (TLS, reached through its public
+# host name); Cassandra, Kafka and ZooKeeper run inside the cluster (04-kafka.yaml,
+# 05-zookeeper.yaml, 06-cassandra.yaml).
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -60,29 +60,26 @@ data:
   SPRING_DATASOURCE_URL: jdbc:postgresql://postgresql-215231-0.cloudclusters.net:10012/greeniq?sslmode=require
   # note: spring.jpa.hibernate.ddl-auto is already "none" in thingsboard.yml; the schema is
   # created/upgraded by the tb-install job only.
-  # Managed Cassandra (external): telemetry. TLS is enabled by default on the server, so the
-  # client has to use it too, and the host name inside CASSANDRA_URL must match the
-  # certificate (hostname validation stays enabled).
+  # Cassandra in the cluster (06-cassandra.yaml): telemetry and latest telemetry. The traffic stays
+  # inside the namespace (NetworkPolicy), so no TLS is needed between the services and the node.
   DATABASE_TS_TYPE: cassandra
   DATABASE_TS_LATEST_TYPE: cassandra
-  CASSANDRA_URL: cassandra-215233-0.cloudclusters.net:19948
-  # keyspace "greeniq" (already created in the CloudClusters console; the installer only runs
+  CASSANDRA_URL: tb-cassandra:9042
+  CASSANDRA_CLUSTER_NAME: tb-cassandra
+  # keyspace "greeniq" (created by 06b-cassandra-init.yaml; the installer only runs
   # CREATE KEYSPACE IF NOT EXISTS, so the replication settings of the existing keyspace stay)
   CASSANDRA_KEYSPACE_NAME: greeniq
   # must match the datacenter name of the Cassandra cluster — verified with:
   #   SELECT data_center FROM system.local;   ->  DC1
   CASSANDRA_LOCAL_DATACENTER: DC1
-  CASSANDRA_USE_CREDENTIALS: "true"
-  CASSANDRA_USE_SSL: "true"
-  # The server certificate is signed by the CloudClusters cluster CA (self-signed), which is not
-  # in the JVM truststore, so the truststore downloaded from the console has to be mounted:
-  #   kubectl -n thingsboard create secret generic tb-cassandra-tls \
-  #     --from-file=cassandra.truststore.jks=./cassandra.truststore.jks
-  # and its password goes to tb-secrets as CASSANDRA_SSL_TRUST_STORE_PASSWORD.
-  CASSANDRA_SSL_TRUST_STORE: /certs/cassandra.truststore.jks
-  # the certificate carries no host name (CN=US, OU=CassandraCluster), so hostname verification
-  # cannot succeed; the connection is still encrypted and the CA is pinned through the truststore
-  CASSANDRA_SSL_HOSTNAME_VALIDATION: "false"
+  # same as the Ubuntu installation guide for a Cassandra next to ThingsBoard: the CQL port is only
+  # reachable from this namespace, so no credentials are exchanged
+  CASSANDRA_USE_CREDENTIALS: "false"
+  CASSANDRA_USE_SSL: "false"
+  # Left over from the managed Cassandra that was reached over TLS; they are only read when
+  # CASSANDRA_USE_SSL is true (the tb-cassandra-tls Secret stays in the cluster for that case).
+  # CASSANDRA_SSL_TRUST_STORE: /certs/cassandra.truststore.jks
+  # CASSANDRA_SSL_HOSTNAME_VALIDATION: "false"
   # the driver negotiates compression with the server; keep 'none' unless the Cassandra
   # server is explicitly configured for lz4
   CASSANDRA_COMPRESSION: none
