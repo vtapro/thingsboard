@@ -33,6 +33,7 @@ import { LoginSettingsComponent } from '@home/pages/admin/login-settings.compone
 import { RolesComponent } from '@home/pages/admin/roles.component';
 import { RoleDialogComponent } from '@home/pages/admin/role-dialog.component';
 import { UserGroupDialogComponent } from '@home/pages/admin/user-group-dialog.component';
+import { CustomerHierarchyDialogComponent } from '@home/pages/admin/customer-hierarchy-dialog.component';
 import { AutomationComponent } from '@home/pages/admin/automation.component';
 import { AutomationRuleDialogComponent } from '@home/pages/admin/automation-rule-dialog.component';
 
@@ -64,6 +65,7 @@ import { AutomationRuleDialogComponent } from '@home/pages/admin/automation-rule
       RolesComponent,
       RoleDialogComponent,
       UserGroupDialogComponent,
+      CustomerHierarchyDialogComponent,
       AutomationComponent,
       AutomationRuleDialogComponent
     ],

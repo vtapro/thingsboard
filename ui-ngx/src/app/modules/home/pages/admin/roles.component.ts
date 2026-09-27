@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
 import { Component, OnInit } from '@angular/core';
-import { FormControl } from '@angular/forms';
 import { Store } from '@ngrx/store';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { MatDialog } from '@angular/material/dialog';
@@ -17,6 +16,8 @@ import { EntityGroupDialogComponent } from '@home/components/entity/entity-group
 import { AddEntitiesDialogComponent } from '@home/components/entity/add-entities-dialog.component';
 import { RoleDialogComponent, RoleDialogResult } from '@home/pages/admin/role-dialog.component';
 import { UserGroupDialogComponent, UserGroupDialogResult } from '@home/pages/admin/user-group-dialog.component';
+import { CustomerHierarchyDialogComponent, CustomerHierarchyRelation } from
+    '@home/pages/admin/customer-hierarchy-dialog.component';
 
 interface RbacRole {
   id: string;
@@ -124,9 +125,6 @@ export class RolesComponent extends PageComponent implements OnInit {
   userGroups: RbacUserGroup[] = [];
   customers: TenantCustomerInfo[] = [];
   hierarchyRows: Array<{childId: string; parentId: string}> = [];
-
-  childCustomerControl = new FormControl('');
-  parentCustomerControl = new FormControl('');
 
   private loadedUserGroupIds: string[] = [];
 
@@ -528,18 +526,48 @@ export class RolesComponent extends PageComponent implements OnInit {
   }
 
   addHierarchyRow() {
-    const childId = this.childCustomerControl.value;
-    const parentId = this.parentCustomerControl.value;
-    if (!childId || !parentId || childId === parentId) {
-      return;
-    }
-    this.hierarchyRows = [...this.hierarchyRows.filter(row => row.childId !== childId), {childId, parentId}];
-    this.persistHierarchy();
+    this.openHierarchyDialog();
+  }
+
+  editHierarchyRow(row: {childId: string; parentId: string}) {
+    this.openHierarchyDialog(row);
+  }
+
+  private openHierarchyDialog(row?: {childId: string; parentId: string}) {
+    this.dialog.open<CustomerHierarchyDialogComponent, any, CustomerHierarchyRelation>(
+      CustomerHierarchyDialogComponent, {
+        data: {
+          customers: this.customers.map(customer => ({id: customer.id.id, title: customer.title})),
+          rows: this.hierarchyRows.map(relation => ({...relation})),
+          row
+        },
+        width: '520px',
+        autoFocus: false
+      }).afterClosed().subscribe((result: CustomerHierarchyRelation) => {
+      if (!result) {
+        return;
+      }
+      this.hierarchyRows = [
+        ...this.hierarchyRows.filter(relation => relation.childId !== result.childId),
+        {childId: result.childId, parentId: result.parentId}
+      ];
+      this.persistHierarchy();
+    });
   }
 
   removeHierarchyRow(row: {childId: string; parentId: string}) {
-    this.hierarchyRows = this.hierarchyRows.filter(r => r.childId !== row.childId);
-    this.persistHierarchy();
+    this.dialogService.confirm(
+      this.translate.instant('admin.roles-delete-relation-title', {customer: this.customerLabel(row.childId)}),
+      this.translate.instant('admin.roles-delete-relation-text'),
+      this.translate.instant('action.no'),
+      this.translate.instant('action.yes'),
+      true
+    ).subscribe(result => {
+      if (result) {
+        this.hierarchyRows = this.hierarchyRows.filter(r => r.childId !== row.childId);
+        this.persistHierarchy();
+      }
+    });
   }
 
   private persistHierarchy() {

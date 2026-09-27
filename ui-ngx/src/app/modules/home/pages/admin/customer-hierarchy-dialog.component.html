@@ -1,0 +1,42 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<h2 mat-dialog-title>
+  {{ (isEdit ? 'admin.roles-edit-relation' : 'admin.roles-add-relation') | translate }}
+</h2>
+<mat-dialog-content>
+  <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
+    <mat-label translate>admin.roles-child-customer</mat-label>
+    <mat-select [formControl]="childControl" required>
+      @for (customer of childOptions; track customer.id) {
+        <mat-option [value]="customer.id">{{ customer.title }}</mat-option>
+      }
+    </mat-select>
+    @if (childControl.invalid) {
+      <mat-error translate>admin.roles-customer-required</mat-error>
+    }
+  </mat-form-field>
+  <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
+    <mat-label translate>admin.roles-parent-customer</mat-label>
+    <mat-select [formControl]="parentControl" required>
+      @for (customer of parentOptions; track customer.id) {
+        <mat-option [value]="customer.id">{{ customer.title }}</mat-option>
+      }
+    </mat-select>
+    @if (parentControl.invalid) {
+      <mat-error translate>admin.roles-customer-required</mat-error>
+    }
+  </mat-form-field>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="cancel()">
+    {{ 'action.cancel' | translate }}
+  </button>
+  <button mat-raised-button color="primary" type="button" (click)="save()"
+          [disabled]="childControl.invalid || parentControl.invalid">
+    {{ (isEdit ? 'action.save' : 'action.add') | translate }}
+  </button>
+</mat-dialog-actions>

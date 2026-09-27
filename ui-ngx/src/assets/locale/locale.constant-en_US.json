@@ -371,6 +371,10 @@
         "roles-child-customer": "Child customer",
         "roles-parent-customer": "Parent customer",
         "roles-add-relation": "Add relation",
+        "roles-edit-relation": "Edit relation",
+        "roles-customer-required": "Customer is required",
+        "roles-delete-relation-title": "Remove the parent of \"{{customer}}\"",
+        "roles-delete-relation-text": "The users of the customer lose the access to the entities of the parent. Are you sure?",
         "entity-group-members": {
             "add-members": "Add entities",
             "no-entities": "No entities found"

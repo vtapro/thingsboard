@@ -91,26 +91,8 @@
   overflow: auto;
 }
 
-.tb-roles-create {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.tb-roles-name {
-  min-width: 260px;
-  max-width: 360px;
-  flex: 1 1 260px;
-}
-
 @media #{$mat-xs} {
   .tb-roles-page {
     padding: 8px;
-  }
-
-  .tb-roles-name {
-    min-width: 100%;
-    max-width: 100%;
   }
 }
