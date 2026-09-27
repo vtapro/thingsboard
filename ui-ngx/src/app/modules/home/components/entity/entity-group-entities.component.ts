@@ -15,16 +15,10 @@ import { catchError } from 'rxjs/operators';
 import { MatDialog } from '@angular/material/dialog';
 import { AddEntityDialogComponent } from './add-entity-dialog.component';
 
-interface EntityGroup {
-  id: string;
-  name: string;
-  entityType: string;
-  entityIds: string[];
-  allGroup?: boolean;
-}
+import { EntityGroupInfo } from './entity-group.resolver';
 
 interface GroupEntity {
-  id: { id: string };
+  id: string;
   createdTime: number;
   name: string;
   label?: string;
@@ -48,7 +42,7 @@ interface GroupEntity {
 export class EntityGroupEntitiesComponent extends PageComponent implements OnInit {
 
   entityType: string;
-  group: EntityGroup;
+  group: EntityGroupInfo;
   entities: GroupEntity[] = [];
   columns: string[] = [];
   loading = true;
@@ -70,20 +64,15 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
     this.columns = this.entityType === 'ENTITY_VIEW'
       ? ['createdTime', 'name', 'type']
       : ['createdTime', 'name', 'profile', 'label'];
-    const groupId = this.route.snapshot.params.groupId;
-    // the config of the entity type is resolved by the router: it is used by the "Add entity" dialog
+    // the group and the config of the entity type are resolved by the router
+    this.group = this.route.snapshot.data.entityGroup;
     this.tableConfig = this.route.snapshot.data.entitiesTableConfig;
-    this.http.get<{ groups: EntityGroup[] }>('/api/tenant/entityGroup',
-      defaultHttpOptionsFromConfig(undefined)).subscribe(settings => {
-      this.group = (settings?.groups || []).find(group => group.id === groupId
-        && group.entityType === this.entityType);
-      if (!this.group) {
-        this.loading = false;
-        return;
-      }
-      this.title = `${this.group.name}: ${this.translate.instant(this.titleKey())}`;
-      this.loadPage();
-    });
+    if (!this.group) {
+      this.loading = false;
+      return;
+    }
+    this.title = `${this.group.name}: ${this.translate.instant(this.titleKey())}`;
+    this.loadPage();
   }
 
   get title(): string {
@@ -143,7 +132,7 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
       data: {entitiesTableConfig: this.tableConfig}
     }).afterClosed().subscribe((created: any) => {
       if (created?.id?.id) {
-        const updated: EntityGroup = {...this.group, entityIds: [...(this.group.entityIds || []), created.id.id]};
+        const updated: EntityGroupInfo = {...this.group, entityIds: [...(this.group.entityIds || []), created.id.id]};
         this.http.post('/api/tenant/entityGroup/group', updated,
           defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe(() => {
           this.group = updated;
@@ -263,7 +252,7 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
         const info = entityDataToEntityInfo(entityData);
         const fields = (entityData.latest && entityData.latest[EntityKeyType.ENTITY_FIELD]) || {};
         return {
-          id: info.id as any,
+          id: entityData.entityId.id,
           createdTime: Number(fields.createdTime?.value) || 0,
           name: info.name,
           label: ((fields.label?.value as string) || info.label) as string
@@ -289,7 +278,7 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
     }
     const entityApi = this.entityType === 'ASSET' ? '/api/asset/' : '/api/device/';
     const profileApi = this.entityType === 'ASSET' ? '/api/assetProfileInfo/' : '/api/deviceProfileInfo/';
-    forkJoin(entities.map(entity => this.http.get<any>(entityApi + entity.id.id,
+    forkJoin(entities.map(entity => this.http.get<any>(entityApi + entity.id,
       defaultHttpOptionsFromConfig(undefined)).pipe(catchError(() => of(null))))).subscribe(details => {
       const profileIds: string[] = [];
       details.forEach(detail => {

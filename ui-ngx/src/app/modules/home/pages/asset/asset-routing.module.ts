@@ -5,6 +5,7 @@ import { RouterModule, Routes } from '@angular/router';
 
 import { EntitiesTableComponent } from '../../components/entity/entities-table.component';
 import { EntityGroupEntitiesComponent } from '../../components/entity/entity-group-entities.component';
+import { EntityGroupResolver } from '../../components/entity/entity-group.resolver';
 import { Authority } from '@shared/models/authority.enum';
 import { AssetsTableConfigResolver } from './assets-table-config.resolver';
 import { EntityDetailsPageComponent } from '@home/components/entity/entity-details-page.component';
@@ -57,7 +58,8 @@ export const assetRoutes: Routes = [
               } as BreadCrumbConfig<any>
             },
             resolve: {
-              entitiesTableConfig: AssetsTableConfigResolver
+              entitiesTableConfig: AssetsTableConfigResolver,
+              entityGroup: EntityGroupResolver
             }
           }
         ]

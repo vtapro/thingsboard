@@ -19,4 +19,4 @@ export const entityDetailsPageBreadcrumbLabelFunction: BreadCrumbLabelFunction<E
 
 /** Breadcrumb of the entity group detail page: the name of the group ("All", "Nhóm thiết bị", ...). */
 export const entityGroupBreadcrumbLabelFunction: BreadCrumbLabelFunction<any>
-  = ((route, translate, component) => component?.group?.name);
+  = ((route, translate, component) => route?.data?.entityGroup?.name || component?.group?.name);

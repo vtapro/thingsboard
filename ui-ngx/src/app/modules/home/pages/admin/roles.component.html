@@ -120,33 +120,37 @@
                               </mat-checkbox>
                             }
                           </div>
-                          @if (supportsOwnScope(resource)) {
-                            <mat-checkbox class="tb-roles-own" [checked]="isOwnOnly(resource)"
-                                          (change)="toggleOwnOnly(resource)">
-                              {{ 'admin.roles-own-only' | translate }}
-                            </mat-checkbox>
-                            @if (isOwnOnly(resource)) {
-                              <div class="tb-roles-own-warning">
-                                {{ 'admin.roles-own-only-warning' | translate }}
+                          <div class="tb-roles-own-scope">
+                            @if (supportsOwnScope(resource)) {
+                              <mat-checkbox class="tb-roles-own" [checked]="isOwnOnly(resource)"
+                                            (change)="toggleOwnOnly(resource)">
+                                {{ 'admin.roles-own-only' | translate }}
+                              </mat-checkbox>
+                            } @else {
+                              <div class="tb-roles-hint tb-roles-own-scope-hint">
+                                {{ 'admin.roles-own-scope-not-supported' | translate }}
                               </div>
                             }
-                          } @else {
-                            <div class="tb-roles-hint">{{ 'admin.roles-own-scope-not-supported' | translate }}</div>
-                          }
-                          <mat-form-field class="tb-roles-scope" subscriptSizing="dynamic" appearance="outline">
-                            <mat-label translate>admin.roles-scope-groups</mat-label>
-                            <mat-select multiple
-                                        [disabled]="!hasAnyOperation(resource) || !canScopeToGroups(resource)"
-                                        [value]="groupsFor(resource)"
-                                        (selectionChange)="setGroups(resource, $event.value)">
-                              @for (group of groups; track group.id) {
-                                <mat-option [value]="group.id">{{ group.name }}</mat-option>
+                            <mat-form-field class="tb-roles-scope" subscriptSizing="dynamic" appearance="outline">
+                              <mat-label translate>admin.roles-scope-groups</mat-label>
+                              <mat-select multiple
+                                          [disabled]="!hasAnyOperation(resource) || !canScopeToGroups(resource)"
+                                          [value]="groupsFor(resource)"
+                                          (selectionChange)="setGroups(resource, $event.value)">
+                                @for (group of groups; track group.id) {
+                                  <mat-option [value]="group.id">{{ group.name }}</mat-option>
+                                }
+                              </mat-select>
+                              @if (!canScopeToGroups(resource)) {
+                                <mat-hint>{{ 'admin.roles-scope-not-supported' | translate: {resource} }}</mat-hint>
                               }
-                            </mat-select>
-                            @if (!canScopeToGroups(resource)) {
-                              <mat-hint>{{ 'admin.roles-scope-not-supported' | translate: {resource} }}</mat-hint>
-                            }
-                          </mat-form-field>
+                            </mat-form-field>
+                          </div>
+                          @if (supportsOwnScope(resource) && isOwnOnly(resource)) {
+                            <div class="tb-roles-own-warning">
+                              {{ 'admin.roles-own-only-warning' | translate }}
+                            </div>
+                          }
                         </div>
                       </mat-tab>
                     }

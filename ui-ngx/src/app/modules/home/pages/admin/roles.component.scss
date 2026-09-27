@@ -229,19 +229,35 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 12px;
+  gap: 8px;
   padding: 12px 16px 16px;
 }
 
+/*
+ * Compact matrix: as many checkbox columns as fit in the card, so the operations of an entity type stay visible
+ * without scrolling vertically or horizontally.
+ */
 .tb-roles-ops {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 16px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0 12px;
   align-items: center;
 }
 
+.tb-roles-own-scope {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.tb-roles-own-scope-hint {
+  flex: 1 1 100%;
+  max-width: none;
+}
+
 .tb-roles-own {
-  align-self: flex-start;
+  flex: 0 0 auto;
 }
 
 .tb-roles-own-warning {
@@ -257,8 +273,8 @@
 }
 
 .tb-roles-scope {
-  width: 100%;
-  min-width: 0;
+  flex: 1 1 240px;
+  min-width: 200px;
   max-width: 420px;
 }
 
