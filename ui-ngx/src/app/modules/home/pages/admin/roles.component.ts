@@ -415,17 +415,6 @@ export class RolesComponent extends PageComponent implements OnInit {
   }
 
   /**
-   * Short summary of the operations configured for the entity type, shown as a badge on the tab.
-   */
-  resourceGrantSummary(resource: string): string {
-    const operations = this.permissionDraft[resource];
-    if (!operations) {
-      return '';
-    }
-    return this.operationsFor(resource).filter(operation => operations[operation]).join(', ');
-  }
-
-  /**
    * Compact representation of the permissions of a role, one chip per entity type.
    */
   permissionChips(role: RbacRole): PermissionChip[] {
