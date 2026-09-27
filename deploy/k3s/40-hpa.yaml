@@ -1,6 +1,8 @@
+#
 # SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 # SPDX-License-Identifier: Apache-2.0
 #
+
 # HorizontalPodAutoscaler cho các service co giãn ngang được.
 # - min 1: khi ít tải chỉ chạy 1 pod (tiết kiệm RAM/CPU)
 # - max giữ thấp có chủ đích: tb-rule-engine bị giới hạn bởi số partition của topic RE
