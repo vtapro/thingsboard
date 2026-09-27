@@ -17,6 +17,9 @@ param(
     [string]$Namespace = "thingsboard",
     [switch]$OnlyInfrastructure,
     [switch]$SkipInstall,
+    # Chay buoc schema o che do upgrade (INSTALL_UPGRADE=true) - dung khi DB da duoc cai truoc do,
+    # vi installer luon tao lai sysadmin va se loi "already present" tren DB da co du lieu he thong.
+    [switch]$InstallUpgrade,
     [int]$InstallTimeoutMinutes = 20
 )
 
@@ -73,7 +76,15 @@ if ($OnlyInfrastructure) {
 if (-not $SkipInstall) {
     Write-Host "==> chay job tb-install (cai/cap nhat schema)"
     & $Kubectl -n $Namespace delete job tb-install --ignore-not-found | Out-Host
-    Apply-Manifest "10-install-job.yaml"
+    if ($InstallUpgrade) {
+        Write-Host "    che do upgrade: INSTALL_UPGRADE=true (DB da co du lieu he thong)"
+        $jobYaml = Get-Content (Join-Path $manifestDir "10-install-job.yaml") -Raw
+        $jobYaml = $jobYaml -replace '(?m)(- name: INSTALL_UPGRADE\r?\n\s+value: )"false"', '${1}"true"'
+        if ($jobYaml -notmatch 'value: "true"') { throw "Khong bat duoc INSTALL_UPGRADE trong 10-install-job.yaml" }
+        $jobYaml | & $Kubectl -n $Namespace apply -f - | Out-Host
+    } else {
+        Apply-Manifest "10-install-job.yaml"
+    }
     & $Kubectl -n $Namespace wait --for=condition=complete job/tb-install --timeout="$($InstallTimeoutMinutes)m" | Out-Host
     if ($LASTEXITCODE -ne 0) {
         Write-Host "==> job that bai, log:"

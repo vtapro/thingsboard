@@ -9,6 +9,12 @@
 #   kubectl -n thingsboard wait --for=condition=complete job/tb-install --timeout=15m
 #   kubectl -n thingsboard delete job tb-install
 #
+# NOTE: the installer creates the system administrator unconditionally, so this job only works on a
+# database that has no system data yet. To apply the schema/system upgrades of a new release on an
+# installed database, run it with INSTALL_UPGRADE=true instead (scripts/deploy-k3s.ps1 -InstallUpgrade):
+# the upgrade path updates the schema, the views/functions, the rule nodes and the system widgets
+# without touching the existing users.
+#
 # The services run with RUN_INSTALL=false, so a pod restart never triggers a migration.
 apiVersion: batch/v1
 kind: Job
@@ -42,6 +48,8 @@ spec:
               value: "true"
             - name: RUN_INSTALL_ONLY
               value: "true"
+            - name: INSTALL_UPGRADE
+              value: "false"
             - name: TB_SERVICE_TYPE
               value: monolith
           volumeMounts:

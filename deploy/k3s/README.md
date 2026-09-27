@@ -74,6 +74,17 @@ kubectl -n thingsboard rollout status statefulset/tb-cassandra --timeout=10m
 kubectl apply -f deploy/k3s/06b-cassandra-init.yaml
 kubectl -n thingsboard wait --for=condition=complete job/tb-cassandra-init --timeout=5m
 
+# schema / system data of an empty database (first installation)
+kubectl apply -f deploy/k3s/10-install-job.yaml
+kubectl -n thingsboard wait --for=condition=complete job/tb-install --timeout=20m
+kubectl -n thingsboard delete job tb-install
+
+# schema / system data upgrade of an existing database: the installer creates the system
+# administrator unconditionally, so the install mode fails with "already present".
+# Use the upgrade mode (INSTALL_UPGRADE=true) instead:
+#   powershell -File scripts\deploy-k3s.ps1 -InstallUpgrade     (or -SkipInstall when the
+#   database schema of the release is already applied)
+
 # secrets (never committed) — copy 02-secret.example.yaml and replace every value
 kubectl -n thingsboard create secret generic tb-secrets \
   --from-literal=SPRING_DATASOURCE_USERNAME=postgres \
