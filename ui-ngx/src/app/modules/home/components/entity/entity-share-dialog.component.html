@@ -30,7 +30,9 @@
   }
 </mat-dialog-content>
 <mat-dialog-actions align="end">
-  <button mat-button type="button" (click)="cancel()" [disabled]="saving" translate>action.cancel</button>
+  <button mat-button type="button" (click)="cancel()" [disabled]="saving">
+    {{ 'action.cancel' | translate }}
+  </button>
   <button mat-raised-button color="primary" type="button" (click)="save()" [disabled]="loading || saving">
     {{ 'action.save' | translate }}
   </button>
