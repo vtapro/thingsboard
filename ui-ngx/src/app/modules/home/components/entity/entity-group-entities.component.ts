@@ -10,6 +10,10 @@ import { AppState } from '@core/core.state';
 import { defaultHttpOptionsFromConfig } from '@core/http/http-utils';
 import { entityDataToEntityInfo, EntityData, EntityKeyType } from '@shared/models/query/query.models';
 import { PageData } from '@shared/models/page/page-data';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { MatDialog } from '@angular/material/dialog';
+import { AddEntityDialogComponent } from './add-entity-dialog.component';
 
 interface EntityGroup {
   id: string;
@@ -56,6 +60,7 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
               private http: HttpClient,
               private route: ActivatedRoute,
               private router: Router,
+              private dialog: MatDialog,
               private translate: TranslateService) {
     super(store);
     this.entityType = this.route.snapshot.data.entityType;
@@ -66,6 +71,8 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
       ? ['createdTime', 'name', 'type']
       : ['createdTime', 'name', 'profile', 'label'];
     const groupId = this.route.snapshot.params.groupId;
+    // the config of the entity type is resolved by the router: it is used by the "Add entity" dialog
+    this.tableConfig = this.route.snapshot.data.entitiesTableConfig;
     this.http.get<{ groups: EntityGroup[] }>('/api/tenant/entityGroup',
       defaultHttpOptionsFromConfig(undefined)).subscribe(settings => {
       this.group = (settings?.groups || []).find(group => group.id === groupId
@@ -88,6 +95,7 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
   }
 
   private pageTitle = '';
+  private tableConfig: any;
 
   get entityNameLabel(): string {
     return this.translate.instant(this.nameKey());
@@ -124,7 +132,26 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
   }
 
   addEntity(): void {
-    this.router.navigateByUrl(this.listUrl());
+    if (!this.group || !this.tableConfig) {
+      this.router.navigateByUrl(this.listUrl());
+      return;
+    }
+    // like ThingsBoard PE: create the entity and add it to the group
+    this.dialog.open(AddEntityDialogComponent, {
+      disableClose: true,
+      panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+      data: {entitiesTableConfig: this.tableConfig}
+    }).afterClosed().subscribe((created: any) => {
+      if (created?.id?.id) {
+        const updated: EntityGroup = {...this.group, entityIds: [...(this.group.entityIds || []), created.id.id]};
+        this.http.post('/api/tenant/entityGroup/group', updated,
+          defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe(() => {
+          this.group = updated;
+          this.pageIndex = 0;
+          this.reload();
+        }, () => this.reload());
+      }
+    });
   }
 
   private listUrl(): string {
@@ -242,12 +269,54 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
           label: ((fields.label?.value as string) || info.label) as string
         };
       });
+      this.enrichProfiles(this.entities);
       this.totalElements = page?.totalElements || 0;
       this.loading = false;
     }, () => {
       this.entities = [];
       this.totalElements = 0;
       this.loading = false;
+    });
+  }
+
+  /**
+   * The entity query API does not return the profile of a device/asset, so the profile names of the current page are
+   * resolved with two small batches of calls (entities then their profiles).
+   */
+  private enrichProfiles(entities: GroupEntity[]): void {
+    if (this.entityType === 'ENTITY_VIEW' || !entities.length) {
+      return;
+    }
+    const entityApi = this.entityType === 'ASSET' ? '/api/asset/' : '/api/device/';
+    const profileApi = this.entityType === 'ASSET' ? '/api/assetProfileInfo/' : '/api/deviceProfileInfo/';
+    forkJoin(entities.map(entity => this.http.get<any>(entityApi + entity.id.id,
+      defaultHttpOptionsFromConfig(undefined)).pipe(catchError(() => of(null))))).subscribe(details => {
+      const profileIds: string[] = [];
+      details.forEach(detail => {
+        const profileId = detail?.deviceProfileId?.id || detail?.assetProfileId?.id;
+        if (profileId && !profileIds.includes(profileId)) {
+          profileIds.push(profileId);
+        }
+      });
+      if (!profileIds.length) {
+        return;
+      }
+      forkJoin(profileIds.map(profileId => this.http.get<any>(profileApi + profileId,
+        defaultHttpOptionsFromConfig(undefined)).pipe(catchError(() => of(null))))).subscribe(profiles => {
+        const names = new Map<string, string>();
+        profiles.filter(profile => !!profile).forEach(profile => names.set(profile.id.id, profile.name));
+        entities.forEach((entity, index) => {
+          const profileId = details[index]?.deviceProfileId?.id || details[index]?.assetProfileId?.id;
+          const name = profileId ? names.get(profileId) : null;
+          if (name) {
+            if (this.entityType === 'ASSET') {
+              entity.assetProfileName = name;
+            } else {
+              entity.deviceProfileName = name;
+            }
+          }
+        });
+      });
     });
   }
 

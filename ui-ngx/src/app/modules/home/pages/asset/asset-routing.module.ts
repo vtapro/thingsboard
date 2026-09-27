@@ -50,10 +50,14 @@ export const assetRoutes: Routes = [
             data: {
               auth: [Authority.TENANT_ADMIN],
               entityType: 'ASSET',
+              assetsType: 'tenant',
               breadcrumb: {
                 labelFunction: entityGroupBreadcrumbLabelFunction,
                 icon: 'layers'
               } as BreadCrumbConfig<any>
+            },
+            resolve: {
+              entitiesTableConfig: AssetsTableConfigResolver
             }
           }
         ]

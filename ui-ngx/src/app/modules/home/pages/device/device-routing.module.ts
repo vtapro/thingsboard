@@ -50,10 +50,14 @@ export const deviceRoutes: Routes = [
             data: {
               auth: [Authority.TENANT_ADMIN],
               entityType: 'DEVICE',
+              devicesType: 'tenant',
               breadcrumb: {
                 labelFunction: entityGroupBreadcrumbLabelFunction,
                 icon: 'layers'
               } as BreadCrumbConfig<any>
+            },
+            resolve: {
+              entitiesTableConfig: DevicesTableConfigResolver
             }
           }
         ]

@@ -50,10 +50,14 @@ export const entityViewRoutes: Routes = [
             data: {
               auth: [Authority.TENANT_ADMIN],
               entityType: 'ENTITY_VIEW',
+              entityViewsType: 'tenant',
               breadcrumb: {
                 labelFunction: entityGroupBreadcrumbLabelFunction,
                 icon: 'layers'
               } as BreadCrumbConfig<any>
+            },
+            resolve: {
+              entitiesTableConfig: EntityViewsTableConfigResolver
             }
           }
         ]
