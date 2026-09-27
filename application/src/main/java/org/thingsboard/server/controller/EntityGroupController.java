@@ -15,6 +15,7 @@ import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroupSettings;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroup;
+import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.config.annotations.ApiOperation;
 import org.thingsboard.server.dao.settings.EntityGroupService;
 import org.thingsboard.server.dao.exception.IncorrectParameterException;
@@ -72,6 +73,10 @@ public class EntityGroupController extends BaseController {
         if (!ALLOWED_ENTITY_TYPES.contains(entityGroup.getEntityType())) {
             throw new IncorrectParameterException("Entity group type must be one of " + ALLOWED_ENTITY_TYPES);
         }
+        if (isAllGroup(getCurrentUser().getTenantId(), entityGroup.getId())) {
+            throw new IncorrectParameterException("The All group of an entity type contains every entity of the tenant "
+                    + "and can not be modified");
+        }
         return entityGroupService.saveEntityGroup(getCurrentUser().getTenantId(), entityGroup);
     }
 
@@ -87,7 +92,18 @@ public class EntityGroupController extends BaseController {
         if (StringUtils.isBlank(groupId)) {
             throw new IncorrectParameterException("Entity group id is required");
         }
+        if (isAllGroup(getCurrentUser().getTenantId(), groupId)) {
+            throw new IncorrectParameterException("The All group of an entity type contains every entity of the tenant "
+                    + "and can not be deleted");
+        }
         return entityGroupService.deleteEntityGroup(getCurrentUser().getTenantId(), groupId);
+    }
+
+    /** True when the group is the "All" group of its entity type (created by the backend, read only). */
+    private boolean isAllGroup(TenantId tenantId, String groupId) {
+        RbacEntityGroupSettings settings = entityGroupService.getEntityGroupSettings(tenantId);
+        return settings.getGroups() != null && settings.getGroups().stream()
+                .anyMatch(group -> groupId.equals(group.getId()) && group.isAllGroup());
     }
 
     private static final List<String> ALLOWED_ENTITY_TYPES = List.of("DEVICE", "ASSET", "ENTITY_VIEW");

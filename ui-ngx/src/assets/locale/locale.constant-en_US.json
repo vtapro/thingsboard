@@ -332,6 +332,7 @@
             "members": "Members",
             "created-time": "Created time",
             "add": "Add entity group",
+            "all-readonly": "The All group contains every entity of this type and can not be modified or deleted",
             "no-groups": "No entity groups found",
             "tenant-admin-only": "Only tenant administrators can manage entity groups."
         },
