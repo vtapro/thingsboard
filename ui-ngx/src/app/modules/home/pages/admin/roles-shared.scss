@@ -1,0 +1,243 @@
+// SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+// SPDX-License-Identifier: Apache-2.0
+/*
+ * Styles shared by the Roles page and the role dialog (the dialog edits the permission matrix of a role, so both
+ * components have to render the same widgets). Imported by roles.component.scss and role-dialog.component.scss.
+ */
+.tb-roles-inline-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tb-roles-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.01);
+}
+
+.tb-roles-section-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.tb-roles-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.tb-roles-hint {
+  font-size: 11px;
+  line-height: 16px;
+  color: rgba(0, 0, 0, 0.6);
+  max-width: 860px;
+}
+
+.tb-roles-table {
+  width: 100%;
+  background: transparent;
+}
+
+.tb-roles-cell-strong {
+  font-weight: 500;
+}
+
+.tb-roles-cell-hint {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 320px;
+}
+
+.tb-roles-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.tb-roles-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  line-height: 16px;
+  /* the chip never gets cut off: the text wraps inside the rounded badge */
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.75);
+
+  &.tb-roles-chip-scoped {
+    background: rgba(48, 86, 128, 0.12);
+    color: #305680;
+  }
+}
+
+.tb-roles-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.tb-roles-public-icon {
+  opacity: 0.45;
+
+  &.tb-on {
+    opacity: 1;
+    color: #198038;
+  }
+}
+
+.tb-roles-empty {
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.5);
+  border: 1px dashed rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+}
+
+/* --------------------------------------------------------------- permission matrix */
+
+.tb-roles-presets {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+
+  .tb-roles-presets-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    color: rgba(0, 0, 0, .54);
+  }
+
+  .tb-roles-preset {
+    height: 26px;
+    min-width: 0;
+    padding: 0 8px;
+    font-size: 11px;
+    line-height: 24px;
+  }
+}
+
+.tb-roles-resource-tabs {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: #fff;
+  min-height: 0;
+}
+
+.tb-roles-resource {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 10px 12px 12px;
+  /* the checkbox matrix adapts to the width of its own container, not to the window */
+  container-type: inline-size;
+}
+
+/*
+ * Compact matrix: as many checkbox columns as fit, so the operations of an entity type stay visible without
+ * scrolling horizontally and every operation label stays on a single line.
+ */
+.tb-roles-ops {
+  display: grid;
+  gap: 0 10px;
+  align-items: center;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  @container (min-width: 470px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  @container (min-width: 630px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  @container (min-width: 800px) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.tb-roles-own-scope {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.tb-roles-own-scope-hint {
+  flex: 1 1 100%;
+  max-width: none;
+}
+
+.tb-roles-own {
+  flex: 0 0 auto;
+}
+
+.tb-roles-own-warning {
+  align-self: flex-start;
+  max-width: 560px;
+  padding: 6px 10px;
+  border-left: 3px solid #d68b00;
+  border-radius: 4px;
+  background: rgba(214, 139, 0, .1);
+  color: rgba(0, 0, 0, .75);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.tb-roles-scope {
+  flex: 1 1 240px;
+  min-width: 200px;
+  max-width: 420px;
+}
+
+.tb-roles-resource-name {
+  margin-right: 6px;
+  font-weight: 500;
+}
+
+.tb-roles-role-chip-cell {
+  max-width: 520px;
+}
+
+.tb-roles-users-select {
+  width: 100%;
+  min-width: 220px;
+  max-width: 360px;
+}
+
+@media (max-width: 600px) {
+  .tb-roles-ops {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tb-roles-scope,
+  .tb-roles-users-select {
+    min-width: 100%;
+    max-width: 100%;
+  }
+}

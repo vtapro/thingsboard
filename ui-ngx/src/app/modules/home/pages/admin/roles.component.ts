@@ -15,6 +15,8 @@ import { ActionNotificationShow } from '@core/notification/notification.actions'
 import { DialogService } from '@core/services/dialog.service';
 import { EntityGroupDialogComponent } from '@home/components/entity/entity-group-dialog.component';
 import { AddEntitiesDialogComponent } from '@home/components/entity/add-entities-dialog.component';
+import { RoleDialogComponent, RoleDialogResult } from '@home/pages/admin/role-dialog.component';
+import { UserGroupDialogComponent, UserGroupDialogResult } from '@home/pages/admin/user-group-dialog.component';
 
 interface RbacRole {
   id: string;
@@ -86,8 +88,6 @@ export class RolesComponent extends PageComponent implements OnInit {
    * ones (dashboard, customer, user, rule chain, ...) are created by the tenant administrator only.
    */
   readonly ownScopedResources = GROUP_ENTITY_TYPES;
-  /** Legacy trio, still used for roles created before the detailed matrix. */
-  readonly operations = ['READ', 'WRITE', 'DELETE'];
 
   /**
    * PE like permission matrix: the operations offered for each entity type.
@@ -113,124 +113,7 @@ export class RolesComponent extends PageComponent implements OnInit {
     {id: 'admin', label: 'Admin'}
   ];
 
-  /** Operations of the "Self-managed" preset: the user manages the entities created by him/herself. */
-  readonly selfManagedOperations = ['CREATE', 'READ', 'WRITE', 'DELETE'];
-
-  /** Operations offered for an entity type (fallback: create/read/write/delete). */
-  operationsFor(resource: string): string[] {
-    return this.operationsByResource[resource] || ['CREATE', 'READ', 'WRITE', 'DELETE'];
-  }
-
-  /** Human readable label of an operation, e.g. READ_TELEMETRY -> "Read telemetry". */
-  operationLabel(operation: string): string {
-    const text = operation.replace(/_/g, ' ').toLowerCase();
-    return text.charAt(0).toUpperCase() + text.slice(1);
-  }
-
-  /** Applies a preset (Viewer / Operator / Manager / Admin) to the entity type. */
-  applyPreset(resource: string, presetId: string): void {
-    const available = this.operationsFor(resource);
-    const wanted = this.presetOperations(presetId);
-    const draft = this.permissionDraft[resource] || (this.permissionDraft[resource] = {});
-    if (presetId === 'selfManaged') {
-      // PE like "user manages the entities created by him/herself": the basic operations on own entities only.
-      for (const operation of available) {
-        draft[operation] = this.selfManagedOperations.includes(operation);
-      }
-      this.ownOnlyDraft[resource] = true;
-      return;
-    }
-    for (const operation of available) {
-      // credentials are sensitive: the presets never grant them, the administrator has to tick them on purpose
-      const readAuxiliary = operation.startsWith('READ') && !operation.endsWith('CREDENTIALS');
-      draft[operation] = wanted.includes(operation)
-        || (presetId === 'operator' && readAuxiliary)
-        || (presetId === 'manager' && (readAuxiliary || operation === 'WRITE_TELEMETRY'));
-    }
-  }
-
-  selectAllOperations(resource: string): void {
-    const draft = this.permissionDraft[resource] || (this.permissionDraft[resource] = {});
-    for (const operation of this.operationsFor(resource)) {
-      draft[operation] = true;
-    }
-  }
-
-  clearAllOperations(resource: string): void {
-    this.permissionDraft[resource] = {};
-  }
-
-  /** "Only my entities" flag of the entity type (owner scope). */
-  isOwnOnly(resource: string): boolean {
-    return !!this.ownOnlyDraft[resource];
-  }
-
-  /** True when the owner scope may be configured for the entity type. */
-  supportsOwnScope(resource: string): boolean {
-    return this.ownScopedResources.includes(resource);
-  }
-
-  /** Loads an existing role into the form so its permissions/users can be edited. */
-  editRole(role: RbacRole): void {
-    this.editingRoleId = role.id;
-    this.nameControl.setValue(role.name);
-    this.ownCustomerOnlyControl.setValue(!!role.ownCustomerOnly);
-    this.permissionDraft = {};
-    this.ownOnlyDraft = {...(role.ownOnly || {})};
-    this.groupScopeDraft = {};
-    Object.entries(role.permissions || {}).forEach(([resource, operations]) => {
-      const draft = this.permissionDraft[resource] = {};
-      operations.forEach(operation => draft[operation] = true);
-    });
-    Object.entries(role.scopedPermissions || {}).forEach(([resource, byOperation]) => {
-      const draft = this.permissionDraft[resource] || (this.permissionDraft[resource] = {});
-      Object.entries(byOperation).forEach(([operation, groups]) => {
-        draft[operation] = true;
-        this.groupScopeDraft[resource] = groups as string[];
-      });
-    });
-    if (role.userIds) {
-      this.setRoleUsers(role, role.userIds);
-    }
-  }
-
-  get isEditingRole(): boolean {
-    return !!this.editingRoleId;
-  }
-
-  /** Role currently selected in the first column (undefined when a new role is being created). */
-  get selectedRole(): RbacRole {
-    return this.roles.find(role => role.id === this.editingRoleId);
-  }
-
-  cancelEditRole(): void {
-    this.editingRoleId = null;
-    this.nameControl.setValue('');
-    this.permissionDraft = {};
-    this.ownOnlyDraft = {};
-    this.groupScopeDraft = {};
-  }
-
-  toggleOwnOnly(resource: string): void {
-    this.ownOnlyDraft[resource] = !this.ownOnlyDraft[resource];
-  }
-
-  private presetOperations(presetId: string): string[] {
-    switch (presetId) {
-      case 'viewer':
-        return ['READ'];
-      case 'operator':
-        return ['READ', 'WRITE_TELEMETRY', 'RPC_CALL'];
-      case 'manager':
-        return ['CREATE', 'READ', 'WRITE', 'DELETE', 'WRITE_ATTRIBUTES', 'WRITE_TELEMETRY',
-          'RPC_CALL', 'CLAIM_DEVICES', 'ASSIGN_TO_CUSTOMER'];
-      default:
-        return ['CREATE', 'READ', 'WRITE', 'DELETE', 'READ_TELEMETRY', 'WRITE_TELEMETRY',
-          'READ_ATTRIBUTES', 'WRITE_ATTRIBUTES', 'READ_CREDENTIALS', 'WRITE_CREDENTIALS',
-          'RPC_CALL', 'CLAIM_DEVICES', 'ASSIGN_TO_CUSTOMER'];
-    }
-  }
-
+  readonly roleColumns = ['name', 'permissions', 'users', 'actions'];
   readonly groupColumns = ['name', 'entityType', 'description', 'public', 'members', 'actions'];
   readonly userGroupColumns = ['name', 'userIds', 'roleIds', 'actions'];
   readonly hierarchyColumns = ['child', 'parent', 'actions'];
@@ -242,20 +125,9 @@ export class RolesComponent extends PageComponent implements OnInit {
   customers: TenantCustomerInfo[] = [];
   hierarchyRows: Array<{childId: string; parentId: string}> = [];
 
-  nameControl = new FormControl('');
-  ownCustomerOnlyControl = new FormControl(false);
-  userGroupNameControl = new FormControl('');
   childCustomerControl = new FormControl('');
   parentCustomerControl = new FormControl('');
 
-  /**
-   * Permissions of the role being created, per entity type (resource). Each entity type is edited in its own tab.
-   */
-  private permissionDraft: { [resource: string]: { [operation: string]: boolean } } = {};
-  private ownOnlyDraft: { [resource: string]: boolean } = {};
-  /** Id of the role being edited (null = creating a new role). */
-  editingRoleId: string = null;
-  private groupScopeDraft: { [resource: string]: string[] } = {};
   private loadedUserGroupIds: string[] = [];
 
   constructor(protected store: Store<AppState>,
@@ -283,59 +155,56 @@ export class RolesComponent extends PageComponent implements OnInit {
       .subscribe(settings => this.roles = settings?.roles || []);
   }
 
-  /**
-   * Adds the role being configured to the list of the tenant (or replaces it in place when it is being edited).
-   * Nothing is persisted yet: the settings are sent to the backend by saveAll() / save().
-   * The saved role stays selected so the permission matrix and the users column keep showing it.
-   */
-  saveRole(): boolean {
-    const name = (this.nameControl.value || '').trim();
-    if (!name) {
-      this.nameControl.markAsTouched();
-      return false;
-    }
-    const permissions: { [resource: string]: string[] } = {};
-    const scopedPermissions: { [resource: string]: { [operation: string]: string[] } } = {};
-    for (const resource of this.resources) {
-      const operations = this.operationsFor(resource).filter(operation => this.isOperationGranted(resource, operation));
-      if (!operations.length) {
-        continue;
+  /** Opens the role dialog (without a role = create a new one), then persists the whole list of roles. */
+  addRole() {
+    this.openRoleDialog();
+  }
+
+  editRole(role: RbacRole) {
+    this.openRoleDialog(role);
+  }
+
+  private openRoleDialog(role?: RbacRole) {
+    this.dialog.open<RoleDialogComponent, any, RoleDialogResult>(RoleDialogComponent, {
+      data: {
+        role,
+        users: this.users,
+        resources: this.resources,
+        operationsByResource: this.operationsByResource,
+        presets: this.presets,
+        groups: this.groups,
+        groupScopedResources: this.groupScopedResources,
+        ownScopedResources: this.ownScopedResources
+      },
+      width: '960px',
+      maxWidth: '94vw',
+      maxHeight: '92vh',
+      autoFocus: false
+    }).afterClosed().subscribe((result: RoleDialogResult) => {
+      if (!result) {
+        return;
       }
-      const scopedGroups = this.groupsFor(resource);
-      if (scopedGroups.length) {
-        scopedPermissions[resource] = {};
-        for (const operation of operations) {
-          scopedPermissions[resource][operation] = scopedGroups;
-        }
-      } else {
-        permissions[resource] = operations;
+      if (!Object.keys(result.permissions).length && !Object.keys(result.scopedPermissions).length) {
+        this.store.dispatch(new ActionNotificationShow({
+          message: this.translate.instant('admin.roles-no-permissions'),
+          type: 'warn'
+        }));
+        return;
       }
-    }
-    if (!Object.keys(permissions).length && !Object.keys(scopedPermissions).length) {
-      this.store.dispatch(new ActionNotificationShow({
-        message: this.translate.instant('admin.roles-no-permissions'),
-        type: 'warn'
-      }));
-      return false;
-    }
-    const editedId = this.editingRoleId;
-    const savedRole: RbacRole = {
-      id: editedId || this.generateId(),
-      name,
-      permissions,
-      scopedPermissions,
-      // keep the users already assigned to the role when editing it
-      userIds: editedId ? (this.roles.find(r => r.id === editedId)?.userIds || []) : [],
-      ownOnly: Object.fromEntries(Object.entries(this.ownOnlyDraft)
-        .filter(e => e[1] && this.supportsOwnScope(e[0]))),
-      ownCustomerOnly: !!this.ownCustomerOnlyControl.value
-    };
-    this.roles = editedId
-      ? this.roles.map(r => r.id === editedId ? savedRole : r)
-      : [...this.roles, savedRole];
-    this.editingRoleId = savedRole.id;
-    this.nameControl.setValue(savedRole.name);
-    return true;
+      const savedRole: RbacRole = {
+        id: role?.id || this.generateId(),
+        name: result.name,
+        permissions: result.permissions,
+        scopedPermissions: result.scopedPermissions,
+        ownOnly: result.ownOnly,
+        ownCustomerOnly: result.ownCustomerOnly,
+        userIds: result.userIds
+      };
+      const roles = role
+        ? this.roles.map(r => r.id === role.id ? savedRole : r)
+        : [...this.roles, savedRole];
+      this.saveRoles(roles);
+    });
   }
 
   removeRole(role: RbacRole) {
@@ -347,71 +216,24 @@ export class RolesComponent extends PageComponent implements OnInit {
       true
     ).subscribe(result => {
       if (result) {
-        this.roles = this.roles.filter(r => r.id !== role.id);
-        if (this.editingRoleId === role.id) {
-          this.cancelEditRole();
-        }
+        this.saveRoles(this.roles.filter(r => r.id !== role.id));
       }
     });
   }
 
-  setRoleUsers(role: RbacRole, userIds: string[]) {
-    this.roles = this.roles.map(r => r.id === role.id ? {...r, userIds} : r);
-  }
-
-  save() {
-    this.http.post<{roles: RbacRole[]}>('/api/tenant/role', {roles: this.roles},
+  /** Persists the given list of roles (the backend stores the roles of the tenant as a whole). */
+  private saveRoles(roles: RbacRole[]) {
+    this.http.post<{roles: RbacRole[]}>('/api/tenant/role', {roles},
       defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
       next: settings => {
-        this.roles = settings?.roles || [];
+        this.roles = settings?.roles || roles;
         this.notifySaved('admin.roles-save-success');
       },
-      error: (error: HttpErrorResponse) => this.notifySaveFailed('admin.roles-save-failed', error)
+      error: (error: HttpErrorResponse) => {
+        this.notifySaveFailed('admin.roles-save-failed', error);
+        this.loadRoles();
+      }
     });
-  }
-
-  /**
-   * Single save action of the Roles tab: commits a role that is still being configured (when its name is filled),
-   * then persists every role of the tenant.
-   */
-  saveAll() {
-    if ((this.nameControl.value || '').trim() && !this.saveRole()) {
-      return;
-    }
-    this.save();
-  }
-
-  isOperationGranted(resource: string, operation: string): boolean {
-    return !!this.permissionDraft[resource]?.[operation];
-  }
-
-  toggleOperation(resource: string, operation: string) {
-    const operations = this.permissionDraft[resource] || (this.permissionDraft[resource] = {});
-    operations[operation] = !operations[operation];
-    if (!this.hasAnyOperation(resource)) {
-      delete this.groupScopeDraft[resource];
-    }
-  }
-
-  hasAnyOperation(resource: string): boolean {
-    const operations = this.permissionDraft[resource];
-    return !!operations && this.operationsFor(resource).some(operation => operations[operation]);
-  }
-
-  canScopeToGroups(resource: string): boolean {
-    return this.groupScopedResources.includes(resource);
-  }
-
-  groupsFor(resource: string): string[] {
-    return this.groupScopeDraft[resource] || [];
-  }
-
-  setGroups(resource: string, groupIds: string[]) {
-    if (groupIds?.length) {
-      this.groupScopeDraft[resource] = groupIds;
-    } else {
-      delete this.groupScopeDraft[resource];
-    }
   }
 
   /**
@@ -603,48 +425,73 @@ export class RolesComponent extends PageComponent implements OnInit {
   }
 
   addUserGroup() {
-    const name = (this.userGroupNameControl.value || '').trim();
-    if (!name) {
-      this.userGroupNameControl.markAsTouched();
-      return;
-    }
-    this.userGroups = [...this.userGroups, {
-      id: this.generateId(),
-      name,
-      userIds: [],
-      roleIds: []
-    }];
-    this.userGroupNameControl.setValue('');
+    this.dialog.open<UserGroupDialogComponent, any, UserGroupDialogResult>(UserGroupDialogComponent, {
+      width: '420px',
+      autoFocus: false
+    }).afterClosed().subscribe((result: UserGroupDialogResult) => {
+      if (result) {
+        this.persistUserGroups([...this.userGroups, {
+          id: this.generateId(),
+          name: result.name,
+          userIds: [],
+          roleIds: []
+        }]);
+      }
+    });
+  }
+
+  editUserGroup(group: RbacUserGroup) {
+    this.dialog.open<UserGroupDialogComponent, any, UserGroupDialogResult>(UserGroupDialogComponent, {
+      data: {name: group.name},
+      width: '420px',
+      autoFocus: false
+    }).afterClosed().subscribe((result: UserGroupDialogResult) => {
+      if (result) {
+        this.persistUserGroups(this.userGroups.map(g => g.id === group.id ? {...g, name: result.name} : g));
+      }
+    });
   }
 
   removeUserGroup(group: RbacUserGroup) {
-    this.userGroups = this.userGroups.filter(g => g.id !== group.id);
+    this.dialogService.confirm(
+      this.translate.instant('admin.roles-delete-user-group-title', {name: group.name}),
+      this.translate.instant('admin.roles-delete-user-group-text'),
+      this.translate.instant('action.no'),
+      this.translate.instant('action.yes'),
+      true
+    ).subscribe(result => {
+      if (result) {
+        this.persistUserGroups(this.userGroups.filter(g => g.id !== group.id));
+      }
+    });
   }
 
   setUserGroupUsers(group: RbacUserGroup, userIds: string[]) {
-    this.userGroups = this.userGroups.map(g => g.id === group.id ? {...g, userIds} : g);
+    this.persistUserGroups(this.userGroups.map(g => g.id === group.id ? {...g, userIds} : g));
   }
 
   setUserGroupRoles(group: RbacUserGroup, roleIds: string[]) {
-    this.userGroups = this.userGroups.map(g => g.id === group.id ? {...g, roleIds} : g);
+    this.persistUserGroups(this.userGroups.map(g => g.id === group.id ? {...g, roleIds} : g));
   }
 
-  saveUserGroups() {
-    // Read - modify - write: the groups edited here win, the groups created elsewhere are preserved and only the
-    // groups removed by the administrator are deleted.
+  /**
+   * Persists the user groups of the tenant (read - modify - write: the groups edited here win, the groups created
+   * elsewhere are preserved and only the groups removed by the administrator are deleted).
+   */
+  private persistUserGroups(groups: RbacUserGroup[]) {
     this.http.get<{groups: RbacUserGroup[]}>('/api/tenant/userGroup',
       defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
       next: current => {
         const byId = new Map<string, RbacUserGroup>();
         (current?.groups || []).forEach(group => byId.set(group.id, group));
-        this.userGroups.forEach(group => byId.set(group.id, group));
+        groups.forEach(group => byId.set(group.id, group));
         this.loadedUserGroupIds
-          .filter(id => !this.userGroups.some(group => group.id === id))
+          .filter(id => !groups.some(group => group.id === id))
           .forEach(id => byId.delete(id));
         this.http.post<{groups: RbacUserGroup[]}>('/api/tenant/userGroup', {groups: Array.from(byId.values())},
           defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
           next: settings => {
-            this.userGroups = settings?.groups || [];
+            this.userGroups = settings?.groups || groups;
             this.loadedUserGroupIds = this.userGroups.map(group => group.id);
             this.notifySaved('admin.roles-user-groups-save-success');
           },

@@ -1,39 +1,16 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
 @import '../../../../../scss/constants';
+@import 'roles-shared';
 
 :host {
   display: block;
   width: 100%;
   height: 100%;
   /*
-   * The whole page fills the viewport: the three columns share the available height and only the content that
-   * does not fit scrolls (inside its own column), so the browser never shows a page level scrollbar.
+   * The page fills the viewport: every tab shows its own list, the browser never shows a page level scrollbar.
    */
   overflow: hidden;
-}
-
-.tb-roles-presets {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 6px;
-
-  .tb-roles-presets-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: .3px;
-    color: rgba(0, 0, 0, .54);
-  }
-
-  .tb-roles-preset {
-    height: 26px;
-    min-width: 0;
-    padding: 0 8px;
-    font-size: 11px;
-    line-height: 24px;
-  }
 }
 
 .tb-roles-page {
@@ -56,7 +33,7 @@
 
 /*
  * The generic settings card is capped at 60% / 80% of the content area (settings-card.scss).
- * The roles page needs the whole width, otherwise the three columns are squeezed against the left edge.
+ * The roles page needs the whole width, otherwise the lists are squeezed against the left edge.
  * The extra .tb-roles-page ancestor keeps this rule above the settings-card one (same file, loaded after).
  */
 .tb-roles-page .mat-mdc-card.settings-card.tb-roles-card {
@@ -102,142 +79,16 @@
   padding-bottom: 8px;
 }
 
-/* Roles tab: role list | permission matrix | users + save */
-.tb-roles-3col {
-  display: grid;
-  gap: 16px;
-  /*
-   * The three columns always share the width proportionally (role list | permission matrix | users) and stretch to
-   * the same height, so every resolution keeps the same layout and nothing is clipped or pushed to the next row.
-   * Below 1280px the columns keep proportional widths and below 900px they are stacked.
-   */
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.9fr) minmax(0, 0.95fr);
-  align-items: stretch;
-  height: 100%;
-  min-height: 0;
-
-  @media (max-width: 1280px) {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2.35fr) minmax(0, 0.85fr);
-  }
-
-  @media (max-width: 900px) {
-    grid-template-columns: minmax(0, 1fr);
-    height: auto;
-  }
-}
-
-.tb-roles-col {
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-
-  > .mat-mdc-card-content,
-  > .tb-roles-col-content {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    overflow: auto;
-  }
-}
-
-/* the role list of the first column scrolls on its own, the card itself never scrolls */
-.tb-roles-col-1 > .tb-roles-col-content {
-  overflow: hidden;
-}
-
-.tb-roles-inline-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tb-roles-role-list {
+/* Roles tab: a single compact list of the tenant roles, edited through the role dialog. */
+.tb-roles-list {
   flex: 1 1 auto;
-  min-height: 120px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  /* the list scrolls inside its column, never the whole page */
+  min-height: 0;
+}
+
+.tb-roles-list-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
-
-  .tb-roles-role-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 4px 8px;
-    padding: 8px;
-    border-radius: 6px;
-    cursor: pointer;
-
-    &:hover {
-      background: rgba(0, 0, 0, .04);
-    }
-
-    &.tb-selected {
-      background: rgba(25, 118, 210, .12);
-    }
-
-    .tb-roles-role-main {
-      display: flex;
-      flex-direction: column;
-      flex: 1 1 120px;
-      min-width: 0;
-    }
-
-    .tb-roles-role-name {
-      font-weight: 500;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .tb-roles-role-actions {
-      display: flex;
-      align-items: center;
-      margin-left: auto;
-    }
-
-    .tb-roles-role-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      flex: 1 1 100%;
-    }
-  }
-}
-
-.tb-roles-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.01);
-}
-
-.tb-roles-section-bar {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.tb-roles-section-title {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.tb-roles-hint {
-  font-size: 11px;
-  line-height: 16px;
-  color: rgba(0, 0, 0, 0.6);
-  max-width: 860px;
 }
 
 .tb-roles-create {
@@ -253,189 +104,12 @@
   flex: 1 1 260px;
 }
 
-.tb-roles-own-customer {
-  padding-bottom: 2px;
-}
-
-.tb-roles-resource-tabs {
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
-  background: #fff;
-}
-
-.tb-roles-resource {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  padding: 10px 12px 12px;
-  /* the checkbox matrix adapts to the width of its own column, not to the window */
-  container-type: inline-size;
-}
-
-/*
- * Compact matrix: as many checkbox columns as fit in the card, so the operations of an entity type stay visible
- * without scrolling vertically or horizontally.
- */
-.tb-roles-ops {
-  display: grid;
-  gap: 0 10px;
-  align-items: center;
-  /* two columns are the safe default: every operation label stays on a single line */
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-
-  /* 3 columns from ~470px and 4 from ~630px of usable width, i.e. only when the labels still fit on one line */
-  @container (min-width: 470px) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  @container (min-width: 630px) {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-.tb-roles-own-scope {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-}
-
-.tb-roles-own-scope-hint {
-  flex: 1 1 100%;
-  max-width: none;
-}
-
-.tb-roles-own {
-  flex: 0 0 auto;
-}
-
-.tb-roles-own-warning {
-  align-self: flex-start;
-  max-width: 560px;
-  padding: 6px 10px;
-  border-left: 3px solid #d68b00;
-  border-radius: 4px;
-  background: rgba(214, 139, 0, .1);
-  color: rgba(0, 0, 0, .75);
-  font-size: 12px;
-  line-height: 18px;
-}
-
-.tb-roles-scope {
-  flex: 1 1 240px;
-  min-width: 200px;
-  max-width: 420px;
-}
-
-.tb-roles-resource-name {
-  margin-right: 6px;
-  font-weight: 500;
-}
-
-.tb-roles-table {
-  width: 100%;
-  background: transparent;
-}
-
-.tb-roles-users-select {
-  width: 100%;
-  min-width: 220px;
-  max-width: 360px;
-}
-
-.tb-roles-cell-strong {
-  font-weight: 500;
-}
-
-.tb-roles-cell-hint {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.6);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 320px;
-}
-
-.tb-roles-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px 0;
-}
-
-.tb-roles-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  line-height: 18px;
-  /*
-   * The chip must never be cut off by its column: the text wraps inside the rounded badge instead of overflowing
-   * (a permission chip of a wide role is longer than the role list column on smaller screens).
-   */
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  text-align: left;
-  background: rgba(0, 0, 0, 0.06);
-  color: rgba(0, 0, 0, 0.75);
-
-  &.tb-roles-chip-scoped {
-    max-width: 100%;
-    background: rgba(48, 86, 128, 0.12);
-    color: #305680;
-  }
-}
-
-.tb-roles-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.tb-roles-public-icon {
-  opacity: 0.45;
-
-  &.tb-on {
-    opacity: 1;
-    color: #198038;
-  }
-}
-
-.tb-roles-empty {
-  padding: 24px;
-  text-align: center;
-  font-size: 13px;
-  color: rgba(0, 0, 0, 0.5);
-  border: 1px dashed rgba(0, 0, 0, 0.12);
-  border-radius: 8px;
-}
-
-.tb-entity-group-dialog-hint {
-  margin-top: 8px;
-  color: rgba(0, 0, 0, 0.6);
-}
-
 @media #{$mat-xs} {
   .tb-roles-page {
     padding: 8px;
   }
 
-  .tb-roles-ops {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .tb-roles-name,
-  .tb-roles-scope,
-  .tb-roles-users-select {
+  .tb-roles-name {
     min-width: 100%;
     max-width: 100%;
   }

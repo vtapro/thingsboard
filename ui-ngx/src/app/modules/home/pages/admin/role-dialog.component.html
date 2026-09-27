@@ -1,0 +1,110 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<h2 mat-dialog-title>
+  {{ (isEdit ? 'admin.roles-update' : 'admin.roles-add') | translate }}
+</h2>
+<mat-dialog-content class="tb-role-dialog-content">
+  <div class="tb-role-dialog-identity">
+    <mat-form-field class="tb-role-dialog-name" subscriptSizing="dynamic" appearance="outline">
+      <mat-label translate>admin.roles-name</mat-label>
+      <input matInput [formControl]="nameControl" required>
+      @if (nameControl.invalid) {
+        <mat-error translate>admin.roles-name-required</mat-error>
+      }
+    </mat-form-field>
+    <mat-checkbox class="tb-role-dialog-own-customer" [formControl]="ownCustomerOnlyControl">
+      {{ 'admin.roles-own-customer-only' | translate }}
+    </mat-checkbox>
+  </div>
+
+  <div class="tb-roles-section-title" translate>admin.roles-permissions</div>
+  <div class="tb-roles-hint" translate>admin.roles-permissions-hint</div>
+
+  <mat-tab-group class="tb-roles-resource-tabs" mat-stretch-tabs="false" mat-align-tabs="start">
+    @for (resource of resources; track resource) {
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <span class="tb-roles-resource-name">{{ resource }}</span>
+        </ng-template>
+        <div class="tb-roles-resource">
+          <div class="tb-roles-presets">
+            <span class="tb-roles-presets-label" translate>admin.roles-presets</span>
+            @for (preset of presets; track preset.id) {
+              <button type="button" mat-stroked-button class="tb-roles-preset"
+                      (click)="applyPreset(resource, preset.id)">{{ preset.label }}</button>
+            }
+            <span class="flex-1"></span>
+            <button type="button" mat-button (click)="selectAllOperations(resource)">
+              {{ 'admin.roles-select-all' | translate }}
+            </button>
+            <button type="button" mat-button (click)="clearAllOperations(resource)">
+              {{ 'admin.roles-clear-all' | translate }}
+            </button>
+          </div>
+          <div class="tb-roles-ops">
+            @for (operation of operationsFor(resource); track operation) {
+              <mat-checkbox [checked]="isOperationGranted(resource, operation)"
+                            (change)="toggleOperation(resource, operation)">
+                {{ operationLabel(operation) }}
+              </mat-checkbox>
+            }
+          </div>
+          <div class="tb-roles-own-scope">
+            @if (supportsOwnScope(resource)) {
+              <mat-checkbox class="tb-roles-own" [checked]="isOwnOnly(resource)"
+                            (change)="toggleOwnOnly(resource)">
+                {{ 'admin.roles-own-only' | translate }}
+              </mat-checkbox>
+            } @else {
+              <div class="tb-roles-hint tb-roles-own-scope-hint">
+                {{ 'admin.roles-own-scope-not-supported' | translate }}
+              </div>
+            }
+            <mat-form-field class="tb-roles-scope" subscriptSizing="dynamic" appearance="outline">
+              <mat-label translate>admin.roles-scope-groups</mat-label>
+              <mat-select multiple
+                          [disabled]="!hasAnyOperation(resource) || !canScopeToGroups(resource)"
+                          [value]="groupsFor(resource)"
+                          (selectionChange)="setGroups(resource, $event.value)">
+                @for (group of groups; track group.id) {
+                  <mat-option [value]="group.id">{{ group.name }}</mat-option>
+                }
+              </mat-select>
+              @if (!canScopeToGroups(resource)) {
+                <mat-hint>{{ 'admin.roles-scope-not-supported' | translate: {resource} }}</mat-hint>
+              }
+            </mat-form-field>
+          </div>
+          @if (supportsOwnScope(resource) && isOwnOnly(resource)) {
+            <div class="tb-roles-own-warning">
+              {{ 'admin.roles-own-only-warning' | translate }}
+            </div>
+          }
+        </div>
+      </mat-tab>
+    }
+  </mat-tab-group>
+
+  <div class="tb-roles-section-title" translate>admin.roles-users</div>
+  <mat-form-field class="tb-roles-users-select" subscriptSizing="dynamic" appearance="outline">
+    <mat-label translate>admin.roles-assign-users</mat-label>
+    <mat-select multiple [value]="userIds" (selectionChange)="userIds = $event.value">
+      @for (user of users; track user.id.id) {
+        <mat-option [value]="user.id.id">{{ userLabel(user) }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="cancel()">
+    {{ 'action.cancel' | translate }}
+  </button>
+  <button mat-raised-button color="primary" type="button" (click)="save()"
+          [disabled]="nameControl.invalid || !hasAnyPermission()">
+    {{ (isEdit ? 'action.save' : 'action.add') | translate }}
+  </button>
+</mat-dialog-actions>

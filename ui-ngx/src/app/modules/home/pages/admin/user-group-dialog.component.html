@@ -1,0 +1,27 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<h2 mat-dialog-title>
+  {{ (isEdit ? 'admin.roles-edit-user-group' : 'admin.roles-add-user-group') | translate }}
+</h2>
+<mat-dialog-content>
+  <mat-form-field class="mat-block" subscriptSizing="dynamic" appearance="outline">
+    <mat-label translate>admin.roles-name</mat-label>
+    <input matInput [formControl]="nameControl" required>
+    @if (nameControl.invalid) {
+      <mat-error translate>admin.roles-user-group-name-required</mat-error>
+    }
+  </mat-form-field>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="cancel()">
+    {{ 'action.cancel' | translate }}
+  </button>
+  <button mat-raised-button color="primary" type="button" (click)="save()"
+          [disabled]="nameControl.invalid">
+    {{ (isEdit ? 'action.save' : 'action.add') | translate }}
+  </button>
+</mat-dialog-actions>

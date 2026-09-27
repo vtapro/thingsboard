@@ -1,0 +1,25 @@
+// SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+// SPDX-License-Identifier: Apache-2.0
+.tb-role-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.tb-role-dialog-identity {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+
+.tb-role-dialog-name {
+  flex: 1 1 320px;
+  min-width: 240px;
+  max-width: 480px;
+}
+
+.tb-role-dialog-own-customer {
+  flex: 0 0 auto;
+}
