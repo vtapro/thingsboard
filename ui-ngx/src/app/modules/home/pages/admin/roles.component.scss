@@ -6,32 +6,41 @@
   display: block;
   width: 100%;
   height: 100%;
-  overflow: auto;
+  /*
+   * The whole page fills the viewport: the three columns share the available height and only the content that
+   * does not fit scrolls (inside its own column), so the browser never shows a page level scrollbar.
+   */
+  overflow: hidden;
 }
 
 .tb-roles-presets {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 6px;
+  margin-bottom: 6px;
 
   .tb-roles-presets-label {
-    font-size: 12px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: .3px;
     color: rgba(0, 0, 0, .54);
   }
 
   .tb-roles-preset {
-    height: 30px;
-    padding: 0 10px;
-    font-size: 12px;
-    line-height: 28px;
+    height: 26px;
+    min-width: 0;
+    padding: 0 8px;
+    font-size: 11px;
+    line-height: 24px;
   }
 }
 
 .tb-roles-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
   padding: 16px;
   width: 100%;
   max-width: none;
@@ -39,6 +48,8 @@
 }
 
 .tb-roles-card {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -66,19 +77,28 @@
 }
 
 .tb-roles-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   padding: 0 16px 16px;
 }
 
 .tb-roles-tabs {
+  flex: 1 1 auto;
+  min-height: 0;
+
   .mat-mdc-tab-body-wrapper {
-    padding-top: 16px;
+    padding-top: 12px;
   }
 }
 
 .tb-roles-tab {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  min-height: 0;
+  height: 100%;
   padding-bottom: 8px;
 }
 
@@ -86,28 +106,47 @@
 .tb-roles-3col {
   display: grid;
   gap: 16px;
-  align-items: start;
   /*
-   * The three columns always share the width proportionally (role list | permission matrix | users): every
-   * resolution keeps the same layout and the columns shrink/grow with the window instead of wrapping to the
-   * next row. Below 900px the columns are stacked, which is the only case where the layout changes.
+   * The three columns always share the width proportionally (role list | permission matrix | users) and stretch to
+   * the same height, so every resolution keeps the same layout and nothing is clipped or pushed to the next row.
+   * Below 1280px the columns keep proportional widths and below 900px they are stacked.
    */
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 2.1fr) minmax(0, 1.15fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.9fr) minmax(0, 0.95fr);
+  align-items: stretch;
+  height: 100%;
+  min-height: 0;
+
+  @media (max-width: 1280px) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2.35fr) minmax(0, 0.85fr);
+  }
 
   @media (max-width: 900px) {
     grid-template-columns: minmax(0, 1fr);
+    height: auto;
   }
 }
 
 .tb-roles-col {
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 
   > .mat-mdc-card-content,
   > .tb-roles-col-content {
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 12px;
+    overflow: auto;
   }
+}
+
+/* the role list of the first column scrolls on its own, the card itself never scrolls */
+.tb-roles-col-1 > .tb-roles-col-content {
+  overflow: hidden;
 }
 
 .tb-roles-inline-actions {
@@ -118,11 +157,12 @@
 }
 
 .tb-roles-role-list {
+  flex: 1 1 auto;
+  min-height: 120px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* follows the window height, so the list uses the available room on tall screens */
-  max-height: clamp(240px, calc(100vh - 430px), 720px);
+  /* the list scrolls inside its column, never the whole page */
   overflow: auto;
 
   .tb-roles-role-row {
@@ -167,8 +207,6 @@
       flex-wrap: wrap;
       gap: 4px;
       flex: 1 1 100%;
-      max-height: 42px;
-      overflow: hidden;
     }
   }
 }
@@ -196,8 +234,8 @@
 }
 
 .tb-roles-hint {
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 11px;
+  line-height: 16px;
   color: rgba(0, 0, 0, 0.6);
   max-width: 860px;
 }
@@ -229,8 +267,10 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
-  padding: 12px 16px 16px;
+  gap: 6px;
+  padding: 10px 12px 12px;
+  /* the checkbox matrix adapts to the width of its own column, not to the window */
+  container-type: inline-size;
 }
 
 /*
@@ -239,9 +279,19 @@
  */
 .tb-roles-ops {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 0 12px;
+  gap: 0 10px;
   align-items: center;
+  /* two columns are the safe default: every operation label stays on a single line */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  /* 3 columns from ~470px and 4 from ~630px of usable width, i.e. only when the labels still fit on one line */
+  @container (min-width: 470px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  @container (min-width: 630px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .tb-roles-own-scope {
@@ -321,11 +371,19 @@
   border-radius: 12px;
   font-size: 11px;
   line-height: 18px;
-  white-space: nowrap;
+  /*
+   * The chip must never be cut off by its column: the text wraps inside the rounded badge instead of overflowing
+   * (a permission chip of a wide role is longer than the role list column on smaller screens).
+   */
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
   background: rgba(0, 0, 0, 0.06);
   color: rgba(0, 0, 0, 0.75);
 
   &.tb-roles-chip-scoped {
+    max-width: 100%;
     background: rgba(48, 86, 128, 0.12);
     color: #305680;
   }
