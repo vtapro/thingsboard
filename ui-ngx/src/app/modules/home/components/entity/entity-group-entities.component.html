@@ -1,0 +1,68 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<div class="tb-group-entities">
+  <mat-card appearance="outlined" class="tb-group-entities-card">
+    <div class="tb-group-entities-header">
+      <button mat-icon-button type="button" (click)="back()"
+              [matTooltip]="'action.back' | translate">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <span class="tb-group-entities-title">{{ title }}</span>
+      <span class="flex-1"></span>
+      <button mat-icon-button type="button" (click)="reload()">
+        <mat-icon>refresh</mat-icon>
+      </button>
+      <button mat-raised-button color="primary" type="button" (click)="addEntity()">
+        <mat-icon>add</mat-icon>
+        {{ 'action.add' | translate }}
+      </button>
+    </div>
+
+    @if (loading) {
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+    }
+
+    @if (!group) {
+      <div class="tb-group-entities-empty">{{ 'entity-group.no-groups' | translate }}</div>
+    } @else if (!loading && !entities.length) {
+      <div class="tb-group-entities-empty">{{ 'entity-group.no-entities' | translate }}</div>
+    } @else {
+      <table mat-table [dataSource]="entities" class="tb-group-entities-table">
+        <ng-container matColumnDef="createdTime">
+          <th mat-header-cell *matHeaderCellDef>{{ 'common.created-time' | translate }}</th>
+          <td mat-cell *matCellDef="let entity">{{ entity.createdTime | date: 'yyyy-MM-dd HH:mm:ss' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>{{ entityNameLabel }}</th>
+          <td mat-cell *matCellDef="let entity">
+            <div class="tb-group-entities-name">{{ nameOf(entity) }}</div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="profile">
+          <th mat-header-cell *matHeaderCellDef>{{ profileLabel }}</th>
+          <td mat-cell *matCellDef="let entity">{{ profileOf(entity) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="label">
+          <th mat-header-cell *matHeaderCellDef>{{ 'device.label' | translate }}</th>
+          <td mat-cell *matCellDef="let entity">{{ entity.label || '-' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef>{{ 'common.type' | translate }}</th>
+          <td mat-cell *matCellDef="let entity">{{ entity.type || '-' }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns;"></tr>
+      </table>
+      <mat-paginator [length]="totalElements"
+                     [pageIndex]="pageIndex"
+                     [pageSize]="pageSize"
+                     [pageSizeOptions]="[10, 20, 50]"
+                     (page)="onPageChange($event)"
+                     showFirstLastButtons></mat-paginator>
+    }
+  </mat-card>
+</div>

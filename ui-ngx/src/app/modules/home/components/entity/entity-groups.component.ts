@@ -6,6 +6,7 @@ import { FormControl } from '@angular/forms';
 import { Store } from '@ngrx/store';
 import { MatDialog } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
+import { Router } from '@angular/router';
 import { AddEntitiesDialogComponent } from '@home/components/entity/add-entities-dialog.component';
 import { EntityGroupDialogComponent } from '@home/components/entity/entity-group-dialog.component';
 
@@ -55,6 +56,7 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
               private http: HttpClient,
               private dialog: MatDialog,
               private dialogService: DialogService,
+              private router: Router,
               private translate: TranslateService) {
     super();
   }
@@ -67,6 +69,22 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
 
   isTenantAdmin(): boolean {
     return getCurrentAuthState(this.store).authUser?.authority === Authority.TENANT_ADMIN;
+  }
+
+  /** Opens the entities of one group, like the "All: Devices" page of ThingsBoard PE. */
+  openGroup(group: EntityGroup): void {
+    this.router.navigate(['/entities', this.groupPath(), 'groups', group.id]);
+  }
+
+  private groupPath(): string {
+    switch (this.entityType) {
+      case 'ASSET':
+        return 'assets';
+      case 'ENTITY_VIEW':
+        return 'entityViews';
+      default:
+        return 'devices';
+    }
   }
 
   load() {

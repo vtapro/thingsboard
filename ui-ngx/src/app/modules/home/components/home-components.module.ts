@@ -194,6 +194,7 @@ import { EntityGroupsComponent } from '@home/components/entity/entity-groups.com
 import { AddEntitiesDialogComponent } from '@home/components/entity/add-entities-dialog.component';
 import { EntityGroupDialogComponent } from '@home/components/entity/entity-group-dialog.component';
 import { EntityShareDialogComponent } from '@home/components/entity/entity-share-dialog.component';
+import { EntityGroupEntitiesComponent } from '@home/components/entity/entity-group-entities.component';
 
 @NgModule({
   declarations:
@@ -204,6 +205,7 @@ import { EntityShareDialogComponent } from '@home/components/entity/entity-share
       AddEntitiesDialogComponent,
       EntityGroupDialogComponent,
       EntityShareDialogComponent,
+      EntityGroupEntitiesComponent,
       AddEntityDialogComponent,
       DetailsPanelComponent,
       EntityDetailsPanelComponent,
@@ -377,6 +379,7 @@ import { EntityShareDialogComponent } from '@home/components/entity/entity-share
   exports: [
     RouterTabsComponent,
     EntitiesTableComponent,
+    EntityGroupEntitiesComponent,
     AddEntityDialogComponent,
     DetailsPanelComponent,
     EntityDetailsPanelComponent,

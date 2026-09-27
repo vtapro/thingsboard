@@ -334,6 +334,8 @@
             "add": "Add entity group",
             "all-readonly": "The All group contains every entity of this type and can not be modified or deleted",
             "no-groups": "No entity groups found",
+            "not-found": "Entity group not found",
+            "no-entities": "No entities in this group",
             "tenant-admin-only": "Only tenant administrators can manage entity groups."
         },
         "roles-add-group": "Add group",
