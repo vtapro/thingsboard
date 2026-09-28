@@ -44,6 +44,13 @@ spec:
           labelSelector:
             matchLabels:
               app.kubernetes.io/name: tb-core
+        # trai deu TONG so pod ThingsBoard tren cac worker, khong chi trong tung service
+        - maxSkew: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: thingsboard
       containers:
         - name: tb-core
           # tb-node image: same jar as tb-rule-engine, role selected by TB_SERVICE_TYPE

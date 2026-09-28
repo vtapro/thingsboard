@@ -39,6 +39,20 @@ spec:
     spec:
       imagePullSecrets:
         - name: ghcr
+      # Phase 0+ (2026-09-28): trai deu pod tren cac worker de tai khong don vao 1 node.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: tb-coap-transport
+        - maxSkew: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: thingsboard
       containers:
         - name: tb-coap-transport
           image: ghcr.io/vtapro/tb-coap-transport:v4.4.0.1
@@ -157,6 +171,20 @@ spec:
     spec:
       imagePullSecrets:
         - name: ghcr
+      # Phase 0+ (2026-09-28): trai deu pod tren cac worker de tai khong don vao 1 node.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: tb-lwm2m-transport
+        - maxSkew: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: thingsboard
       containers:
         - name: tb-lwm2m-transport
           image: ghcr.io/vtapro/tb-lwm2m-transport:v4.4.0.1
@@ -303,6 +331,20 @@ spec:
     spec:
       imagePullSecrets:
         - name: ghcr
+      # Phase 0+ (2026-09-28): trai deu pod tren cac worker de tai khong don vao 1 node.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: tb-snmp-transport
+        - maxSkew: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: thingsboard
       containers:
         - name: tb-snmp-transport
           image: ghcr.io/vtapro/tb-snmp-transport:v4.4.0.1
