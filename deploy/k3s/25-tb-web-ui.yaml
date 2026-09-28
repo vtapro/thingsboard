@@ -46,7 +46,7 @@ spec:
               app.kubernetes.io/name: tb-web-ui
       containers:
         - name: tb-web-ui
-          image: ghcr.io/vtapro/tb-web-ui:v4.4.0.0
+          image: ghcr.io/vtapro/tb-web-ui:v4.4.0.1
           imagePullPolicy: Always
           env:
             - name: NODE_ENV

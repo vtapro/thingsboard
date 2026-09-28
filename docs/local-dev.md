@@ -354,7 +354,7 @@ Kết quả lần chạy đầu (2026-09-25): **15/15 PASS**, gồm `RPC deliver
 ## 10. Chỉ sau khi local pass: đẩy GHCR + deploy k3s
 
 ```powershell
-# 1) commit + push -> GitHub Actions build 8 image ghcr.io/vtapro/tb-*:v4.4.0.0 (~8-15 phút)
+# 1) commit + push -> GitHub Actions build 8 image ghcr.io/vtapro/tb-*:v4.4.0.1 (~8-15 phút)
 git add -A
 git commit -m "feat: ..."
 git push origin RBAC-full-groups-tabs

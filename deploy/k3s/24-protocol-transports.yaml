@@ -41,7 +41,7 @@ spec:
         - name: ghcr
       containers:
         - name: tb-coap-transport
-          image: ghcr.io/vtapro/tb-coap-transport:v4.4.0.0
+          image: ghcr.io/vtapro/tb-coap-transport:v4.4.0.1
           imagePullPolicy: Always
           envFrom:
             - configMapRef:
@@ -159,7 +159,7 @@ spec:
         - name: ghcr
       containers:
         - name: tb-lwm2m-transport
-          image: ghcr.io/vtapro/tb-lwm2m-transport:v4.4.0.0
+          image: ghcr.io/vtapro/tb-lwm2m-transport:v4.4.0.1
           imagePullPolicy: Always
           envFrom:
             - configMapRef:
@@ -305,7 +305,7 @@ spec:
         - name: ghcr
       containers:
         - name: tb-snmp-transport
-          image: ghcr.io/vtapro/tb-snmp-transport:v4.4.0.0
+          image: ghcr.io/vtapro/tb-snmp-transport:v4.4.0.1
           imagePullPolicy: Always
           envFrom:
             - configMapRef:

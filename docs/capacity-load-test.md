@@ -72,6 +72,32 @@ Diễn giải:
 Hai phương pháp cho cùng một kết luận: **trần của cấu hình hiện tại nằm quanh 900–1.100 msg/s**,
 và trần đó bị quyết định bởi rule-engine + Kafka + CPU của cụm, không phải bởi transport.
 
+### 3.1. Đo lại ngày 2026-09-28 trên cấu hình hiện tại (1.000 thiết bị)
+
+Cấu hình lúc đo: **3 worker 4 vCPU/8 GiB** (thêm `vmi2917809`), Cassandra **đã ở trong cụm**,
+`tb-core` ×3, `tb-rule-engine` ×2, `tb-js-executor` ×4, `tb-mqtt-transport` ×2 (tự scale lên 3 khi tải).
+Kịch bản: 4 shard × 250 thiết bị, 1 message/giây/thiết bị, 60 giây, payload 4 key.
+
+| Chỉ số | Kết quả |
+|---|---|
+| Kết nối MQTT | 1.000/1.000 – mỗi shard `sockets_created=250 connected=250`, `CONNACK: Success` 250 |
+| Publish / PUBACK / lỗi phía client | **60.000 / 60.000 / 0** |
+| Dòng `ts_kv_cf` tăng thêm | **+240.000** = 60.000 message × 4 key (**khớp tuyệt đối**) |
+| Dòng `ts_kv_latest_cf` tăng thêm | +4.000 = 1.000 thiết bị × 4 key |
+| Mất dữ liệu | **0 %** |
+| `Timeout to process` của rule-engine | 135 dòng / **29.220 message-timeout** (~49 % số message) |
+| Lag Kafka sau khi dừng bơm 60 s | **0** trên mọi consumer group |
+
+Tài nguyên đỉnh khi bơm: node `vmi3011340` **97 % CPU / 79 % RAM**; mỗi pod rule-engine **1,1–1,6 core**
+(limit 2); `tb-mqtt-transport` 0,65–0,87 core × 3 pod; `tb-kafka-0` 0,6–0,9 core.
+
+Đọc kết quả: **1.000 thiết bị × 1 msg/s vẫn 0 % mất dữ liệu**, nhưng rule-engine đã chạm trần — HPA báo
+**290 %/70 %** trong khi `maxReplicas` chỉ 2, và ~49 % message phải đi qua đường timeout rồi được xử lý lại.
+Biên an toàn gần như bằng 0: mọi mức tải cao hơn cần thêm replica rule-engine và/hoặc thêm worker trước.
+
+Sau khi đo: xoá 1.000 thiết bị test khỏi PostgreSQL và purge 240.000 dòng telemetry test khỏi Cassandra
+(`ts_kv_cf` về đúng **31** dòng, `ts_kv_latest_cf` về **3** dòng như trước khi đo).
+
 ## 4. Tài nguyên tiêu thụ khi đo
 
 | Thành phần | 1.000 msg/s | 2.000 msg/s (bão hoà) |
@@ -92,6 +118,7 @@ pod thứ 8 bị `Pending` vì hết CPU request).
 |---|---|---|
 | ≤ 500 thiết bị × 1 msg/s | An toàn, p95 thấp, còn dư CPU cho dashboard/API | **Đây là mức khai thác hiện tại** |
 | ~600–1.000 thiết bị × 1 msg/s | Chạy được, đã kiểm chứng 0 % mất gói ở đúng 1.000; p95 tăng | Chỉ dùng khi chấp nhận hết dư địa |
+| 1.000 thiết bị × 1 msg/s (đo lại 2026-09-28) | **0 % mất dữ liệu** (240.000/240.000 dòng) nhưng 49 % message đi qua timeout | **Trần thực tế hiện tại** — phải tăng replica rule-engine trước khi vượt |
 | ≥ 1.500 msg/s | Mất gói, latency tăng mạnh | **Phải mở rộng trước khi lên mức này** |
 
 Nút cổ chai theo thứ tự tác động:
@@ -108,14 +135,35 @@ Nút cổ chai theo thứ tự tác động:
    đồng thời làm bão kết nối (mỗi CONNECT cần tra credential) chậm hẳn — 250 thiết bị mất 13–58 s để vào đủ.
 5. **Rác trong Kafka**: 236 topic (189 topic `tb_*`), nhiều `tb_core.notifications.<pod cũ>` và consumer
    group của các pod đã bị xoá — tăng chi phí rebalance/metadata.
+6. **Đo lại 2026-09-28 — nút cổ chai đã dịch sang CPU/HPA**: 3 worker hết dư địa (`vmi3011340` 97 % CPU,
+   79 % RAM request khi tải 1.000 msg/s) và **HPA rule-engine bị chặn ở max 2 replica** dù đạt
+   290 %/70 %. Cassandra trong cụm không còn là nút cổ chai (write p95 1,3 ms, 0 dropped mutation).
 
 ## 6. Lộ trình mở rộng
 
 ### Phase 0 — cấu hình, không thêm hạ tầng — ✅ **đã làm ngày 2026-09-25**
 
+> **Cập nhật 2026-09-28 — Phase 0 làm lại đúng cách và đã kiểm chứng:** sửa `pack_processing_timeout`
+> trong **bảng `queue` của PostgreSQL** (2000 → 30000 ms), tăng `queue.partitions` của `Main` 10 → 32,
+> nâng HPA rule-engine (min 2 / max 4) + mqtt (min 2 / max 4) và `requests.cpu` rule-engine lên 1 core.
+> Bài đo lại 1.000 thiết bị: **0 dòng `Timeout to process`** (trước đó 184 pack / 39.896 message),
+> `ts_kv_cf` +203.000 = số message × 4 (0 % mất dữ liệu), CPU node đỉnh giảm 97 % → 80 %.
+> Chi tiết ở [`k3s-processing-speed-audit.md` §11](k3s-processing-speed-audit.md).
+
 1. ✅ Tăng `TB_QUEUE_RULE_ENGINE_PACK_PROCESSING_TIMEOUT_MS` 2000 → **30000 ms** cho `tb-rule-engine`
    và `TB_QUEUE_CORE_PACK_PROCESSING_TIMEOUT_MS` 2000 → **30000 ms** cho `tb-core`
    (`deploy/k3s/20-tb-core.yaml`, `deploy/k3s/21-tb-rule-engine.yaml`, đã rolling restart).
+   > ⚠️ **Đính chính (2026-09-28): cách này KHÔNG có tác dụng với queue rule-engine.** Timeout của pack
+   > rule-engine lấy từ **entity `Queue` trong PostgreSQL** (`queue.pack_processing_timeout`), không lấy
+   > từ biến môi trường: mỗi queue được tạo một lần bởi job install
+   > (`DefaultSystemDataLoaderService.createQueues()` hard-code `setPackProcessingTimeout(2000)`), sau đó
+   > không ai ghi đè. Đo thực tế trong DB: `HighPriority`/`Main`/`SequentialByOriginator` đều
+   > **`pack_processing_timeout = 2000`** dù env đã đặt 30000. Hệ quả: bài đo 1.000 thiết bị (2026-09-28)
+   > vẫn có 184 pack `Timeout to process` (độ trễ log_time − publish_ts: min 2,05 s / p50 5,9 s / p90 7,7 s).
+   > Cách sửa đúng: đổi **trong UI System admin → Queues** (hoặc REST `POST /api/queues`, hoặc
+   > `UPDATE queue SET pack_processing_timeout = 30000 WHERE name IN ('Main','HighPriority','SequentialByOriginator');`)
+   > rồi đo lại. Biến `TB_QUEUE_*_PACK_PROCESSING_TIMEOUT_MS` chỉ còn ý nghĩa cho queue của **transport**
+   > (xem `transport/*/src/main/resources/*.yml`).
 2. ✅ Tăng partition `tb_transport.api.requests` 10 → **30** (đã alter topic trên cụm và đặt mặc định
    `TB_QUEUE_KAFKA_TA_TOPIC_PROPERTIES` trong `deploy/k3s/01-config.yaml` cho topic tạo mới). Queue
    rule-engine vẫn 10 partition (`tb_rule_engine.hp|main|sq.0..9`) — tăng khi thêm replica (Phase 1).
@@ -162,6 +210,13 @@ Việc còn lại của Phase 0: dựng monitoring ngoài cụm (hoặc dịch v
 3. **Đo tải phải chia nhiều pod bơm** và đặt CPU request nhỏ, nếu không kết luận sẽ sai về phía server.
 4. **Bản ghi mồ côi**: telemetry của thiết bị test sau khi xoá thiết bị vẫn nằm trong Cassandra (không hiện
    trên UI, không ảnh hưởng truy vấn theo entity). Có thể purge bằng script khi cần giải phóng dung lượng.
+5. **Purge telemetry mồ côi phải dùng đủ partition key**: `ts_kv_cf` có khoá
+   `((entity_type, entity_id, key, partition), ts)`, nên `DELETE ... WHERE entity_type='DEVICE' AND
+   entity_id=?` bị Cassandra từ chối (`Some partition key parts are missing: key, partition`). Cách chạy
+   được: xác định bộ `key` (temperature/humidity/battery/seq) và `partition` (ví dụ `1788220800000` —
+   mốc tuần) rồi xoá theo `(entity_id, key, partition)`; gộp tất cả câu lệnh vào **một file `.cql`** và
+   chạy `cqlsh -f` một lần (1.000 thiết bị × 4 key × 3 partition = 12.000 câu, ~1 phút) thay vì gọi
+   `cqlsh` cho từng entity.
 
 ## 8. Chạy lại bài đo
 

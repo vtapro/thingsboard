@@ -43,9 +43,11 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: tb-rule-engine
-  minReplicas: 1
-  # 2 = số replica đang chạy an toàn với số partition hiện tại của topic RE; tăng max chỉ sau khi tăng partition
-  maxReplicas: 2
+  minReplicas: 2
+  # Phase 0 (2026-09-28): queue Main đã tăng lên 32 partition nên có thể chạy nhiều replica hơn.
+  # Trần cũ 2 replica chính là thứ chặn rule-engine khi tải 1.000 thiết bị (290 %/70 %).
+  # Trần mới 4 để còn vừa CPU/RAM của 3 worker hiện tại; lên 8 chỉ sau khi thêm worker (Phase 1).
+  maxReplicas: 4
   metrics:
     - type: Resource
       resource:
@@ -107,8 +109,11 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: tb-mqtt-transport
-  minReplicas: 1
-  maxReplicas: 3
+  # Phase 0 (2026-09-28): giữ 2 replica thường trực — để 1 replica thì lúc bắt đầu bão kết nối
+  # transport đuối (connect phase 26–31 s) và cả bài đo bị chậm theo.
+  minReplicas: 2
+  # Phase 0 (2026-09-28): 1.000 thiết bị đã đẩy mqtt-transport lên 347 %/70 % và chạm trần 3.
+  maxReplicas: 4
   metrics:
     - type: Resource
       resource:

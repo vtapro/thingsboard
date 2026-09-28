@@ -44,7 +44,7 @@ spec:
               app.kubernetes.io/name: tb-rule-engine
       containers:
         - name: tb-rule-engine
-          image: ghcr.io/vtapro/tb-node:v4.4.0.0
+          image: ghcr.io/vtapro/tb-node:v4.4.0.1
           imagePullPolicy: Always
           envFrom:
             - configMapRef:
@@ -105,7 +105,9 @@ spec:
             failureThreshold: 5
           resources:
             requests:
-              cpu: 500m
+              # Phase 0 (2026-09-28): request 1 core de HPA phan anh dung tai thuc te.
+              # Voi request 500m, pod dung 1,6 core bi tinh la "320 %" va luon ket o maxReplicas.
+              cpu: 1000m
               memory: 1Gi
             limits:
               cpu: "2"

@@ -19,6 +19,7 @@ SPDX-License-Identifier: Apache-2.0
 | [white-labeling-roadmap.md](white-labeling-roadmap.md) | Lộ trình các phần white labeling còn lại |
 | [access-control-roadmap.md](access-control-roadmap.md) | Lộ trình RBAC (roles, entity groups, user groups, customer hierarchy) |
 | [capacity-load-test.md](capacity-load-test.md) | Kết quả đo tải thật trên cụm (MQTT 1 msg/s/thiết bị), nút cổ chai và lộ trình mở rộng |
+| [k3s-processing-speed-audit.md](k3s-processing-speed-audit.md) | Audit tốc độ xử lý cụm k3s (2026-09-28): độ trễ PostgreSQL/Cassandra/Kafka, HPA, throttling, khuyến nghị |
 | [implementation-status.md](implementation-status.md) | Trạng thái từng tính năng và môi trường chạy local |
 | [code-audit.md](code-audit.md) | Kết quả audit toàn bộ code tự thêm so với ThingsBoard CE, bằng chứng kiểm chứng |
 
