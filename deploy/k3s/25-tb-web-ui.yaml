@@ -46,9 +46,8 @@ spec:
               app.kubernetes.io/name: tb-web-ui
       containers:
         - name: tb-web-ui
-          # v4.4.0.2 = v4.4.0.1 + fix UI: mo device trong group "All" bi HTTP 400
+          # Release v4.4.0.2 = v4.4.0.1 + fix UI: mo device trong group "All" bi HTTP 400
           # (panel goi /api/device/info/[object Object] vi id cua entity la object).
-          # Cac image backend giu nguyen v4.4.0.1 (cung code, khong doi).
           image: ghcr.io/vtapro/tb-web-ui:v4.4.0.2
           imagePullPolicy: Always
           env:

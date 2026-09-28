@@ -37,7 +37,7 @@ spec:
         - name: ghcr
       containers:
         - name: tb-install
-          image: ghcr.io/vtapro/tb-node:v4.4.0.1
+          image: ghcr.io/vtapro/tb-node:v4.4.0.2
           envFrom:
             - configMapRef:
                 name: tb-common
