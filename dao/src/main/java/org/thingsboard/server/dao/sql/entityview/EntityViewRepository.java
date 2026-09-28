@@ -109,6 +109,8 @@ public interface EntityViewRepository extends JpaRepository<EntityViewEntity, UU
 
     List<EntityViewEntity> findAllByTenantIdAndEntityId(UUID tenantId, UUID entityId);
 
+    List<EntityViewEntity> findAllByTenantIdAndEntityId(UUID tenantId, UUID entityId, Pageable pageable);
+
     boolean existsByTenantIdAndEntityId(UUID tenantId, UUID entityId);
 
     List<EntityViewEntity> findEntityViewsByTenantIdAndIdIn(UUID tenantId, List<UUID> entityViewIds);

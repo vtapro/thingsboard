@@ -29,6 +29,9 @@
     @if (parentControl.invalid) {
       <mat-error translate>admin.roles-customer-required</mat-error>
     }
+    @if (cycleError) {
+      <mat-error translate>admin.roles-hierarchy-cycle</mat-error>
+    }
   </mat-form-field>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
@@ -36,7 +39,7 @@
     {{ 'action.cancel' | translate }}
   </button>
   <button mat-raised-button color="primary" type="button" (click)="save()"
-          [disabled]="childControl.invalid || parentControl.invalid">
+          [disabled]="childControl.invalid || parentControl.invalid || cycleError">
     {{ (isEdit ? 'action.save' : 'action.add') | translate }}
   </button>
 </mat-dialog-actions>

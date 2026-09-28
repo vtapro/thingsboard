@@ -228,10 +228,13 @@ public class AssetController extends BaseController {
             @RequestParam(required = false) String sortOrder) throws ThingsboardException {
         TenantId tenantId = getCurrentUser().getTenantId();
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ASSET, Operation.READ);
         if (type != null && type.trim().length() > 0) {
-            return checkNotNull(assetService.findAssetsByTenantIdAndType(tenantId, type, pageLink));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> assetService.findAssetsByTenantIdAndType(tenantId, type, link), Asset::getId));
         } else {
-            return checkNotNull(assetService.findAssetsByTenantId(tenantId, pageLink));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> assetService.findAssetsByTenantId(tenantId, link), Asset::getId));
         }
     }
 
@@ -258,17 +261,16 @@ public class AssetController extends BaseController {
         TenantId tenantId = getCurrentUser().getTenantId();
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ASSET, Operation.READ);
-        PageLink fetchLink = scopedPageLink(allowedEntityIds, pageLink);
         if (type != null && type.trim().length() > 0) {
-            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink,
-                    assetService.findAssetInfosByTenantIdAndType(tenantId, type, fetchLink), AssetInfo::getId));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> assetService.findAssetInfosByTenantIdAndType(tenantId, type, link), AssetInfo::getId));
         } else if (assetProfileId != null && assetProfileId.length() > 0) {
             AssetProfileId profileId = new AssetProfileId(toUUID(assetProfileId));
-            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink,
-                    assetService.findAssetInfosByTenantIdAndAssetProfileId(tenantId, profileId, fetchLink), AssetInfo::getId));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> assetService.findAssetInfosByTenantIdAndAssetProfileId(tenantId, profileId, link), AssetInfo::getId));
         } else {
-            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink,
-                    assetService.findAssetInfosByTenantId(tenantId, fetchLink), AssetInfo::getId));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> assetService.findAssetInfosByTenantId(tenantId, link), AssetInfo::getId));
         }
     }
 
@@ -277,7 +279,9 @@ public class AssetController extends BaseController {
     @GetMapping(value = "/tenant/assets", params = {"assetName"})
     public Asset getTenantAsset(@RequestParam String assetName) throws ThingsboardException {
         TenantId tenantId = getCurrentUser().getTenantId();
-        return checkNotNull(assetService.findAssetByTenantIdAndName(tenantId, assetName));
+        Asset asset = checkNotNull(assetService.findAssetByTenantIdAndName(tenantId, assetName));
+        accessControlService.checkPermission(getCurrentUser(), Resource.ASSET, Operation.READ, asset.getId(), asset);
+        return asset;
     }
 
     @ApiOperation(value = "Get Tenant Asset (getTenantAssetByName)",
@@ -316,10 +320,18 @@ public class AssetController extends BaseController {
         CustomerId customerId = new CustomerId(toUUID(strCustomerId));
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ASSET, Operation.READ);
+        boolean tenantWide = allowedEntityIds != null;
         if (type != null && type.trim().length() > 0) {
-            return checkNotNull(assetService.findAssetsByTenantIdAndCustomerIdAndType(tenantId, customerId, type, pageLink));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? link -> assetService.findAssetsByTenantIdAndType(tenantId, type, link)
+                    : link -> assetService.findAssetsByTenantIdAndCustomerIdAndType(tenantId, customerId, type, link),
+                    Asset::getId));
         } else {
-            return checkNotNull(assetService.findAssetsByTenantIdAndCustomerId(tenantId, customerId, pageLink));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? link -> assetService.findAssetsByTenantId(tenantId, link)
+                    : link -> assetService.findAssetsByTenantIdAndCustomerId(tenantId, customerId, link),
+                    Asset::getId));
         }
     }
 
@@ -351,23 +363,22 @@ public class AssetController extends BaseController {
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ASSET, Operation.READ);
-        PageLink fetchLink = scopedPageLink(allowedEntityIds, pageLink);
         boolean tenantWide = allowedEntityIds != null;
         if (type != null && type.trim().length() > 0) {
-            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? assetService.findAssetInfosByTenantIdAndType(tenantId, type, fetchLink)
-                    : assetService.findAssetInfosByTenantIdAndCustomerIdAndType(tenantId, customerId, type, fetchLink),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? link -> assetService.findAssetInfosByTenantIdAndType(tenantId, type, link)
+                    : link -> assetService.findAssetInfosByTenantIdAndCustomerIdAndType(tenantId, customerId, type, link),
                     AssetInfo::getId));
         } else if (assetProfileId != null && assetProfileId.length() > 0) {
             AssetProfileId profileId = new AssetProfileId(toUUID(assetProfileId));
-            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? assetService.findAssetInfosByTenantIdAndAssetProfileId(tenantId, profileId, fetchLink)
-                    : assetService.findAssetInfosByTenantIdAndCustomerIdAndAssetProfileId(tenantId, customerId, profileId, fetchLink),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? link -> assetService.findAssetInfosByTenantIdAndAssetProfileId(tenantId, profileId, link)
+                    : link -> assetService.findAssetInfosByTenantIdAndCustomerIdAndAssetProfileId(tenantId, customerId, profileId, link),
                     AssetInfo::getId));
         } else {
-            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? assetService.findAssetInfosByTenantId(tenantId, fetchLink)
-                    : assetService.findAssetInfosByTenantIdAndCustomerId(tenantId, customerId, fetchLink),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? link -> assetService.findAssetInfosByTenantId(tenantId, link)
+                    : link -> assetService.findAssetInfosByTenantIdAndCustomerId(tenantId, customerId, link),
                     AssetInfo::getId));
         }
     }
@@ -393,7 +404,15 @@ public class AssetController extends BaseController {
         } else {
             assets = assetService.findAssetsByTenantIdCustomerIdAndIdsAsync(tenantId, customerId, assetIds);
         }
-        return checkNotNull(assets.get());
+        List<Asset> found = checkNotNull(assets.get());
+        return found.stream().filter(asset -> {
+            try {
+                accessControlService.checkPermission(user, Resource.ASSET, Operation.READ, asset.getId(), asset);
+                return true;
+            } catch (ThingsboardException e) {
+                return false;
+            }
+        }).collect(Collectors.toList());
     }
 
     @ApiOperation(value = "Find related assets (findAssetsByQuery)",
@@ -507,25 +526,14 @@ public class AssetController extends BaseController {
         EdgeId edgeId = new EdgeId(toUUID(strEdgeId));
         checkEdgeId(edgeId, Operation.READ);
         TimePageLink pageLink = createTimePageLink(pageSize, page, textSearch, sortProperty, sortOrder, startTime, endTime);
-        PageData<Asset> nonFilteredResult;
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ASSET, Operation.READ);
         if (type != null && type.trim().length() > 0) {
-            nonFilteredResult = assetService.findAssetsByTenantIdAndEdgeIdAndType(tenantId, edgeId, type, pageLink);
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> assetService.findAssetsByTenantIdAndEdgeIdAndType(tenantId, edgeId, type, link), Asset::getId));
         } else {
-            nonFilteredResult = assetService.findAssetsByTenantIdAndEdgeId(tenantId, edgeId, pageLink);
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> assetService.findAssetsByTenantIdAndEdgeId(tenantId, edgeId, link), Asset::getId));
         }
-        List<Asset> filteredAssets = nonFilteredResult.getData().stream().filter(asset -> {
-            try {
-                accessControlService.checkPermission(getCurrentUser(), Resource.ASSET, Operation.READ, asset.getId(), asset);
-                return true;
-            } catch (ThingsboardException e) {
-                return false;
-            }
-        }).collect(Collectors.toList());
-        PageData<Asset> filteredResult = new PageData<>(filteredAssets,
-                nonFilteredResult.getTotalPages(),
-                nonFilteredResult.getTotalElements(),
-                nonFilteredResult.hasNext());
-        return checkNotNull(filteredResult);
     }
 
     @ApiOperation(value = "Import the bulk of assets (processAssetBulkImport)",

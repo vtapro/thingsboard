@@ -69,6 +69,13 @@ public interface EntityViewService extends EntityDaoService {
 
     List<EntityView> findEntityViewsByTenantIdAndEntityId(TenantId tenantId, EntityId entityId);
 
+    /**
+     * Returns at most {@code limit} entity views that reference the given entity. Unlike
+     * {@link #findEntityViewsByTenantIdAndEntityId(TenantId, EntityId)} the result is neither cached nor complete,
+     * so it must only be used for user facing messages.
+     */
+    List<EntityView> findEntityViewsByTenantIdAndEntityId(TenantId tenantId, EntityId entityId, int limit);
+
     boolean existsByTenantIdAndEntityId(TenantId tenantId, EntityId entityId);
 
     void deleteEntityView(TenantId tenantId, EntityViewId entityViewId);

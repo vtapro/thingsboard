@@ -16,6 +16,8 @@ import org.thingsboard.server.common.data.query.EntityKeyType;
 import org.thingsboard.server.common.data.query.TsValue;
 import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.dao.entity.EntityService;
+import org.thingsboard.server.service.security.permission.AccessControlService;
+import org.thingsboard.server.service.security.permission.RbacEntityAccessFilter;
 import org.thingsboard.server.service.ws.WebSocketService;
 import org.thingsboard.server.service.ws.WebSocketSessionRef;
 import org.thingsboard.server.service.ws.telemetry.sub.TelemetrySubscriptionUpdate;
@@ -40,8 +42,8 @@ public abstract class TbAbstractDataSubCtx<T extends AbstractDataQuery<? extends
     public TbAbstractDataSubCtx(String serviceId, WebSocketService wsService,
                                 EntityService entityService, TbLocalSubscriptionService localSubscriptionService,
                                 AttributesService attributesService, SubscriptionServiceStatistics stats,
-                                WebSocketSessionRef sessionRef, int cmdId) {
-        super(serviceId, wsService, entityService, localSubscriptionService, attributesService, stats, sessionRef, cmdId);
+                                WebSocketSessionRef sessionRef, int cmdId, AccessControlService accessControlService) {
+        super(serviceId, wsService, entityService, localSubscriptionService, attributesService, stats, sessionRef, cmdId, accessControlService);
         this.subToEntityIdMap = new ConcurrentHashMap<>();
     }
 
@@ -52,6 +54,8 @@ public abstract class TbAbstractDataSubCtx<T extends AbstractDataQuery<? extends
 
     protected PageData<EntityData> findEntityData() {
         PageData<EntityData> result = entityService.findEntityDataByQuery(getTenantId(), getCustomerId(), buildEntityDataQuery());
+        result = RbacEntityAccessFilter.filterEntityData(accessControlService, sessionRef.getSecurityCtx(), result,
+                query.getPageLink().getPageSize());
         if (log.isTraceEnabled()) {
             result.getData().forEach(ed -> {
                 log.trace("[{}][{}] EntityData: {}", getSessionId(), getCmdId(), ed);

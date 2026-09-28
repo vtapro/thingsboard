@@ -66,6 +66,7 @@ interface TenantCustomerInfo {
 }
 
 const MAX_USER_PAGES = 50;
+const MAX_CUSTOMER_PAGES = 50;
 
 const GROUP_ENTITY_TYPES = ['DEVICE', 'ASSET', 'ENTITY_VIEW'];
 
@@ -144,6 +145,9 @@ export class RolesComponent extends PageComponent implements OnInit {
   hierarchyRows: Array<{childId: string; parentId: string}> = [];
 
   private loadedUserGroupIds: string[] = [];
+
+  /** Queue of the user group saves: they are read - modify - write cycles, so they must not overlap. */
+  private userGroupSaveQueue: Promise<void> = Promise.resolve();
 
   /**
    * Users that can not be a member of a role: the tenant administrators (and the system administrators) always
@@ -587,32 +591,49 @@ export class RolesComponent extends PageComponent implements OnInit {
   /**
    * Persists the user groups of the tenant (read - modify - write: the groups edited here win, the groups created
    * elsewhere are preserved and only the groups removed by the administrator are deleted).
+   *
+   * The saves are queued: two of them running at the same time would read the same state and the second one would
+   * overwrite the first one (and bring back the groups it deleted).
    */
   private persistUserGroups(groups: RbacUserGroup[]) {
-    this.http.get<{groups: RbacUserGroup[]}>('/api/tenant/userGroup',
-      defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
-      next: current => {
-        const byId = new Map<string, RbacUserGroup>();
-        (current?.groups || []).forEach(group => byId.set(group.id, group));
-        groups.forEach(group => byId.set(group.id, group));
-        this.loadedUserGroupIds
-          .filter(id => !groups.some(group => group.id === id))
-          .forEach(id => byId.delete(id));
-        this.http.post<{groups: RbacUserGroup[]}>('/api/tenant/userGroup', {groups: Array.from(byId.values())},
-          defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
-          next: settings => {
-            this.userGroups = settings?.groups || groups;
-            this.loadedUserGroupIds = this.userGroups.map(group => group.id);
-            this.clampUserGroupPage();
-            this.notifySaved('admin.roles-user-groups-save-success');
-          },
-          error: (error: HttpErrorResponse) => {
-            this.notifySaveFailed('admin.roles-user-groups-save-failed', error);
-            this.loadUserGroups();
-          }
-        });
-      },
-      error: (error: HttpErrorResponse) => this.notifySaveFailed('admin.roles-user-groups-save-failed', error)
+    // optimistic local state: the table shows the change at once, the queued save confirms it
+    this.userGroups = groups;
+    this.clampUserGroupPage();
+    this.userGroupSaveQueue = this.userGroupSaveQueue.then(() => this.saveUserGroups(groups));
+  }
+
+  private saveUserGroups(groups: RbacUserGroup[]): Promise<void> {
+    return new Promise<void>(resolve => {
+      this.http.get<{groups: RbacUserGroup[]}>('/api/tenant/userGroup',
+        defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
+        next: current => {
+          const byId = new Map<string, RbacUserGroup>();
+          (current?.groups || []).forEach(group => byId.set(group.id, group));
+          groups.forEach(group => byId.set(group.id, group));
+          this.loadedUserGroupIds
+            .filter(id => !groups.some(group => group.id === id))
+            .forEach(id => byId.delete(id));
+          this.http.post<{groups: RbacUserGroup[]}>('/api/tenant/userGroup', {groups: Array.from(byId.values())},
+            defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
+            next: settings => {
+              this.userGroups = settings?.groups || groups;
+              this.loadedUserGroupIds = this.userGroups.map(group => group.id);
+              this.clampUserGroupPage();
+              this.notifySaved('admin.roles-user-groups-save-success');
+              resolve();
+            },
+            error: (error: HttpErrorResponse) => {
+              this.notifySaveFailed('admin.roles-user-groups-save-failed', error);
+              this.loadUserGroups();
+              resolve();
+            }
+          });
+        },
+        error: (error: HttpErrorResponse) => {
+          this.notifySaveFailed('admin.roles-user-groups-save-failed', error);
+          resolve();
+        }
+      });
     });
   }
 
@@ -624,14 +645,27 @@ export class RolesComponent extends PageComponent implements OnInit {
   /* ------------------------------------------------------ customer hierarchy */
 
   loadHierarchy() {
-    this.http.get<{data: TenantCustomerInfo[]}>('/api/customers?pageSize=100&page=0',
-      defaultHttpOptionsFromConfig(undefined)).subscribe(page => this.customers = page?.data || []);
+    this.loadCustomers();
     this.http.get<{parents: {[childId: string]: string}}>('/api/tenant/customerHierarchy',
       defaultHttpOptionsFromConfig(undefined)).subscribe(hierarchy => {
       const parents = hierarchy?.parents || {};
       this.hierarchyRows = Object.keys(parents).map(childId => ({childId, parentId: parents[childId]}));
       this.clampHierarchyPage();
     });
+  }
+
+  /** Loads every customer of the tenant page by page: the hierarchy dialog offers all of them. */
+  private loadCustomers(page = 0, customers: TenantCustomerInfo[] = []): void {
+    this.http.get<{data: TenantCustomerInfo[]; hasNext: boolean}>(
+      `/api/customers?pageSize=100&page=${page}`, defaultHttpOptionsFromConfig(undefined))
+      .subscribe(data => {
+        const loaded = customers.concat(data?.data || []);
+        if (data?.hasNext && page + 1 < MAX_CUSTOMER_PAGES) {
+          this.loadCustomers(page + 1, loaded);
+        } else {
+          this.customers = loaded;
+        }
+      });
   }
 
   /** Rows of the current page of the customer hierarchy table. */

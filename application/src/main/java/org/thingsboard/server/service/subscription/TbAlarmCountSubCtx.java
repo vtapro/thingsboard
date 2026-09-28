@@ -19,6 +19,8 @@ import org.thingsboard.server.dao.alarm.AlarmService;
 import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.dao.entity.EntityService;
 import org.thingsboard.server.dao.model.ModelConstants;
+import org.thingsboard.server.service.security.permission.AccessControlService;
+import org.thingsboard.server.service.security.permission.RbacEntityAccessFilter;
 import org.thingsboard.server.service.ws.WebSocketService;
 import org.thingsboard.server.service.ws.WebSocketSessionRef;
 import org.thingsboard.server.service.ws.telemetry.cmd.v2.AlarmCountUpdate;
@@ -55,8 +57,9 @@ public class TbAlarmCountSubCtx extends TbAbstractEntityQuerySubCtx<AlarmCountQu
     public TbAlarmCountSubCtx(String serviceId, WebSocketService wsService,
                               EntityService entityService, TbLocalSubscriptionService localSubscriptionService,
                               AttributesService attributesService, SubscriptionServiceStatistics stats, AlarmService alarmService,
-                              WebSocketSessionRef sessionRef, int cmdId, int maxEntitiesPerAlarmSubscription, int maxAlarmQueriesPerRefreshInterval) {
-        super(serviceId, wsService, entityService, localSubscriptionService, attributesService, stats, sessionRef, cmdId);
+                              WebSocketSessionRef sessionRef, int cmdId, int maxEntitiesPerAlarmSubscription, int maxAlarmQueriesPerRefreshInterval,
+                              AccessControlService accessControlService) {
+        super(serviceId, wsService, entityService, localSubscriptionService, attributesService, stats, sessionRef, cmdId, accessControlService);
         this.alarmService = alarmService;
         this.subToEntityIdMap = new ConcurrentHashMap<>();
         this.maxEntitiesPerAlarmSubscription = maxEntitiesPerAlarmSubscription;
@@ -76,6 +79,8 @@ public class TbAlarmCountSubCtx extends TbAbstractEntityQuerySubCtx<AlarmCountQu
             entitiesIds = new LinkedHashSet<>();
             log.trace("[{}] Fetching data: {}", cmdId, alarmCountInvocationAttempts);
             PageData<EntityData> data = entityService.findEntityDataByQuery(getTenantId(), getCustomerId(), buildEntityDataQuery());
+            data = RbacEntityAccessFilter.filterEntityData(accessControlService, sessionRef.getSecurityCtx(), data,
+                    maxEntitiesPerAlarmSubscription);
             entitiesIds.clear();
             tooManyEntities = data.hasNext();
             for (EntityData entityData : data.getData()) {

@@ -16,6 +16,7 @@ public class DefaultShareService implements ShareService {
     public static final String SHARES_SETTINGS_KEY = "rbacShares";
 
     private final AdminSettingsService adminSettingsService;
+    private final TenantSettingsLocks locks = new TenantSettingsLocks();
 
     @Override
     public RbacShareSettings getShareSettings(TenantId tenantId) {
@@ -33,15 +34,17 @@ public class DefaultShareService implements ShareService {
 
     @Override
     public RbacShareSettings saveShareSettings(TenantId tenantId, RbacShareSettings settings) {
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, SHARES_SETTINGS_KEY);
-        if (adminSettings == null) {
-            adminSettings = new AdminSettings();
-            adminSettings.setTenantId(tenantId);
-            adminSettings.setKey(SHARES_SETTINGS_KEY);
+        synchronized (locks.lockFor(tenantId)) {
+            AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, SHARES_SETTINGS_KEY);
+            if (adminSettings == null) {
+                adminSettings = new AdminSettings();
+                adminSettings.setTenantId(tenantId);
+                adminSettings.setKey(SHARES_SETTINGS_KEY);
+            }
+            adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
+            AdminSettings saved = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
+            return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), RbacShareSettings.class);
         }
-        adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
-        AdminSettings saved = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
-        return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), RbacShareSettings.class);
     }
 
 }

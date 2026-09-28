@@ -9,6 +9,7 @@ import { buildUserHome, buildUserMenu, HomeSection, MenuId, MenuSection } from '
 import { Observable, ReplaySubject, Subject } from 'rxjs';
 import { AuthState } from '@core/auth/auth.models';
 import { ActivationEnd, NavigationEnd, Router } from '@angular/router';
+import { onRbacPermissionsChanged } from '@core/services/rbac-permissions';
 
 @Injectable({
   providedIn: 'root'
@@ -41,6 +42,15 @@ export class MenuService {
     this.router.events.pipe(filter(event => event instanceof ActivationEnd)).subscribe(() => {
         this.updateActiveMenuSections();
     });
+    // the roles of the user are loaded after the menu was built: rebuild it as soon as they are known
+    onRbacPermissionsChanged(() => this.rebuildMenu());
+  }
+
+  /**
+   * Rebuilds the menu of the current user, e.g. after the custom roles were loaded.
+   */
+  public rebuildMenu() {
+    this.buildMenu();
   }
 
   private buildMenu() {

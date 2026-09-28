@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.thingsboard.server.common.data.EntityInfo;
 import org.thingsboard.server.common.data.EntitySubtype;
@@ -149,6 +150,12 @@ public class JpaEntityViewDao extends JpaAbstractDao<EntityViewEntity, EntityVie
     public List<EntityView> findEntityViewsByTenantIdAndEntityId(UUID tenantId, UUID entityId) {
         return DaoUtil.convertDataList(
                 entityViewRepository.findAllByTenantIdAndEntityId(tenantId, entityId));
+    }
+
+    @Override
+    public List<EntityView> findEntityViewsByTenantIdAndEntityId(UUID tenantId, UUID entityId, int limit) {
+        return DaoUtil.convertDataList(
+                entityViewRepository.findAllByTenantIdAndEntityId(tenantId, entityId, PageRequest.of(0, limit)));
     }
 
     @Override

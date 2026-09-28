@@ -162,7 +162,9 @@ public class EntityViewController extends BaseController {
     public EntityView getTenantEntityView(
             @RequestParam String entityViewName) throws ThingsboardException {
         TenantId tenantId = getCurrentUser().getTenantId();
-        return checkNotNull(entityViewService.findEntityViewByTenantIdAndName(tenantId, entityViewName));
+        EntityView entityView = checkNotNull(entityViewService.findEntityViewByTenantIdAndName(tenantId, entityViewName));
+        accessControlService.checkPermission(getCurrentUser(), Resource.ENTITY_VIEW, Operation.READ, entityView.getId(), entityView);
+        return entityView;
     }
 
     @ApiOperation(value = "Get Entity View by name (getTenantEntityViewByName)",
@@ -240,10 +242,18 @@ public class EntityViewController extends BaseController {
         CustomerId customerId = new CustomerId(toUUID(strCustomerId));
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ENTITY_VIEW, Operation.READ);
+        boolean tenantWide = allowedEntityIds != null;
         if (type != null && !type.trim().isEmpty()) {
-            return checkNotNull(entityViewService.findEntityViewsByTenantIdAndCustomerIdAndType(tenantId, customerId, pageLink, type));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? link -> entityViewService.findEntityViewByTenantIdAndType(tenantId, link, type)
+                    : link -> entityViewService.findEntityViewsByTenantIdAndCustomerIdAndType(tenantId, customerId, link, type),
+                    EntityView::getId));
         } else {
-            return checkNotNull(entityViewService.findEntityViewsByTenantIdAndCustomerId(tenantId, customerId, pageLink));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? link -> entityViewService.findEntityViewByTenantId(tenantId, link)
+                    : link -> entityViewService.findEntityViewsByTenantIdAndCustomerId(tenantId, customerId, link),
+                    EntityView::getId));
         }
     }
 
@@ -273,17 +283,16 @@ public class EntityViewController extends BaseController {
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ENTITY_VIEW, Operation.READ);
-        PageLink fetchLink = scopedPageLink(allowedEntityIds, pageLink);
         boolean tenantWide = allowedEntityIds != null;
         if (type != null && !type.trim().isEmpty()) {
-            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? entityViewService.findEntityViewInfosByTenantIdAndType(tenantId, type, fetchLink)
-                    : entityViewService.findEntityViewInfosByTenantIdAndCustomerIdAndType(tenantId, customerId, type, fetchLink),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? link -> entityViewService.findEntityViewInfosByTenantIdAndType(tenantId, type, link)
+                    : link -> entityViewService.findEntityViewInfosByTenantIdAndCustomerIdAndType(tenantId, customerId, type, link),
                     EntityViewInfo::getId));
         } else {
-            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? entityViewService.findEntityViewInfosByTenantId(tenantId, fetchLink)
-                    : entityViewService.findEntityViewInfosByTenantIdAndCustomerId(tenantId, customerId, fetchLink),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? link -> entityViewService.findEntityViewInfosByTenantId(tenantId, link)
+                    : link -> entityViewService.findEntityViewInfosByTenantIdAndCustomerId(tenantId, customerId, link),
                     EntityViewInfo::getId));
         }
     }
@@ -308,11 +317,13 @@ public class EntityViewController extends BaseController {
             @RequestParam(required = false) String sortOrder) throws ThingsboardException {
         TenantId tenantId = getCurrentUser().getTenantId();
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
-
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ENTITY_VIEW, Operation.READ);
         if (type != null && !type.trim().isEmpty()) {
-            return checkNotNull(entityViewService.findEntityViewByTenantIdAndType(tenantId, pageLink, type));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> entityViewService.findEntityViewByTenantIdAndType(tenantId, link, type), EntityView::getId));
         } else {
-            return checkNotNull(entityViewService.findEntityViewByTenantId(tenantId, pageLink));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> entityViewService.findEntityViewByTenantId(tenantId, link), EntityView::getId));
         }
     }
 
@@ -337,13 +348,12 @@ public class EntityViewController extends BaseController {
         TenantId tenantId = getCurrentUser().getTenantId();
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ENTITY_VIEW, Operation.READ);
-        PageLink fetchLink = scopedPageLink(allowedEntityIds, pageLink);
         if (type != null && !type.trim().isEmpty()) {
-            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink,
-                    entityViewService.findEntityViewInfosByTenantIdAndType(tenantId, type, fetchLink), EntityViewInfo::getId));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> entityViewService.findEntityViewInfosByTenantIdAndType(tenantId, type, link), EntityViewInfo::getId));
         } else {
-            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink,
-                    entityViewService.findEntityViewInfosByTenantId(tenantId, fetchLink), EntityViewInfo::getId));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> entityViewService.findEntityViewInfosByTenantId(tenantId, link), EntityViewInfo::getId));
         }
     }
 
@@ -455,18 +465,14 @@ public class EntityViewController extends BaseController {
         EdgeId edgeId = new EdgeId(toUUID(strEdgeId));
         checkEdgeId(edgeId, Operation.READ);
         TimePageLink pageLink = createTimePageLink(pageSize, page, textSearch, sortProperty, sortOrder, startTime, endTime);
-        PageData<EntityView> nonFilteredResult;
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ENTITY_VIEW, Operation.READ);
         if (type != null && !type.trim().isEmpty()) {
-            nonFilteredResult = entityViewService.findEntityViewsByTenantIdAndEdgeIdAndType(tenantId, edgeId, type, pageLink);
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> entityViewService.findEntityViewsByTenantIdAndEdgeIdAndType(tenantId, edgeId, type, link), EntityView::getId));
         } else {
-            nonFilteredResult = entityViewService.findEntityViewsByTenantIdAndEdgeId(tenantId, edgeId, pageLink);
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> entityViewService.findEntityViewsByTenantIdAndEdgeId(tenantId, edgeId, link), EntityView::getId));
         }
-        List<EntityView> filteredEntityViews = filterEntityViewsByReadPermission(nonFilteredResult.getData());
-        PageData<EntityView> filteredResult = new PageData<>(filteredEntityViews,
-                nonFilteredResult.getTotalPages(),
-                nonFilteredResult.getTotalElements(),
-                nonFilteredResult.hasNext());
-        return checkNotNull(filteredResult);
     }
 
     @Hidden

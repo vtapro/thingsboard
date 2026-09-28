@@ -361,13 +361,12 @@ public class DashboardController extends BaseController {
         TenantId tenantId = getCurrentUser().getTenantId();
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.DASHBOARD, Operation.READ);
-        PageLink fetchLink = scopedPageLink(allowedEntityIds, pageLink);
         if (mobile != null && mobile) {
-            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink,
-                    dashboardService.findMobileDashboardsByTenantId(tenantId, fetchLink), DashboardInfo::getId));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> dashboardService.findMobileDashboardsByTenantId(tenantId, link), DashboardInfo::getId));
         } else {
-            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink,
-                    dashboardService.findDashboardsByTenantId(tenantId, fetchLink), DashboardInfo::getId));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> dashboardService.findDashboardsByTenantId(tenantId, link), DashboardInfo::getId));
         }
     }
 
@@ -397,17 +396,16 @@ public class DashboardController extends BaseController {
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.DASHBOARD, Operation.READ);
-        PageLink fetchLink = scopedPageLink(allowedEntityIds, pageLink);
         boolean tenantWide = allowedEntityIds != null;
         if (mobile != null && mobile) {
-            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? dashboardService.findMobileDashboardsByTenantId(tenantId, fetchLink)
-                    : dashboardService.findMobileDashboardsByTenantIdAndCustomerId(tenantId, customerId, fetchLink),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? link -> dashboardService.findMobileDashboardsByTenantId(tenantId, link)
+                    : link -> dashboardService.findMobileDashboardsByTenantIdAndCustomerId(tenantId, customerId, link),
                     DashboardInfo::getId));
         } else {
-            return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? dashboardService.findDashboardsByTenantId(tenantId, fetchLink)
-                    : dashboardService.findDashboardsByTenantIdAndCustomerId(tenantId, customerId, fetchLink),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? link -> dashboardService.findDashboardsByTenantId(tenantId, link)
+                    : link -> dashboardService.findDashboardsByTenantIdAndCustomerId(tenantId, customerId, link),
                     DashboardInfo::getId));
         }
     }
@@ -599,13 +597,9 @@ public class DashboardController extends BaseController {
         EdgeId edgeId = new EdgeId(toUUID(strEdgeId));
         checkEdgeId(edgeId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
-        PageData<DashboardInfo> nonFilteredResult = dashboardService.findDashboardsByTenantIdAndEdgeId(tenantId, edgeId, pageLink);
-        List<DashboardInfo> filteredDashboards = filterDashboardsByReadPermission(nonFilteredResult.getData());
-        PageData<DashboardInfo> filteredResult = new PageData<>(filteredDashboards,
-                nonFilteredResult.getTotalPages(),
-                nonFilteredResult.getTotalElements(),
-                nonFilteredResult.hasNext());
-        return checkNotNull(filteredResult);
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.DASHBOARD, Operation.READ);
+        return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                link -> dashboardService.findDashboardsByTenantIdAndEdgeId(tenantId, edgeId, link), DashboardInfo::getId));
     }
 
     @Hidden

@@ -69,6 +69,8 @@ public class BaseAssetService extends AbstractCachedEntityService<AssetCacheKey,
     public static final String INCORRECT_CUSTOMER_ID = "Incorrect customerId ";
     public static final String INCORRECT_ASSET_ID = "Incorrect assetId ";
 
+    private static final int MAX_REFERENCE_NAMES = 10;
+
     @Autowired
     private AssetDao assetDao;
 
@@ -241,12 +243,17 @@ public class BaseAssetService extends AbstractCachedEntityService<AssetCacheKey,
 
     /**
      * Collects the entities that prevent the deletion of the asset, so that the message of the error
-     * tells the administrator exactly what has to be changed.
+     * tells the administrator exactly what has to be changed. Only a bounded number of entity view names
+     * is fetched, otherwise a single delete request could load every referencing entity view into memory.
      */
     private List<String> findReferences(TenantId tenantId, EntityId entityId) {
         List<String> references = new ArrayList<>();
-        for (EntityView entityView : entityViewService.findEntityViewsByTenantIdAndEntityId(tenantId, entityId)) {
+        List<EntityView> entityViews = entityViewService.findEntityViewsByTenantIdAndEntityId(tenantId, entityId, MAX_REFERENCE_NAMES);
+        for (EntityView entityView : entityViews) {
             references.add("entity view '" + entityView.getName() + "'");
+        }
+        if (entityViews.size() == MAX_REFERENCE_NAMES) {
+            references.add("possibly other entity views");
         }
         if (calculatedFieldService.referencedInAnyCalculatedField(tenantId, entityId)) {
             references.add("a calculated field");

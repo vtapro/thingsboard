@@ -52,6 +52,7 @@ public class EntityGroupController extends BaseController {
             @Parameter(description = "A JSON value representing the entity groups.")
             @RequestBody RbacEntityGroupSettings settings) throws ThingsboardException {
         accessControlService.checkPermission(getCurrentUser(), Resource.ADMIN_SETTINGS, Operation.WRITE);
+        validateSettings(getCurrentUser().getTenantId(), settings);
         return entityGroupService.saveEntityGroupSettings(getCurrentUser().getTenantId(), settings);
     }
 
@@ -70,9 +71,7 @@ public class EntityGroupController extends BaseController {
         if (StringUtils.isBlank(entityGroup.getName())) {
             throw new IncorrectParameterException("Entity group name is required");
         }
-        if (!ALLOWED_ENTITY_TYPES.contains(entityGroup.getEntityType())) {
-            throw new IncorrectParameterException("Entity group type must be one of " + ALLOWED_ENTITY_TYPES);
-        }
+        validateEntityType(entityGroup.getEntityType());
         if (isAllGroup(getCurrentUser().getTenantId(), entityGroup.getId())) {
             throw new IncorrectParameterException("The All group of an entity type contains every entity of the tenant "
                     + "and can not be modified");
@@ -104,6 +103,52 @@ public class EntityGroupController extends BaseController {
         RbacEntityGroupSettings settings = entityGroupService.getEntityGroupSettings(tenantId);
         return settings.getGroups() != null && settings.getGroups().stream()
                 .anyMatch(group -> groupId.equals(group.getId()) && group.isAllGroup());
+    }
+
+    /**
+     * The "All" groups of the entity types are created by the backend and always match every entity of the tenant, so
+     * the payload may not add, remove or change them.
+     */
+    private void validateSettings(TenantId tenantId, RbacEntityGroupSettings settings) {
+        List<RbacEntityGroup> groups = settings != null ? settings.getGroups() : null;
+        if (groups == null) {
+            return;
+        }
+        RbacEntityGroupSettings stored = entityGroupService.getEntityGroupSettings(tenantId);
+        List<RbacEntityGroup> storedGroups = stored.getGroups() != null ? stored.getGroups() : List.of();
+        for (RbacEntityGroup group : groups) {
+            if (group == null) {
+                throw new IncorrectParameterException("Entity group must not be null");
+            }
+            if (StringUtils.isBlank(group.getId())) {
+                throw new IncorrectParameterException("Entity group id is required");
+            }
+            if (StringUtils.isBlank(group.getName())) {
+                throw new IncorrectParameterException("Entity group name is required");
+            }
+            validateEntityType(group.getEntityType());
+            if (group.isAllGroup() && storedGroups.stream()
+                    .noneMatch(storedGroup -> group.getId().equals(storedGroup.getId()) && storedGroup.isAllGroup())) {
+                throw new IncorrectParameterException("Only the backend may create the All group of an entity type");
+            }
+        }
+        for (RbacEntityGroup storedGroup : storedGroups) {
+            if (!storedGroup.isAllGroup()) {
+                continue;
+            }
+            boolean kept = groups.stream().anyMatch(group -> storedGroup.getId().equals(group.getId())
+                    && group.isAllGroup() && storedGroup.getEntityType().equals(group.getEntityType()));
+            if (!kept) {
+                throw new IncorrectParameterException("The All group of " + storedGroup.getEntityType()
+                        + " contains every entity of the tenant and can not be removed or changed");
+            }
+        }
+    }
+
+    private static void validateEntityType(String entityType) {
+        if (StringUtils.isBlank(entityType) || !ALLOWED_ENTITY_TYPES.contains(entityType)) {
+            throw new IncorrectParameterException("Entity group type must be one of " + ALLOWED_ENTITY_TYPES);
+        }
     }
 
     private static final List<String> ALLOWED_ENTITY_TYPES = List.of("DEVICE", "ASSET", "ENTITY_VIEW");

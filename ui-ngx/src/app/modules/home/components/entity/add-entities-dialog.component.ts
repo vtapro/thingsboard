@@ -25,6 +25,11 @@ export class AddEntitiesDialogComponent implements OnInit {
    */
   selectedIds: string[] = [];
   loading = true;
+  /** The picker is not searchable, so every page of the entity type is loaded (up to MAX_PAGES pages). */
+  truncated = false;
+
+  private static readonly PAGE_SIZE = 100;
+  private static readonly MAX_PAGES = 50;
 
   constructor(private dialogRef: MatDialogRef<AddEntitiesDialogComponent>,
               @Inject(MAT_DIALOG_DATA) private data: AddEntitiesDialogData,
@@ -35,10 +40,29 @@ export class AddEntitiesDialogComponent implements OnInit {
     const path = this.data.entityType === 'DEVICE' ? 'devices'
       : this.data.entityType === 'ASSET' ? 'assets' : 'entityViews';
     this.selectedIds = [...(this.data.selectedIds || [])];
-    this.http.get<{data: Array<{id: {id: string}; name: string}>}>(`/api/tenant/${path}?pageSize=100&page=0`,
-      defaultHttpOptionsFromConfig(undefined)).subscribe(page => {
-      this.entities = (page?.data || []).map(entity => ({id: entity.id.id, name: entity.name}));
-      this.loading = false;
+    this.loadEntities(path, 0, []);
+  }
+
+  /** Loads the entities of the type page by page: the first page alone would hide the entities of a large tenant. */
+  private loadEntities(path: string, page: number, entities: Array<{id: string; name: string}>): void {
+    this.http.get<{data: Array<{id: {id: string}; name: string}>; hasNext: boolean}>(
+      `/api/tenant/${path}?pageSize=${AddEntitiesDialogComponent.PAGE_SIZE}&page=${page}`,
+      defaultHttpOptionsFromConfig(undefined)).subscribe({
+      next: pageData => {
+        const loaded = entities.concat((pageData?.data || [])
+          .map(entity => ({id: entity.id.id, name: entity.name})));
+        if (pageData?.hasNext && page + 1 < AddEntitiesDialogComponent.MAX_PAGES) {
+          this.loadEntities(path, page + 1, loaded);
+        } else {
+          this.truncated = !!pageData?.hasNext;
+          this.entities = loaded;
+          this.loading = false;
+        }
+      },
+      error: () => {
+        this.entities = entities;
+        this.loading = false;
+      }
     });
   }
 

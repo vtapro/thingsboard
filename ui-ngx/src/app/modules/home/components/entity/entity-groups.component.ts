@@ -166,12 +166,19 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
         publicGroup: group.publicGroup
       } : {},
       width: '480px'
-    }).afterClosed().subscribe((value: {name: string; description: string; publicGroup: boolean}) => {
+    }).afterClosed().subscribe((value: {name: string; description: string; publicGroup: boolean;
+                                         entityType?: string}) => {
       if (!value) {
         return;
       }
       if (group) {
-        this.persistGroup({...group, ...value});
+        this.persistGroup({
+          ...group,
+          name: value.name,
+          description: value.description,
+          publicGroup: !!value.publicGroup,
+          entityType: value.entityType || group.entityType
+        });
       } else {
         this.persistGroup({
           id: Math.random().toString(36).substring(2, 10),

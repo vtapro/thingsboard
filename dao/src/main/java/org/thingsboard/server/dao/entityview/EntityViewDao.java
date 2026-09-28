@@ -135,6 +135,12 @@ public interface EntityViewDao extends Dao<EntityView>, ExportableEntityDao<Enti
 
     List<EntityView> findEntityViewsByTenantIdAndEntityId(UUID tenantId, UUID entityId);
 
+    /**
+     * Find at most {@code limit} entity views that reference the given entity. Used to build user facing messages
+     * without loading every referencing entity view into memory.
+     */
+    List<EntityView> findEntityViewsByTenantIdAndEntityId(UUID tenantId, UUID entityId, int limit);
+
     boolean existsByTenantIdAndEntityId(UUID tenantId, UUID entityId);
 
     /**

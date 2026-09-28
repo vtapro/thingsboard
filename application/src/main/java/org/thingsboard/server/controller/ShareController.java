@@ -36,6 +36,17 @@ public class ShareController extends BaseController {
     private static final Set<String> ALLOWED_ENTITY_TYPES = Set.of("DEVICE", "ASSET", "ENTITY_VIEW", "DASHBOARD");
     private static final Set<String> ASSIGNEE_TYPES = Set.of("USER", "USER_GROUP");
 
+    /**
+     * Operations a share may grant: the operations of the permission matrix of the roles. The credentials operations
+     * are deliberately missing, because a share is checked before the role of the user, so a share must not be able
+     * to grant an operation that the role model never derives from READ/WRITE.
+     */
+    private static final Set<String> ALLOWED_OPERATIONS = Set.of(
+            Operation.ALL.name(), Operation.CREATE.name(), Operation.READ.name(), Operation.WRITE.name(),
+            Operation.DELETE.name(), Operation.ASSIGN_TO_CUSTOMER.name(), Operation.RPC_CALL.name(),
+            Operation.READ_ATTRIBUTES.name(), Operation.WRITE_ATTRIBUTES.name(),
+            Operation.READ_TELEMETRY.name(), Operation.WRITE_TELEMETRY.name(), Operation.CLAIM_DEVICES.name());
+
     private final ShareService shareService;
 
     @ApiOperation(value = "Get the shares of the tenant (getShares)",
@@ -82,10 +93,9 @@ public class ShareController extends BaseController {
                 throw new IncorrectParameterException("The share of " + share.getEntityId() + " has no operation!");
             }
             for (String operation : share.getOperations()) {
-                try {
-                    Operation.valueOf(operation);
-                } catch (IllegalArgumentException e) {
-                    throw new IncorrectParameterException("Unknown operation of the share: " + operation);
+                if (operation == null || !ALLOWED_OPERATIONS.contains(operation)) {
+                    throw new IncorrectParameterException("Unsupported operation of the share: " + operation
+                            + ", allowed: " + ALLOWED_OPERATIONS);
                 }
             }
         }

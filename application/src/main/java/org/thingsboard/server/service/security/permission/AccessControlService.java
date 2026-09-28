@@ -31,4 +31,13 @@ public interface AccessControlService {
         return null;
     }
 
+    /**
+     * True when a custom role applies to the user, i.e. the permissions of the user may be narrower than the platform
+     * permissions. It is used by the entity data queries of the WEB UI, that are executed without the entity aware
+     * permission checks, to decide whether the results have to be filtered.
+     */
+    default boolean hasCustomRole(SecurityUser user) {
+        return false;
+    }
+
 }

@@ -567,46 +567,75 @@ public abstract class BaseController {
     }
 
     /**
-     * Maximal number of entities that is fetched when the result has to be filtered by the entity groups of the
-     * role of the user. It keeps the memory usage bounded on huge tenants.
+     * Maximal number of entities that is scanned while filtering a page by the entity groups of the role of the user.
+     * It keeps the memory usage and the query count bounded on huge tenants.
      */
     private static final int SCOPED_FETCH_SIZE_LIMIT = 1000;
 
     /**
-     * The entities the user may see are limited by the entity groups of its role, so the list has to be filtered
-     * in memory. The requested page is fetched with an enlarged page size to keep the pagination of the result
-     * meaningful (up to {@link #SCOPED_FETCH_SIZE_LIMIT} entities).
+     * How much bigger than the requested page the database pages are fetched: the entities that are not allowed by
+     * the entity groups of the role are dropped afterwards, so a bigger database page usually avoids a second query.
      */
-    PageLink scopedPageLink(Set<UUID> allowedEntityIds, PageLink pageLink) {
-        if (allowedEntityIds == null) {
-            return pageLink;
-        }
-        int fetchSize = Math.min(SCOPED_FETCH_SIZE_LIMIT, Math.max(pageLink.getPageSize(), 1) * 10);
-        return new PageLink(fetchSize, 0, pageLink.getTextSearch(), pageLink.getSortOrder());
-    }
+    private static final int SCOPED_FETCH_PAGE_MULTIPLIER = 10;
 
     /**
-     * Filters the entities of the fetched page by the ids allowed by the entity groups of the role of the user and
-     * returns the requested page of the filtered result.
+     * Fetches the requested page of entities whose visibility is limited by the entity groups of the role of the user.
+     * The platform can only filter by tenant, customer or profile, so the entities of the granted groups have to be
+     * filtered in memory. Because a database page may contain entities that are not allowed, the database pages are
+     * fetched one after the other until enough allowed entities are collected, so that a full page is returned as
+     * long as the tenant still has allowed entities. At most {@link #SCOPED_FETCH_SIZE_LIMIT} entities are scanned.
+     *
+     * @param allowedEntityIds  the ids allowed by the role, or null when the role does not restrict the entities
+     * @param requestedPageLink the page requested by the client
+     * @param pageFetcher       fetches one database page
+     * @param idExtractor       id of a fetched entity, used to check whether it is allowed
      */
-    <T> PageData<T> applyEntityScope(Set<UUID> allowedEntityIds, PageLink requestedPageLink, PageData<T> fetchedPage,
-                                     Function<T, EntityId> idExtractor) {
-        if (allowedEntityIds == null || fetchedPage == null) {
-            return fetchedPage;
-        }
-        List<T> filtered = new ArrayList<>();
-        for (T entity : fetchedPage.getData()) {
-            EntityId entityId = idExtractor.apply(entity);
-            if (entityId != null && allowedEntityIds.contains(entityId.getId())) {
-                filtered.add(entity);
-            }
+    <T> PageData<T> fetchEntityScope(Set<UUID> allowedEntityIds, PageLink requestedPageLink,
+                                     Function<PageLink, PageData<T>> pageFetcher, Function<T, EntityId> idExtractor) {
+        if (allowedEntityIds == null) {
+            return pageFetcher.apply(requestedPageLink);
         }
         int pageSize = Math.max(requestedPageLink.getPageSize(), 1);
         int from = requestedPageLink.getPage() * pageSize;
-        int to = Math.min(filtered.size(), from + pageSize);
-        List<T> content = from >= filtered.size() ? Collections.emptyList() : filtered.subList(from, to);
-        int totalPages = (int) Math.ceil((double) filtered.size() / pageSize);
-        return new PageData<>(content, totalPages, filtered.size(), to < filtered.size());
+        int required = from + pageSize;
+        int fetchSize = pageSize * SCOPED_FETCH_PAGE_MULTIPLIER;
+        List<T> allowed = new ArrayList<>();
+        int scanned = 0;
+        int dbPage = 0;
+        boolean dbHasNext = true;
+        while (dbHasNext && allowed.size() < required && scanned < SCOPED_FETCH_SIZE_LIMIT) {
+            PageLink fetchLink = scopedFetchLink(requestedPageLink,
+                    Math.min(fetchSize, SCOPED_FETCH_SIZE_LIMIT - scanned), dbPage);
+            PageData<T> fetched = pageFetcher.apply(fetchLink);
+            if (fetched == null || fetched.getData() == null || fetched.getData().isEmpty()) {
+                dbHasNext = false;
+                break;
+            }
+            scanned += fetched.getData().size();
+            for (T entity : fetched.getData()) {
+                EntityId entityId = idExtractor.apply(entity);
+                if (entityId != null && allowedEntityIds.contains(entityId.getId())) {
+                    allowed.add(entity);
+                }
+            }
+            dbHasNext = fetched.hasNext();
+            dbPage++;
+        }
+        List<T> content = from >= allowed.size() ? Collections.emptyList()
+                : new ArrayList<>(allowed.subList(from, Math.min(allowed.size(), required)));
+        int totalPages = (int) Math.ceil((double) allowed.size() / pageSize);
+        return new PageData<>(content, totalPages, allowed.size(), allowed.size() > required || dbHasNext);
+    }
+
+    /**
+     * Builds the link of one database page of a scoped fetch, keeping the time range of the requested page.
+     */
+    private static PageLink scopedFetchLink(PageLink requestedPageLink, int fetchSize, int page) {
+        PageLink link = new PageLink(fetchSize, page, requestedPageLink.getTextSearch(), requestedPageLink.getSortOrder());
+        if (requestedPageLink instanceof TimePageLink timePageLink) {
+            return new TimePageLink(link, timePageLink.getStartTime(), timePageLink.getEndTime());
+        }
+        return link;
     }
 
     protected SecurityUser getCurrentUser() throws ThingsboardException {

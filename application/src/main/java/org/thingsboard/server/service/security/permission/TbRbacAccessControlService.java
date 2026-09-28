@@ -37,6 +37,7 @@ import org.thingsboard.server.service.security.model.SecurityUser;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -54,8 +55,10 @@ import static org.thingsboard.server.common.data.security.Authority.SYS_ADMIN;
  * <p>When {@code security.rbac.enabled=true}:
  * <ul>
  *   <li>a user that is assigned to one of the tenant custom roles gets the permissions of the effective role;
- *   <li>a user without a custom role (or a user for which the settings can not be read) keeps the platform
- *       default permission matrix, so the platform behaviour is unchanged;
+ *   <li>a user without a custom role keeps the platform default permission matrix, so the platform behaviour is
+ *       unchanged;
+ *   <li>when the RBAC settings of the tenant can not be read the request is denied (fail closed) instead of falling
+ *       back to the default permission matrix, which would widen the access of a narrowed role;
  *   <li>custom roles may only <b>narrow</b> the access, never widen it across tenants or customers. The only
  *       exception is a customer user with a role that enables {@code ownCustomerOnly}: the user may then also
  *       access the sub-customers configured by the tenant administrator in the customer hierarchy.
@@ -73,6 +76,15 @@ import static org.thingsboard.server.common.data.security.Authority.SYS_ADMIN;
 public class TbRbacAccessControlService implements AccessControlService {
 
     private static final String PERMISSION_DENIED_MESSAGE = "You don't have permission to perform this operation!";
+
+    /**
+     * Shown when the RBAC settings of the tenant can not be read: the request is denied instead of silently
+     * falling back to the platform permission matrix, otherwise a corrupted settings document would grant the
+     * users more than their role allows.
+     */
+    private static final String SETTINGS_UNAVAILABLE_MESSAGE =
+            "Your role can not be resolved: the RBAC settings of the tenant are not readable. "
+                    + "Ask the tenant administrator to check the roles configuration.";
 
     /**
      * Tenant RBAC settings are stored as JSON documents; the short-lived cache keeps the permission check of the
@@ -105,15 +117,20 @@ public class TbRbacAccessControlService implements AccessControlService {
     private final Map<String, OwnerIndex> ownerIndexCache = new ConcurrentHashMap<>();
     private static final long OWNER_INDEX_TTL_MS = 60_000L;
     private static final int OWNER_INDEX_PAGE_SIZE = 1000;
+    private static final int OWNER_INDEX_MAX_ENTRIES = 256;
 
-    private final Map<String, CacheEntry<Optional<RbacRole>>> effectiveRoleCache = new ConcurrentHashMap<>();
+    private final Map<String, CacheEntry<Optional<EffectiveRole>>> effectiveRoleCache = new ConcurrentHashMap<>();
     private final Map<TenantId, CacheEntry<Optional<List<RbacEntityGroup>>>> entityGroupCache = new ConcurrentHashMap<>();
     private final Map<TenantId, CacheEntry<Optional<List<RbacShare>>>> shareCache = new ConcurrentHashMap<>();
     private final Map<TenantId, CacheEntry<Optional<List<RbacUserGroup>>>> userGroupCache = new ConcurrentHashMap<>();
 
     @Override
     public boolean hasPermission(SecurityUser user, Resource resource, Operation operation) throws ThingsboardException {
-        RbacRole role = getEffectiveRole(user);
+        EffectiveRole effectiveRole = resolveEffectiveRole(user);
+        if (effectiveRole.settingsUnavailable()) {
+            return false;
+        }
+        RbacRole role = effectiveRole.role();
         if (role == null || !isResourceManagedByRole(role, resource)) {
             return defaultAccessControlService.hasPermission(user, resource, operation);
         }
@@ -128,7 +145,16 @@ public class TbRbacAccessControlService implements AccessControlService {
     }
 
     @Override
+    public boolean hasCustomRole(SecurityUser user) {
+       return resolveEffectiveRole(user).role() != null;
+    }
+
+    @Override
     public Set<UUID> getAllowedEntityIds(SecurityUser user, Resource resource, Operation operation) {
+        if (resolveEffectiveRole(user).settingsUnavailable()) {
+            // fail closed: without a readable role nothing is listed
+            return Set.of();
+        }
         Set<UUID> allowed = roleAllowedEntityIds(user, resource, operation);
         Set<UUID> shared = getSharedEntityIds(user, resource, operation);
         if (shared.isEmpty() || allowed == null) {
@@ -141,7 +167,11 @@ public class TbRbacAccessControlService implements AccessControlService {
     }
 
     private Set<UUID> roleAllowedEntityIds(SecurityUser user, Resource resource, Operation operation) {
-        RbacRole role = getEffectiveRole(user);
+        EffectiveRole effectiveRole = resolveEffectiveRole(user);
+        if (effectiveRole.settingsUnavailable()) {
+            return Set.of();
+        }
+        RbacRole role = effectiveRole.role();
         if (role == null || !isResourceManagedByRole(role, resource)) {
             return null;
         }
@@ -192,7 +222,11 @@ public class TbRbacAccessControlService implements AccessControlService {
     @Override
     public void checkPermission(SecurityUser user, Resource resource, Operation operation) throws ThingsboardException {
         if (!hasPermission(user, resource, operation)) {
-            RbacRole role = getEffectiveRole(user);
+            EffectiveRole effectiveRole = resolveEffectiveRole(user);
+            if (effectiveRole.settingsUnavailable()) {
+                permissionDenied(SETTINGS_UNAVAILABLE_MESSAGE);
+            }
+            RbacRole role = effectiveRole.role();
             if (role != null && isResourceManagedByRole(role, resource)) {
                 permissionDenied("Your role does not grant \"" + operationLabel(operation) + "\" on " + resource + ".");
             }
@@ -204,18 +238,23 @@ public class TbRbacAccessControlService implements AccessControlService {
     public <I extends EntityId, T extends HasTenantId> boolean hasPermission(SecurityUser user, Resource resource, Operation operation,
                                                                             I entityId, T entity) throws ThingsboardException {
         if (isSharedWith(user, entityId, operation)) {
-            // an explicit share configured by the tenant administrator grants the operation to the user
-            return true;
+            // an explicit share configured by the tenant administrator grants the operation to the user;
+            // the shares of a tenant only reference the entities of that tenant
+            return entity == null || entity.getTenantId() == null || user.getTenantId().equals(entity.getTenantId());
         }
-        RbacRole role = getEffectiveRole(user);
+        EffectiveRole effectiveRole = resolveEffectiveRole(user);
+        if (effectiveRole.settingsUnavailable()) {
+            return false;
+        }
+        RbacRole role = effectiveRole.role();
         if (role == null || !isResourceManagedByRole(role, resource)) {
             return defaultAccessControlService.hasPermission(user, resource, operation, entityId, entity);
         }
+        if (entity != null && entity.getTenantId() != null && !user.getTenantId().equals(entity.getTenantId())) {
+            return false;
+        }
         if (user.getCustomerId() != null) {
             return hasCustomerUserPermission(user, resource, operation, entityId, entity, role);
-        }
-        if (entity != null && !user.getTenantId().equals(entity.getTenantId())) {
-            return false;
         }
         // "Only entities created by the user": the entity has to be owned by this user.
         if (isOwnOnlyResource(role, resource) && entityId != null && !isEntityOwner(user, entity)) {
@@ -259,6 +298,7 @@ public class TbRbacAccessControlService implements AccessControlService {
         long now = System.currentTimeMillis();
         if (index == null || now - index.createdTs > OWNER_INDEX_TTL_MS) {
             index = new OwnerIndex(now, loadOwnerIndex(user.getTenantId(), resource));
+            evictOwnerIndexEntries(now);
             ownerIndexCache.put(cacheKey, index);
         }
         String userId = user.getId().getId().toString();
@@ -269,6 +309,22 @@ public class TbRbacAccessControlService implements AccessControlService {
             }
         });
         return result;
+    }
+
+    /**
+     * Keeps the owner index cache bounded: an entry is only useful for {@link #OWNER_INDEX_TTL_MS}, so the stale ones
+     * are dropped first and the oldest one when the cache is still full.
+     */
+    private void evictOwnerIndexEntries(long now) {
+        if (ownerIndexCache.size() < OWNER_INDEX_MAX_ENTRIES) {
+            return;
+        }
+        ownerIndexCache.values().removeIf(index -> now - index.createdTs > OWNER_INDEX_TTL_MS);
+        if (ownerIndexCache.size() >= OWNER_INDEX_MAX_ENTRIES) {
+            ownerIndexCache.entrySet().stream()
+                    .min(Comparator.comparingLong(entry -> entry.getValue().createdTs()))
+                    .ifPresent(entry -> ownerIndexCache.remove(entry.getKey(), entry.getValue()));
+        }
     }
 
     /**
@@ -362,7 +418,11 @@ public class TbRbacAccessControlService implements AccessControlService {
      */
     private <I extends EntityId, T extends HasTenantId> String denialReason(SecurityUser user, Resource resource,
                                                                            Operation operation, I entityId, T entity) {
-        RbacRole role = getEffectiveRole(user);
+        EffectiveRole effectiveRole = resolveEffectiveRole(user);
+        if (effectiveRole.settingsUnavailable()) {
+            return SETTINGS_UNAVAILABLE_MESSAGE;
+        }
+        RbacRole role = effectiveRole.role();
         if (role == null || !isResourceManagedByRole(role, resource)) {
             return PERMISSION_DENIED_MESSAGE;
         }
@@ -403,27 +463,69 @@ public class TbRbacAccessControlService implements AccessControlService {
     }
 
     /**
-     * Customer users keep the platform customer isolation: the custom role may extend the operations of the user,
-     * but never grant access to entities of another customer.
+     * A customer user keeps the platform customer isolation and the custom role may only narrow it: the role has to
+     * grant the operation, and an entity that is outside of the customer subtree of the user is accessible only when
+     * the administrator put it into an entity group that is shared with every customer user (a public group).
+     *
+     * <p>The same rules are applied by {@link #roleAllowedEntityIds(SecurityUser, Resource, Operation)} for the list
+     * pages, so a customer user never sees an entity in a list page that the item check denies (and the other way
+     * around).
      */
     private <I extends EntityId, T extends HasTenantId> boolean hasCustomerUserPermission(SecurityUser user, Resource resource,
                                                                                          Operation operation, I entityId, T entity,
                                                                                          RbacRole role) throws ThingsboardException {
-        // An entity that the administrator explicitly put into a group granted to this role is accessible even when
-        // it is not assigned to the customer of the user (the same way the public entity groups of PE work).
-        Set<UUID> allowedEntityIds = getAllowedEntityIds(user, resource, operation);
-        if (entityId != null && allowedEntityIds != null && allowedEntityIds.contains(entityId.getId())) {
-            return entity != null && user.getTenantId().equals(entity.getTenantId());
+        Operation effective = resolveOperation(role, resource, operation);
+        if (effective == null) {
+            // the detailed matrix of the role does not grant this operation
+            return false;
+        }
+        Set<UUID> allowedEntityIds = entityId == null ? null : roleAllowedEntityIds(user, resource, operation);
+        if (allowedEntityIds != null) {
+            // The role limits this resource to the entities of the granted groups (or to the entities created by the
+            // user): the entity has to be one of them.
+            if (entityId == null || !allowedEntityIds.contains(entityId.getId()) || entity == null
+                    || !user.getTenantId().equals(entity.getTenantId())) {
+                return false;
+            }
+            // An entity of another customer is only accessible when the administrator marked the group as public.
+            if (!defaultAccessControlService.hasPermission(user, resource, operation, entityId, entity)
+                    && !userBelongsToCustomerSubtree(user, entity)
+                    && !isInPublicGroup(role, user.getTenantId(), resource, effective, entityId)) {
+                return false;
+            }
+            return true;
         }
         if (defaultAccessControlService.hasPermission(user, resource, operation, entityId, entity)) {
             return true;
         }
-        Operation effective = resolveOperation(role, resource, operation);
-        if (!role.isOwnCustomerOnly() || effective == null
-                || !hasOperationGrant(user.getTenantId(), role, resource, effective, entityId)) {
+        if (!role.isOwnCustomerOnly() || !hasOperationGrant(user.getTenantId(), role, resource, effective, entityId)) {
             return false;
         }
         return userBelongsToCustomerSubtree(user, entity);
+    }
+
+    /**
+     * True when one of the groups that grant the operation is public, i.e. the entity is visible for every customer
+     * user that is assigned to a role scoped to that group (see {@link RbacEntityGroup#isPublicGroup()}).
+     */
+    private boolean isInPublicGroup(RbacRole role, TenantId tenantId, Resource resource, Operation operation,
+                                    EntityId entityId) {
+        List<String> scopedGroups = getScopedGroups(role, resource, operation);
+        if (scopedGroups == null || scopedGroups.isEmpty() || entityId == null) {
+            return false;
+        }
+        String entity = entityId.getId().toString();
+        String entityType = entityId.getEntityType().name();
+        for (RbacEntityGroup group : getEntityGroups(tenantId)) {
+            if (!group.isPublicGroup() || !scopedGroups.contains(group.getId())
+                    || !entityType.equals(group.getEntityType())) {
+                continue;
+            }
+            if (group.isAllGroup() || (group.getEntityIds() != null && group.getEntityIds().contains(entity))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean hasScopedOperation(RbacRole role, Resource resource, Operation operation) {
@@ -523,20 +625,28 @@ public class TbRbacAccessControlService implements AccessControlService {
         return result;
     }
 
-    private RbacRole getEffectiveRole(SecurityUser user) {
+    private EffectiveRole resolveEffectiveRole(SecurityUser user) {
         if (user == null || user.getId() == null || user.getTenantId() == null || SYS_ADMIN.equals(user.getAuthority())) {
-            return null;
+            return EffectiveRole.NONE;
         }
         String userId = user.getId().getId().toString();
         String cacheKey = user.getTenantId().getId() + ":" + userId;
         try {
-            return cached(effectiveRoleCache, cacheKey,
-                    () -> Optional.ofNullable(roleService.getEffectiveRole(user.getTenantId(), userId))).orElse(null);
+            return cached(effectiveRoleCache, cacheKey, () -> {
+                try {
+                    return Optional.of(new EffectiveRole(roleService.getEffectiveRole(user.getTenantId(), userId), false));
+                } catch (Exception e) {
+                    log.error("[{}] Failed to read the RBAC roles of user [{}]; the request is denied instead of " +
+                            "falling back to the default permissions: {}", user.getTenantId(), user.getId(),
+                            e.getMessage(), e);
+                    return Optional.of(new EffectiveRole(null, true));
+                }
+            }).orElse(EffectiveRole.NONE);
         } catch (Exception e) {
-            log.warn("Failed to load RBAC roles for user [{}], falling back to default permissions: {}",
-                    user.getId(), e.getMessage(), e);
+            log.error("[{}] Failed to resolve the RBAC roles of user [{}]: {}", user.getTenantId(), user.getId(),
+                    e.getMessage(), e);
+            return new EffectiveRole(null, true);
         }
-        return null;
     }
 
     /**
@@ -636,6 +746,20 @@ public class TbRbacAccessControlService implements AccessControlService {
     }
 
     /**
+     * True when the share grants the operation. {@code ALL} is honoured like in the permission matrix of a role,
+     * but a share never grants the credentials operations: the share is checked before the role, so it must not be
+     * able to grant an operation that the role model deliberately never derives from READ/WRITE.
+     */
+    private static boolean shareGrants(RbacShare share, Operation operation) {
+        if (operation == null || CREDENTIAL_OPERATIONS.contains(operation)) {
+            return false;
+        }
+        List<String> operations = share.getOperations();
+        return operations != null
+                && (operations.contains(operation.name()) || operations.contains(Operation.ALL.name()));
+    }
+
+    /**
      * True when one of the shares of the tenant grants the operation on this entity to the user or to a user group
      * the user belongs to. The shares are configured by the tenant administrator only (see ShareController).
      */
@@ -649,7 +773,7 @@ public class TbRbacAccessControlService implements AccessControlService {
         Set<String> userGroupIds = null;
         for (RbacShare share : getShares(user.getTenantId())) {
             if (!entityType.equals(share.getEntityType()) || !entity.equals(share.getEntityId())
-                    || share.getOperations() == null || !share.getOperations().contains(operation.name())) {
+                    || !shareGrants(share, operation)) {
                 continue;
             }
             if ("USER".equals(share.getAssigneeType())) {
@@ -681,8 +805,7 @@ public class TbRbacAccessControlService implements AccessControlService {
         String entityType = resource.name();
         Set<String> userGroupIds = null;
         for (RbacShare share : getShares(user.getTenantId())) {
-            if (!entityType.equals(share.getEntityType()) || share.getOperations() == null
-                    || !share.getOperations().contains(operation.name())) {
+            if (!entityType.equals(share.getEntityType()) || !shareGrants(share, operation)) {
                 continue;
             }
             boolean forUser;
@@ -752,6 +875,14 @@ public class TbRbacAccessControlService implements AccessControlService {
     }
 
     private record CacheEntry<T>(T value, long expiresAt) {
+    }
+
+    /**
+     * Result of the role lookup: either the effective role of the user (null when the user has no custom role), or
+     * the information that the RBAC settings of the tenant can not be read.
+     */
+    private record EffectiveRole(RbacRole role, boolean settingsUnavailable) {
+        static final EffectiveRole NONE = new EffectiveRole(null, false);
     }
 
 }

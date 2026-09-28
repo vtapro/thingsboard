@@ -51,6 +51,8 @@ import org.thingsboard.server.dao.timeseries.TimeseriesService;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.executors.DbCallbackExecutorService;
 import org.thingsboard.server.service.security.model.SecurityUser;
+import org.thingsboard.server.service.security.permission.AccessControlService;
+import org.thingsboard.server.service.security.permission.RbacEntityAccessFilter;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -89,9 +91,13 @@ public class DefaultEntityQueryService implements EntityQueryService {
     @Autowired
     private AttributesService attributesService;
 
+    @Autowired
+    private AccessControlService accessControlService;
+
     @Override
     public long countEntitiesByQuery(SecurityUser securityUser, EntityCountQuery query) {
-        return entityService.countEntitiesByQuery(securityUser.getTenantId(), securityUser.getCustomerId(), query);
+        return RbacEntityAccessFilter.countAllowedEntities(accessControlService, entityService, securityUser,
+                securityUser.getTenantId(), securityUser.getCustomerId(), query);
     }
 
     @Override
@@ -104,7 +110,12 @@ public class DefaultEntityQueryService implements EntityQueryService {
                     securityUser
             );
         }
-        return entityService.findEntityDataByQuery(securityUser.getTenantId(), securityUser.getCustomerId(), query);
+        PageData<EntityData> page = entityService.findEntityDataByQuery(securityUser.getTenantId(), securityUser.getCustomerId(), query);
+        return filterEntityData(securityUser, query, page);
+    }
+
+    private PageData<EntityData> filterEntityData(SecurityUser securityUser, EntityDataQuery query, PageData<EntityData> page) {
+        return RbacEntityAccessFilter.filterEntityData(accessControlService, securityUser, page, query.getPageLink().getPageSize());
     }
 
     private void resolveDynamicValuesInPredicates(List<KeyFilterPredicate> predicates, SecurityUser user) {
@@ -166,8 +177,8 @@ public class DefaultEntityQueryService implements EntityQueryService {
     @Override
     public PageData<AlarmData> findAlarmDataByQuery(SecurityUser securityUser, AlarmDataQuery query) {
         EntityDataQuery entityDataQuery = this.buildEntityDataQuery(query);
-        PageData<EntityData> entities = entityService.findEntityDataByQuery(securityUser.getTenantId(),
-                securityUser.getCustomerId(), entityDataQuery);
+        PageData<EntityData> entities = filterEntityData(securityUser, entityDataQuery, entityService.findEntityDataByQuery(securityUser.getTenantId(),
+                securityUser.getCustomerId(), entityDataQuery));
         if (entities.getTotalElements() > 0) {
             LinkedHashMap<EntityId, EntityData> entitiesMap = new LinkedHashMap<>();
             for (EntityData entityData : entities.getData()) {
@@ -193,8 +204,8 @@ public class DefaultEntityQueryService implements EntityQueryService {
     public long countAlarmsByQuery(SecurityUser securityUser, AlarmCountQuery query) {
         if (query.getEntityFilter() != null) {
             EntityDataQuery entityDataQuery = this.buildEntityDataQuery(query);
-            PageData<EntityData> entities = entityService.findEntityDataByQuery(securityUser.getTenantId(),
-                    securityUser.getCustomerId(), entityDataQuery);
+            PageData<EntityData> entities = filterEntityData(securityUser, entityDataQuery, entityService.findEntityDataByQuery(securityUser.getTenantId(),
+                    securityUser.getCustomerId(), entityDataQuery));
             if (entities.getTotalElements() > 0) {
                 List<EntityId> entityIds = entities.getData().stream().map(EntityData::getEntityId).toList();
                 return alarmService.countAlarmsByQuery(securityUser.getTenantId(), securityUser.getCustomerId(), query, entityIds);
@@ -305,9 +316,15 @@ public class DefaultEntityQueryService implements EntityQueryService {
 
     private ListenableFuture<List<EntityId>> findEntityIdsByQueryAsync(SecurityUser securityUser, EntityDataQuery query) {
         return Futures.transform(entityService.findEntityDataByQueryAsync(securityUser.getTenantId(), securityUser.getCustomerId(), query),
-                page -> page.getData().stream()
-                        .map(EntityData::getEntityId)
-                        .toList(),
+                page -> {
+                    List<EntityId> ids = page.getData().stream()
+                            .map(EntityData::getEntityId)
+                            .toList();
+                    if (!accessControlService.hasCustomRole(securityUser)) {
+                        return ids;
+                    }
+                    return RbacEntityAccessFilter.filterEntityIds(accessControlService, securityUser, ids);
+                },
                 dbCallbackExecutor);
     }
 

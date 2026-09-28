@@ -372,10 +372,13 @@ public class DeviceController extends BaseController {
             @RequestParam(required = false) String sortOrder) throws ThingsboardException {
         TenantId tenantId = getCurrentUser().getTenantId();
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.DEVICE, Operation.READ);
         if (type != null && type.trim().length() > 0) {
-            return checkNotNull(deviceService.findDevicesByTenantIdAndType(tenantId, type, pageLink));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> deviceService.findDevicesByTenantIdAndType(tenantId, type, link), Device::getId));
         } else {
-            return checkNotNull(deviceService.findDevicesByTenantId(tenantId, pageLink));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> deviceService.findDevicesByTenantId(tenantId, link), Device::getId));
         }
     }
 
@@ -413,9 +416,9 @@ public class DeviceController extends BaseController {
             filter.deviceProfileId(new DeviceProfileId(toUUID(deviceProfileId)));
         }
         Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.DEVICE, Operation.READ);
-        PageData<DeviceInfo> pageData = deviceService.findDeviceInfosByFilter(filter.build(),
-                scopedPageLink(allowedEntityIds, pageLink));
-        return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, pageData, DeviceInfo::getId));
+        DeviceInfoFilter deviceInfoFilter = filter.build();
+        return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                link -> deviceService.findDeviceInfosByFilter(deviceInfoFilter, link), DeviceInfo::getId));
     }
 
     @Hidden
@@ -424,7 +427,9 @@ public class DeviceController extends BaseController {
     public Device getTenantDevice(
             @RequestParam String deviceName) throws ThingsboardException {
         TenantId tenantId = getCurrentUser().getTenantId();
-        return checkNotNull(deviceService.findDeviceByTenantIdAndName(tenantId, deviceName));
+        Device device = checkNotNull(deviceService.findDeviceByTenantIdAndName(tenantId, deviceName));
+        accessControlService.checkPermission(getCurrentUser(), Resource.DEVICE, Operation.READ, device.getId(), device);
+        return device;
     }
 
     @ApiOperation(value = "Get Tenant Device (getTenantDeviceByName)",
@@ -463,10 +468,18 @@ public class DeviceController extends BaseController {
         CustomerId customerId = new CustomerId(toUUID(strCustomerId));
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.DEVICE, Operation.READ);
+        boolean tenantWide = allowedEntityIds != null;
         if (type != null && type.trim().length() > 0) {
-            return checkNotNull(deviceService.findDevicesByTenantIdAndCustomerIdAndType(tenantId, customerId, type, pageLink));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? link -> deviceService.findDevicesByTenantIdAndType(tenantId, type, link)
+                    : link -> deviceService.findDevicesByTenantIdAndCustomerIdAndType(tenantId, customerId, type, link),
+                    Device::getId));
         } else {
-            return checkNotNull(deviceService.findDevicesByTenantIdAndCustomerId(tenantId, customerId, pageLink));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
+                    ? link -> deviceService.findDevicesByTenantId(tenantId, link)
+                    : link -> deviceService.findDevicesByTenantIdAndCustomerId(tenantId, customerId, link),
+                    Device::getId));
         }
     }
 
@@ -514,9 +527,9 @@ public class DeviceController extends BaseController {
             // tenant and keep only the allowed devices below.
             filter.customerId(null);
         }
-        PageData<DeviceInfo> pageData = deviceService.findDeviceInfosByFilter(filter.build(),
-                scopedPageLink(allowedEntityIds, pageLink));
-        return checkNotNull(applyEntityScope(allowedEntityIds, pageLink, pageData, DeviceInfo::getId));
+        DeviceInfoFilter deviceInfoFilter = filter.build();
+        return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                link -> deviceService.findDeviceInfosByFilter(deviceInfoFilter, link), DeviceInfo::getId));
     }
 
     @ApiOperation(value = "Get Devices By Ids (getDevicesByIds)",
@@ -540,7 +553,15 @@ public class DeviceController extends BaseController {
         } else {
             devices = deviceService.findDevicesByTenantIdCustomerIdAndIdsAsync(tenantId, customerId, deviceIds);
         }
-        return checkNotNull(devices.get());
+        List<Device> found = checkNotNull(devices.get());
+        return found.stream().filter(device -> {
+            try {
+                accessControlService.checkPermission(user, Resource.DEVICE, Operation.READ, device.getId(), device);
+                return true;
+            } catch (ThingsboardException e) {
+                return false;
+            }
+        }).collect(Collectors.toList());
     }
 
     @ApiOperation(value = "Find related devices (findDevicesByQuery)",
@@ -787,7 +808,10 @@ public class DeviceController extends BaseController {
         } else if (deviceProfileId != null && deviceProfileId.length() > 0) {
             filter.deviceProfileId(new DeviceProfileId(toUUID(deviceProfileId)));
         }
-        return checkNotNull(deviceService.findDeviceInfosByFilter(filter.build(), pageLink));
+        DeviceInfoFilter deviceInfoFilter = filter.build();
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.DEVICE, Operation.READ);
+        return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                link -> deviceService.findDeviceInfosByFilter(deviceInfoFilter, link), DeviceInfo::getId));
     }
 
     @ApiOperation(value = "Count devices by device profile  (countByDeviceProfileAndEmptyOtaPackage)",

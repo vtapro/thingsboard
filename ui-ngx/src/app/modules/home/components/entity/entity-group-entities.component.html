@@ -48,9 +48,10 @@
 
     @if (!group) {
       <div class="tb-group-entities-empty">{{ 'entity-group.no-groups' | translate }}</div>
-    } @else if (!loading && !entities.length) {
-      <div class="tb-group-entities-empty">{{ 'entity-group.no-entities' | translate }}</div>
     } @else {
+      @if (!loading && !entities.length) {
+        <div class="tb-group-entities-empty">{{ 'entity-group.no-entities' | translate }}</div>
+      } @else {
       <table mat-table [dataSource]="entities" class="tb-group-entities-table">
         <ng-container matColumnDef="createdTime">
           <th mat-header-cell *matHeaderCellDef>{{ 'common.created-time' | translate }}</th>
@@ -78,6 +79,7 @@
         <tr mat-row *matRowDef="let row; columns: columns;"
             (click)="onRowClick(row)"></tr>
       </table>
+      }
       <mat-paginator [length]="totalElements"
                      [pageIndex]="pageIndex"
                      [pageSize]="pageSize"

@@ -16,8 +16,25 @@ let rbacPermissions: { [resource: string]: string[] } | null = null;
 
 const BASIC_OPERATIONS = ['CREATE', 'READ', 'WRITE', 'DELETE'];
 
+type RbacPermissionsListener = () => void;
+
+const listeners = new Set<RbacPermissionsListener>();
+
+/**
+ * Registers a listener called when the effective permissions change (roles loaded, user logged out).
+ * Returns the function that unregisters it.
+ */
+export const onRbacPermissionsChanged = (listener: RbacPermissionsListener): (() => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
+
 export const setRbacPermissions = (permissions: { [resource: string]: string[] } | null): void => {
+  if (JSON.stringify(rbacPermissions) === JSON.stringify(permissions)) {
+    return;
+  }
   rbacPermissions = permissions;
+  listeners.forEach(listener => listener());
 };
 
 export const getRbacPermissions = (): { [resource: string]: string[] } | null => rbacPermissions;

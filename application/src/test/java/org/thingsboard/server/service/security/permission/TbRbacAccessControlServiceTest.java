@@ -211,7 +211,7 @@ public class TbRbacAccessControlServiceTest {
     @Test
     public void classicRoleKeepsTheEntityDetailsPageWorking() throws Exception {
         // Role created with the permission matrix of the WEB UI: the four basic operations, scoped to a group.
-        givenGroupWithChildCustomerAsset();
+        givenPublicGroupWithChildCustomerAsset();
         givenRole(customerUser, classicGroupScopedRole());
 
         assertThat(accessControlService.hasPermission(customerUser, Resource.ASSET, Operation.READ,
@@ -221,6 +221,16 @@ public class TbRbacAccessControlServiceTest {
                 childCustomerAsset.getId(), childCustomerAsset)).isTrue();
         assertThat(accessControlService.hasPermission(customerUser, Resource.ASSET, Operation.READ_TELEMETRY,
                 childCustomerAsset.getId(), childCustomerAsset)).isTrue();
+    }
+
+    @Test
+    public void groupScopedRoleDoesNotRevealTheEntitiesOfAnotherCustomer() throws Exception {
+        // The same role, but the group is not public: a customer user must not see the entities of another customer
+        givenGroupWithChildCustomerAsset();
+        givenRole(customerUser, classicGroupScopedRole());
+
+        assertThat(accessControlService.hasPermission(customerUser, Resource.ASSET, Operation.READ,
+                childCustomerAsset.getId(), childCustomerAsset)).isFalse();
     }
 
     @Test
@@ -426,10 +436,22 @@ public class TbRbacAccessControlServiceTest {
     }
 
     private void givenGroupWithChildCustomerAsset() {
+        givenGroupWithChildCustomerAsset(false);
+    }
+
+    /**
+     * The same group, but marked as public: the entities of another customer are then accessible for a customer user.
+     */
+    private void givenPublicGroupWithChildCustomerAsset() {
+        givenGroupWithChildCustomerAsset(true);
+    }
+
+    private void givenGroupWithChildCustomerAsset(boolean publicGroup) {
         RbacEntityGroup group = new RbacEntityGroup();
         group.setId("group-1");
         group.setEntityType("ASSET");
         group.setEntityIds(List.of(childCustomerAsset.getId().getId().toString()));
+        group.setPublicGroup(publicGroup);
         RbacEntityGroupSettings groupSettings = new RbacEntityGroupSettings();
         groupSettings.setGroups(List.of(group));
         when(entityGroupService.getEntityGroupSettings(TENANT_ID)).thenReturn(groupSettings);

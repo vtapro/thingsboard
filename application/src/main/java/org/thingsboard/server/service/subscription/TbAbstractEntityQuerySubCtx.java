@@ -27,6 +27,7 @@ import org.thingsboard.server.common.data.query.SimpleKeyFilterPredicate;
 import org.thingsboard.server.common.data.query.TsValue;
 import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.dao.entity.EntityService;
+import org.thingsboard.server.service.security.permission.AccessControlService;
 import org.thingsboard.server.service.ws.WebSocketService;
 import org.thingsboard.server.service.ws.WebSocketSessionRef;
 import org.thingsboard.server.service.ws.telemetry.sub.TelemetrySubscriptionUpdate;
@@ -47,6 +48,7 @@ public abstract class TbAbstractEntityQuerySubCtx<T extends EntityCountQuery> ex
 
     protected final EntityService entityService;
     protected final AttributesService attributesService;
+    protected final AccessControlService accessControlService;
     protected final Set<Integer> subToDynamicValueKeySet;
     @Getter
     protected final Map<DynamicValueKey, List<DynamicValue>> dynamicValues;
@@ -57,10 +59,12 @@ public abstract class TbAbstractEntityQuerySubCtx<T extends EntityCountQuery> ex
     protected volatile ScheduledFuture<?> refreshTask;
 
     public TbAbstractEntityQuerySubCtx(String serviceId, WebSocketService wsService, EntityService entityService, TbLocalSubscriptionService localSubscriptionService,
-                                       AttributesService attributesService, SubscriptionServiceStatistics stats, WebSocketSessionRef sessionRef, int cmdId) {
+                                       AttributesService attributesService, SubscriptionServiceStatistics stats, WebSocketSessionRef sessionRef, int cmdId,
+                                       AccessControlService accessControlService) {
         super(serviceId, wsService, localSubscriptionService, stats, sessionRef, cmdId);
         this.entityService = entityService;
         this.attributesService = attributesService;
+        this.accessControlService = accessControlService;
         this.subToDynamicValueKeySet = ConcurrentHashMap.newKeySet();
         this.dynamicValues = new ConcurrentHashMap<>();
     }

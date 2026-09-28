@@ -80,15 +80,29 @@ export class RoleDialogComponent {
       this.userIds = [...(role.userIds || [])];
       Object.entries(role.permissions || {}).forEach(([resource, operations]) => {
         const draft = this.permissionDraft[resource] = {};
-        operations.forEach(operation => draft[operation] = true);
+        this.grantOperations(draft, resource, operations);
       });
       Object.entries(role.scopedPermissions || {}).forEach(([resource, byOperation]) => {
         const draft = this.permissionDraft[resource] || (this.permissionDraft[resource] = {});
         Object.entries(byOperation).forEach(([operation, groups]) => {
-          draft[operation] = true;
+          this.grantOperations(draft, resource, [operation]);
           this.groupScopeDraft[resource] = groups as string[];
         });
       });
+    }
+  }
+
+  /**
+   * Adds the given operations to the draft. "ALL" is a wildcard understood by the backend: it is expanded into the
+   * operations offered for the entity type, otherwise the check boxes (and the role saved afterwards) would
+   * silently lose the wildcard.
+   */
+  private grantOperations(draft: { [operation: string]: boolean }, resource: string,
+                          operations: string[]): void {
+    if (operations.includes('ALL')) {
+      this.operationsFor(resource).forEach(operation => draft[operation] = true);
+    } else {
+      operations.forEach(operation => draft[operation] = true);
     }
   }
 

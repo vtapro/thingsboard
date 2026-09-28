@@ -16,6 +16,7 @@ public class DefaultUserGroupService implements UserGroupService {
     public static final String USER_GROUPS_SETTINGS_KEY = "userGroups";
 
     private final AdminSettingsService adminSettingsService;
+    private final TenantSettingsLocks locks = new TenantSettingsLocks();
 
     @Override
     public RbacUserGroupSettings getUserGroupSettings(TenantId tenantId) {
@@ -32,15 +33,17 @@ public class DefaultUserGroupService implements UserGroupService {
 
     @Override
     public RbacUserGroupSettings saveUserGroupSettings(TenantId tenantId, RbacUserGroupSettings settings) {
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, USER_GROUPS_SETTINGS_KEY);
-        if (adminSettings == null) {
-            adminSettings = new AdminSettings();
-            adminSettings.setTenantId(tenantId);
-            adminSettings.setKey(USER_GROUPS_SETTINGS_KEY);
+        synchronized (locks.lockFor(tenantId)) {
+            AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, USER_GROUPS_SETTINGS_KEY);
+            if (adminSettings == null) {
+                adminSettings = new AdminSettings();
+                adminSettings.setTenantId(tenantId);
+                adminSettings.setKey(USER_GROUPS_SETTINGS_KEY);
+            }
+            adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
+            AdminSettings saved = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
+            return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), RbacUserGroupSettings.class);
         }
-        adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
-        AdminSettings saved = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
-        return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), RbacUserGroupSettings.class);
     }
 
 }

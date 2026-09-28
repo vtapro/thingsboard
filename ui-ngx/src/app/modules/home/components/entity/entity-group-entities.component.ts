@@ -256,6 +256,7 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
         this.entities = page?.data || [];
         this.totalElements = page?.totalElements || 0;
         this.loading = false;
+        this.clampPageIndex();
       }, () => {
         this.entities = [];
         this.totalElements = 0;
@@ -316,11 +317,24 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
       this.enrichProfiles(this.entities);
       this.totalElements = page?.totalElements || 0;
       this.loading = false;
+      this.clampPageIndex();
     }, () => {
       this.entities = [];
       this.totalElements = 0;
       this.loading = false;
     });
+  }
+
+  /**
+   * MatPaginator does not clamp the page index when the number of elements shrinks: after deleting the last entity of
+   * the last page the user would stay on an empty page without a way back.
+   */
+  private clampPageIndex(): void {
+    const lastPage = Math.max(0, Math.ceil(this.totalElements / this.pageSize) - 1);
+    if (this.pageIndex > lastPage) {
+      this.pageIndex = lastPage;
+      this.loadPage();
+    }
   }
 
   /**

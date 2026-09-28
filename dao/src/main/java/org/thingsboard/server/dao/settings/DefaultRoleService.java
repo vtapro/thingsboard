@@ -27,6 +27,7 @@ public class DefaultRoleService implements RoleService {
 
     private final AdminSettingsService adminSettingsService;
     private final UserGroupService userGroupService;
+    private final TenantSettingsLocks locks = new TenantSettingsLocks();
 
     @Override
     public RbacRoleSettings getRoleSettings(TenantId tenantId) {
@@ -43,15 +44,17 @@ public class DefaultRoleService implements RoleService {
 
     @Override
     public RbacRoleSettings saveRoleSettings(TenantId tenantId, RbacRoleSettings settings) {
-        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, ROLES_SETTINGS_KEY);
-        if (adminSettings == null) {
-            adminSettings = new AdminSettings();
-            adminSettings.setTenantId(tenantId);
-            adminSettings.setKey(ROLES_SETTINGS_KEY);
+        synchronized (locks.lockFor(tenantId)) {
+            AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, ROLES_SETTINGS_KEY);
+            if (adminSettings == null) {
+                adminSettings = new AdminSettings();
+                adminSettings.setTenantId(tenantId);
+                adminSettings.setKey(ROLES_SETTINGS_KEY);
+            }
+            adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
+            AdminSettings saved = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
+            return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), RbacRoleSettings.class);
         }
-        adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
-        AdminSettings saved = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
-        return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), RbacRoleSettings.class);
     }
 
     @Override
@@ -103,6 +106,10 @@ public class DefaultRoleService implements RoleService {
 
     /**
      * Roles are additive: the effective permissions of a user are the union of the permissions of all its roles.
+     *
+     * <p>The "own entities only" flag is a restriction, not a permission: when one of the roles restricts a resource,
+     * the effective role restricts it as well. A restriction always wins over the grants of the other roles, so
+     * adding a role to a user can never widen an explicit restriction.
      */
     private static void mergePermissions(RbacRole source, RbacRole target) {
         if (source.getPermissions() != null) {
@@ -130,6 +137,13 @@ public class DefaultRoleService implements RoleService {
         }
         if (source.isOwnCustomerOnly()) {
             target.setOwnCustomerOnly(true);
+        }
+        if (source.getOwnOnly() != null) {
+            source.getOwnOnly().forEach((resource, ownOnly) -> {
+                if (Boolean.TRUE.equals(ownOnly)) {
+                    target.getOwnOnly().put(resource, true);
+                }
+            });
         }
     }
 

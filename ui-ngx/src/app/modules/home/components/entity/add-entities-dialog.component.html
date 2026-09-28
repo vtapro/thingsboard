@@ -13,6 +13,11 @@
     @if (!entities.length) {
       <div class="tb-add-entities-empty">{{ 'entity-group.no-entities' | translate }}</div>
     }
+    @if (truncated) {
+      <div class="tb-add-entities-empty">
+        {{ 'entity-group.entities-truncated' | translate: {count: entities.length} }}
+      </div>
+    }
     <div class="tb-add-entities-list">
       @for (entity of entities; track entity.id) {
         <mat-checkbox class="tb-add-entities-item"

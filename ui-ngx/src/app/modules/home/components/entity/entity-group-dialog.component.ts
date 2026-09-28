@@ -58,7 +58,12 @@ export class EntityGroupDialogComponent {
       this.groupForm.markAllAsTouched();
       return;
     }
-    this.dialogRef.close(this.groupForm.value);
+    const value = this.groupForm.value;
+    if (!this.entityTypes.length) {
+      // the entity type of an existing group cannot be changed, so it is not part of the dialog result
+      delete value.entityType;
+    }
+    this.dialogRef.close(value);
   }
 
 }

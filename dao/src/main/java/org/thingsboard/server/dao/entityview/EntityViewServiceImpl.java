@@ -345,6 +345,15 @@ public class EntityViewServiceImpl extends CachedVersionedEntityService<EntityVi
     }
 
     @Override
+    public List<EntityView> findEntityViewsByTenantIdAndEntityId(TenantId tenantId, EntityId entityId, int limit) {
+        log.trace("Executing findEntityViewsByTenantIdAndEntityId, tenantId [{}], entityId [{}], limit [{}]", tenantId, entityId, limit);
+        validateId(tenantId, id -> INCORRECT_TENANT_ID + id);
+        validateId(entityId.getId(), id -> "Incorrect entityId" + id);
+
+        return entityViewDao.findEntityViewsByTenantIdAndEntityId(tenantId.getId(), entityId.getId(), limit);
+    }
+
+    @Override
     public boolean existsByTenantIdAndEntityId(TenantId tenantId, EntityId entityId) {
         return entityViewDao.existsByTenantIdAndEntityId(tenantId.getId(), entityId.getId());
     }

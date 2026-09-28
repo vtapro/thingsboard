@@ -3,7 +3,7 @@
 import { AuthState } from '@core/auth/auth.models';
 import { Authority } from '@shared/models/authority.enum';
 import { deepClone } from '@core/utils';
-import { getRbacPermissions } from '@core/services/rbac-permissions';
+import { getRbacPermissions, hasRbacPermission } from '@core/services/rbac-permissions';
 
 export declare type MenuSectionType = 'link' | 'toggle' | 'divider';
 
@@ -1126,16 +1126,15 @@ const menuSectionResource: { [id: string]: string } = {
 };
 
 const hasMenuPermission = (id: string): boolean => {
-  const rbacPermissions = getRbacPermissions();
-  if (!rbacPermissions) {
+  if (!getRbacPermissions()) {
     return true;
   }
   const resource = menuSectionResource[id];
   if (!resource) {
     return true;
   }
-  const operations = rbacPermissions[resource];
-  return !!operations && operations.includes('READ');
+  // a resource no custom role configures keeps the platform permissions, and "ALL" grants every operation
+  return hasRbacPermission(resource, 'READ');
 };
 
 let customMenuItems: Array<{ id: string; name: string; icon?: string; type: string; target: string; assigneeType?: string; order?: number }> = [];

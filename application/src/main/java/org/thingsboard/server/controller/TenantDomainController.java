@@ -14,8 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.domain.Domain;
 import org.thingsboard.server.common.data.domain.DomainInfo;
-import org.thingsboard.server.common.data.id.DomainId;
-import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.common.data.id.DomainId;import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.config.annotations.ApiOperation;
@@ -57,6 +56,15 @@ public class TenantDomainController extends BaseController {
             @Parameter(description = "A JSON value representing the domain.")
             @RequestBody Domain domain) throws Exception {
         TenantId tenantId = getCurrentUser().getTenantId();
+        if (domain.getId() != null && !domain.getId().isNullUid()) {
+            // A tenant may only update the domains it registered itself, otherwise the id of the body would allow
+            // one tenant to take over the domain (and the white labeling) of another one.
+            Domain existingDomain = domainService.findDomainById(tenantId, domain.getId());
+            if (existingDomain == null || !tenantId.equals(existingDomain.getTenantId())) {
+                throw new IncorrectParameterException("Domain with id " + domain.getId()
+                        + " is not registered by this tenant");
+            }
+        }
         domain.setTenantId(tenantId);
         if (StringUtils.isNotBlank(domain.getName())) {
             Domain existingDomain = domainService.findDomainByName(domain.getName().trim());

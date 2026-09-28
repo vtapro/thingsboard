@@ -206,6 +206,7 @@
         "no-groups": "No entity groups found",
         "add-members": "Add entities",
         "no-entities": "No entities found",
+        "entities-truncated": "Only the first {{count}} entities are listed.",
         "delete-title": "Delete entity group \"{{name}}\"",
         "delete-text": "The permissions scoped to this group are removed as well. Are you sure?",
         "device-groups": "Device groups",
@@ -220,7 +221,6 @@
         "entity-view-groups": "Entity view groups",
         "make-public": "Make public",
         "make-private": "Make private",
-        "edit": "Edit",
         "delete": "Delete",
         "refresh": "Refresh",
         "tenant-admin-only": "Only tenant administrators can manage entity groups."
@@ -377,6 +377,7 @@
         "roles-add-relation": "Add relation",
         "roles-edit-relation": "Edit relation",
         "roles-customer-required": "Customer is required",
+        "roles-hierarchy-cycle": "This parent would create a loop in the customer hierarchy",
         "roles-delete-relation-title": "Remove the parent of \"{{customer}}\"",
         "roles-delete-relation-text": "The users of the customer lose the access to the entities of the parent. Are you sure?",
         "entity-group-members": {

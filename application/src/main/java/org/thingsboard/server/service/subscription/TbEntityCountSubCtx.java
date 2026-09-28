@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.thingsboard.server.common.data.query.EntityCountQuery;
 import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.dao.entity.EntityService;
+import org.thingsboard.server.service.security.permission.AccessControlService;
+import org.thingsboard.server.service.security.permission.RbacEntityAccessFilter;
 import org.thingsboard.server.service.ws.WebSocketService;
 import org.thingsboard.server.service.ws.WebSocketSessionRef;
 import org.thingsboard.server.service.ws.telemetry.cmd.v2.EntityCountUpdate;
@@ -17,23 +19,29 @@ public class TbEntityCountSubCtx extends TbAbstractEntityQuerySubCtx<EntityCount
 
     public TbEntityCountSubCtx(String serviceId, WebSocketService wsService, EntityService entityService,
                                TbLocalSubscriptionService localSubscriptionService, AttributesService attributesService,
-                               SubscriptionServiceStatistics stats, WebSocketSessionRef sessionRef, int cmdId) {
-        super(serviceId, wsService, entityService, localSubscriptionService, attributesService, stats, sessionRef, cmdId);
+                               SubscriptionServiceStatistics stats, WebSocketSessionRef sessionRef, int cmdId,
+                               AccessControlService accessControlService) {
+        super(serviceId, wsService, entityService, localSubscriptionService, attributesService, stats, sessionRef, cmdId, accessControlService);
     }
 
     @Override
     public void fetchData() {
-        result = (int) entityService.countEntitiesByQuery(getTenantId(), getCustomerId(), query);
+        result = (int) countEntities();
         sendWsMsg(new EntityCountUpdate(cmdId, result));
     }
 
     @Override
     protected void update() {
-        int newCount = (int) entityService.countEntitiesByQuery(getTenantId(), getCustomerId(), query);
+        int newCount = (int) countEntities();
         if (newCount != result) {
             result = newCount;
             sendWsMsg(new EntityCountUpdate(cmdId, result));
         }
+    }
+
+    private long countEntities() {
+        return RbacEntityAccessFilter.countAllowedEntities(accessControlService, entityService,
+                sessionRef.getSecurityCtx(), getTenantId(), getCustomerId(), query);
     }
 
     @Override

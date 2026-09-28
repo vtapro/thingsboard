@@ -24,6 +24,7 @@ import { WhiteLabelingSettings } from '@shared/models/white-labeling.models';
 import { CustomTranslationService } from '@core/http/custom-translation.service';
 import { CustomMenuService } from '@core/http/custom-menu.service';
 import { RbacService } from '@core/http/rbac.service';
+import { setRbacPermissions } from '@core/services/rbac-permissions';
 
 @Component({
     selector: 'tb-root',
@@ -121,6 +122,9 @@ export class AppComponent {
         this.whiteLabelingService.loadAuthenticatedWhiteLabelingSettings();
         this.customMenuService.loadCustomMenu();
         this.rbacService.loadUserRoles();
+      } else {
+        // the permissions of the previous user must not be reused by the next one
+        setRbacPermissions(null);
       }
       this.authService.gotoDefaultPlace(data.isAuthenticated);
     });

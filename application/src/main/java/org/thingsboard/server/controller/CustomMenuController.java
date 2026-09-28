@@ -71,6 +71,9 @@ public class CustomMenuController extends BaseController {
             return;
         }
         for (CustomMenuItem item : settings.getItems()) {
+            if (item == null) {
+                throw new IncorrectParameterException("Custom menu item must not be null");
+            }
             if (StringUtils.isBlank(item.getName()) || StringUtils.isBlank(item.getTarget())) {
                 throw new IncorrectParameterException("Custom menu item name and target are required");
             }
