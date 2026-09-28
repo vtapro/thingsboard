@@ -125,13 +125,45 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
 
   /** Clicking a row opens the entity details panel (PE opens the same panel from the entities of a group). */
   onRowClick(entity: GroupEntity): void {
-    const entityId: EntityId = {id: entity.id, entityType: this.entityType as EntityType};
+    // The paginated list endpoints ("All" group) return the full entity, whose id is an EntityId object, while a
+    // regular group is built from the entity query and has a plain id string. Normalise before using it in URLs.
+    const id = this.entityIdString(entity);
+    if (!id) {
+      return;
+    }
+    const entityId: EntityId = {id, entityType: this.entityType as EntityType};
     if (this.selectedEntityId?.id === entityId.id) {
       this.isDetailsOpen = !this.isDetailsOpen;
       return;
     }
     this.selectedEntityId = entityId;
     this.isDetailsOpen = true;
+  }
+
+  /**
+   * Id of an entity as a string. The list endpoints of the platform return the whole entity (id is an EntityId
+   * object) while the entity query API returns the id as a string, and the details panel plus the profile lookups
+   * build URLs from this value, so anything but a string ends up as "/api/device/info/[object Object]" (HTTP 400).
+   */
+  private entityIdString(entity: GroupEntity): string {
+    const id: any = (entity as any)?.id;
+    if (typeof id === 'string') {
+      return id;
+    }
+    return id?.id;
+  }
+
+  /** Maps an entity of the paginated list endpoints into the row model of the group table. */
+  private toGroupEntity(entity: any): GroupEntity {
+    return {
+      id: this.entityIdString(entity),
+      createdTime: Number(entity?.createdTime) || 0,
+      name: entity?.name,
+      label: entity?.label,
+      deviceProfileName: entity?.deviceProfileName,
+      assetProfileName: entity?.assetProfileName,
+      type: entity?.type
+    };
   }
 
   closeEntityDetails(): void {
@@ -251,9 +283,10 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
       // "All": every entity of the type, paginated by the backend
       const url = `${this.listApi()}?pageSize=${this.pageSize}&page=${this.pageIndex}` +
         `&sortProperty=createdTime&sortOrder=DESC`;
-      this.http.get<{ data: GroupEntity[]; totalElements: number }>(url,
+      this.http.get<{ data: any[]; totalElements: number }>(url,
         defaultHttpOptionsFromConfig(undefined)).subscribe(page => {
-        this.entities = page?.data || [];
+        this.entities = (page?.data || []).map(entity => this.toGroupEntity(entity));
+        this.enrichProfiles(this.entities);
         this.totalElements = page?.totalElements || 0;
         this.loading = false;
         this.clampPageIndex();
