@@ -132,6 +132,21 @@ docker push ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.1
 
 ### 2.2. Không có Docker ở máy dev — dùng GitHub Actions
 
+> **Phát hành bằng git tag (2026-09-28, dùng khi credential thiếu scope `workflow`)** — nếu git
+> credential hiện tại là OAuth App không có scope `workflow`, mọi push có sửa `.github/workflows/**`
+> sẽ bị GitHub từ chối (`refusing to allow an OAuth App to create or update workflow ... without
+> 'workflow' scope`). Khi đó **không cần** sửa `IMAGE_VERSION` trong workflow: tạo tag `v*` và push
+> tag đó — workflow chạy với `type=ref,event=tag` và image sẽ được gắn đúng tag phiên bản:
+>
+> ```bash
+> git push origin RBAC-Full-User          # code + manifest (không đụng file workflow)
+> git tag -f v4.4.0.1 && git push -f origin v4.4.0.1   # kích hoạt build, image mang tag v4.4.0.1
+> ```
+>
+> Lưu ý: cho tới khi `gh auth refresh -h github.com -s workflow` (hoặc dùng PAT có scope `workflow`)
+> và bump `IMAGE_VERSION`, mỗi lần build vẫn ghi thêm tag `v4.4.0.0` (giá trị `IMAGE_VERSION` cũ) —
+> tag này sẽ trỏ vào code mới nhất.
+
 Máy dev hiện tại **không cài Docker Desktop / docker CLI**, nên cách gọn nhất là để GitHub Actions
 build. Việc duy nhất còn thiếu là quyền `workflow` cho credential đang dùng để push file workflow:
 
@@ -505,6 +520,11 @@ kubectl apply -f deploy/k3s/10-install-job.yaml
 kubectl -n thingsboard wait --for=condition=complete job/tb-install --timeout=15m
 kubectl -n thingsboard logs job/tb-install --tail=50
 kubectl -n thingsboard delete job tb-install
+
+# 4b. CHỈ khi bản mới giữ nguyên <version> 4.4.0-SNAPSHOT (build lại cùng version):
+#     bỏ qua bước 4. Nếu chạy INSTALL_UPGRADE=true trên DB đã ở đúng version, installer sẽ dừng với
+#     "Upgrade failed: database already upgraded to current version" (job báo Failed nhưng DB không sao).
+#     Muốn ép chạy lại migration thì đặt thêm SKIP_SCHEMA_VERSION_CHECK=true — chỉ làm khi thật cần.
 
 # 5. services
 kubectl apply -f deploy/k3s/20-tb-core.yaml
