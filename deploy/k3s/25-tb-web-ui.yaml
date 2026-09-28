@@ -44,13 +44,6 @@ spec:
           labelSelector:
             matchLabels:
               app.kubernetes.io/name: tb-web-ui
-        # trai deu TONG so pod ThingsBoard tren cac worker, khong chi trong tung service
-        - maxSkew: 2
-          topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: ScheduleAnyway
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/part-of: thingsboard
       containers:
         - name: tb-web-ui
           image: ghcr.io/vtapro/tb-web-ui:v4.4.0.1

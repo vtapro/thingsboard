@@ -211,13 +211,6 @@ spec:
           labelSelector:
             matchLabels:
               app.kubernetes.io/name: tb-haproxy
-        # trai deu TONG so pod ThingsBoard tren cac worker, khong chi trong tung service
-        - maxSkew: 2
-          topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: ScheduleAnyway
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/part-of: thingsboard
       containers:
         - name: haproxy
           image: haproxy:3.1-alpine

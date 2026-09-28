@@ -42,13 +42,6 @@ spec:
           labelSelector:
             matchLabels:
               app.kubernetes.io/name: tb-js-executor
-        # trai deu TONG so pod ThingsBoard tren cac worker, khong chi trong tung service
-        - maxSkew: 2
-          topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: ScheduleAnyway
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/part-of: thingsboard
       containers:
         - name: tb-js-executor
           image: ghcr.io/vtapro/tb-js-executor:v4.4.0.1
