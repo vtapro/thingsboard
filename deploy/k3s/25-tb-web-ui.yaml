@@ -46,9 +46,10 @@ spec:
               app.kubernetes.io/name: tb-web-ui
       containers:
         - name: tb-web-ui
-          # Release v4.4.0.3 = v4.4.0.2 + RBAC quan ly thanh vien (User/Customer), menu Users/Customers theo quyen
+          # Release v4.4.0.4 = v4.4.0.3 + fix danh sach Customers rong (NULL_CUSTOMER_ID cua tenant admin)
+          # va bat lai nut Add user tren trang Users cua tenant admin.
           # (panel goi /api/device/info/[object Object] vi id cua entity la object).
-          image: ghcr.io/vtapro/tb-web-ui:v4.4.0.3
+          image: ghcr.io/vtapro/tb-web-ui:v4.4.0.4
           imagePullPolicy: Always
           env:
             - name: NODE_ENV

@@ -307,7 +307,7 @@ public class UserController extends BaseController {
         List<CustomerId> customerIds = new ArrayList<>();
         if (accessibleCustomerIds != null) {
             accessibleCustomerIds.forEach(id -> customerIds.add(new CustomerId(id)));
-        } else if (currentUser.getCustomerId() != null) {
+        } else if (currentUser.getCustomerId() != null && !currentUser.getCustomerId().isNullUid()) {
             customerIds.add(currentUser.getCustomerId());
         }
         if (customerIds.isEmpty()) {

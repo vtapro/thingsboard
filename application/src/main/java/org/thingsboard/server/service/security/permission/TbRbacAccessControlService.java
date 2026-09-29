@@ -240,7 +240,7 @@ public class TbRbacAccessControlService implements AccessControlService {
      */
     @Override
     public Set<UUID> getAccessibleCustomerIds(SecurityUser user) {
-        if (user == null || user.getCustomerId() == null) {
+        if (!isCustomerUser(user)) {
             return null;
         }
         RbacRole role = resolveEffectiveRole(user).role();
@@ -302,10 +302,10 @@ public class TbRbacAccessControlService implements AccessControlService {
         if (entity != null && entity.getTenantId() != null && !user.getTenantId().equals(entity.getTenantId())) {
             return false;
         }
-        if (isMemberResource(resource) && user.getCustomerId() != null) {
+        if (isMemberResource(resource) && isCustomerUser(user)) {
             return hasCustomerMemberPermission(user, resource, operation, entityId, entity, role);
         }
-        if (user.getCustomerId() != null) {
+        if (isCustomerUser(user)) {
             return hasCustomerUserPermission(user, resource, operation, entityId, entity, role);
         }
         // "Only entities created by the user": the entity has to be owned by this user.
@@ -497,7 +497,7 @@ public class TbRbacAccessControlService implements AccessControlService {
                 return "This " + entityLabel + " is not a member of the entity groups granted to your role.";
             }
         }
-        if (user.getCustomerId() != null) {
+        if (isCustomerUser(user)) {
             return "This " + entityLabel + " does not belong to your customer, so your role can not grant access to it.";
         }
         return PERMISSION_DENIED_MESSAGE;
@@ -619,7 +619,7 @@ public class TbRbacAccessControlService implements AccessControlService {
      * enables the customer hierarchy).
      */
     private boolean isCustomerInUserScope(SecurityUser user, CustomerId targetCustomerId, RbacRole role) {
-        if (user.getCustomerId() == null || targetCustomerId == null) {
+        if (!isCustomerUser(user) || targetCustomerId == null) {
             return false;
         }
         if (user.getCustomerId().equals(targetCustomerId)) {
@@ -692,6 +692,15 @@ public class TbRbacAccessControlService implements AccessControlService {
 
     private static boolean isMemberResource(Resource resource) {
         return MEMBER_RESOURCES.contains(resource.name());
+    }
+
+    /**
+     * True when the user really belongs to a customer. Tenant and system administrators carry the "null"
+     * customer id (13814000-...) instead of a Java null, so a plain {@code getCustomerId() != null} check would
+     * treat them as customer users and silently wrong-scope their entity checks and list queries.
+     */
+    private static boolean isCustomerUser(SecurityUser user) {
+        return user != null && user.getCustomerId() != null && !user.getCustomerId().isNullUid();
     }
 
     /**
@@ -980,7 +989,7 @@ public class TbRbacAccessControlService implements AccessControlService {
      * True when the entity belongs to the customer of the user or to any of its sub-customers.
      */
     private boolean userBelongsToCustomerSubtree(SecurityUser user, HasTenantId entity) {
-        if (user.getCustomerId() == null || !(entity instanceof HasCustomerId)) {
+        if (!isCustomerUser(user) || !(entity instanceof HasCustomerId)) {
             return false;
         }
         try {

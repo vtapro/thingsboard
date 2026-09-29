@@ -118,13 +118,14 @@ export class UsersTableConfigResolver  {
           this.config.entitiesFetchFunction = pageLink => this.userService.getUsers(pageLink);
           this.config.addEnabled = hasRbacPermission('USER', 'CREATE');
         } else {
-          // tenant administrator: every user of the tenant, read-only (members are managed per customer)
+          // tenant administrator: every user of the tenant; adding here creates a tenant level user
+          // (authority TENANT_ADMIN, no customer). Role limited members are created under a customer.
           this.allUsers = true;
           this.authority = Authority.TENANT_ADMIN;
           this.tenantId = this.authUser.tenantId.id;
           this.customerId = NULL_UUID;
           this.config.entitiesFetchFunction = pageLink => this.userService.getUsers(pageLink);
-          this.config.addEnabled = false;
+          this.config.addEnabled = true;
         }
         this.updateActionCellDescriptors(auth);
       }),

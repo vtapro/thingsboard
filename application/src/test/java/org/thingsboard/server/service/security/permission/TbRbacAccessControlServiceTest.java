@@ -462,6 +462,22 @@ public class TbRbacAccessControlServiceTest {
                 null, user(TENANT_ID, CUSTOMER_ID, Authority.CUSTOMER_USER))).isTrue();
     }
 
+    /**
+     * Regression: the tenant administrator carries the "null" customer id (13814000-...) instead of a Java null,
+     * so {@code getCustomerId() != null} must not be used to detect a customer user. When it was, the customer and
+     * user list endpoints scoped the query to that null customer and returned an empty page.
+     */
+    @Test
+    public void tenantAdminWithTheNullCustomerIdIsNotTreatedAsACustomerUser() throws Exception {
+        SecurityUser admin = securityUser(Authority.TENANT_ADMIN,
+                new CustomerId(UUID.fromString("13814000-1dd2-11b2-8080-808080808080")));
+        when(roleService.getEffectiveRole(TENANT_ID, admin.getId().getId().toString())).thenReturn(null);
+
+        assertThat(accessControlService.getAccessibleCustomerIds(admin)).isNull();
+        assertThat(accessControlService.getAllowedEntityIds(admin, Resource.CUSTOMER, Operation.READ)).isNull();
+        assertThat(accessControlService.getAllowedEntityIds(admin, Resource.USER, Operation.READ)).isNull();
+    }
+
     @Test
     public void customerUserWithoutUserPermissionCanNotCreateMembers() throws Exception {
         givenRole(customerUser, role(grants("DEVICE", "READ"), Map.of(), false));

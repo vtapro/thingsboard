@@ -204,11 +204,12 @@ public class CustomerController extends BaseController {
         SecurityUser currentUser = getCurrentUser();
         TenantId tenantId = currentUser.getTenantId();
         Set<UUID> scope = accessControlService.getAllowedEntityIds(currentUser, Resource.CUSTOMER, Operation.READ);
-        if (currentUser.getCustomerId() != null) {
+        CustomerId currentCustomerId = currentUser.getCustomerId();
+        if (currentCustomerId != null && !currentCustomerId.isNullUid()) {
             // a customer user always sees its own customer at least, and the sub-customers when its role allows it
             Set<UUID> accessible = accessControlService.getAccessibleCustomerIds(currentUser);
             if (accessible == null) {
-                accessible = Set.of(currentUser.getCustomerId().getId());
+                accessible = Set.of(currentCustomerId.getId());
             }
             scope = intersect(scope, accessible);
         }
