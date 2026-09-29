@@ -40,4 +40,15 @@ public interface AccessControlService {
         return false;
     }
 
+    /**
+     * Ids of the customers the user may see because of its customer scope (the customer of the user and, when the
+     * custom role enables the customer hierarchy, its sub-customers). {@code null} means that the platform behaviour
+     * applies (the user only sees its own customer).
+     * <p>Used by the customer and user list endpoints, that have to filter the results in memory for the roles that
+     * are scoped to the customer hierarchy.
+     */
+    default Set<UUID> getAccessibleCustomerIds(SecurityUser user) {
+        return null;
+    }
+
 }

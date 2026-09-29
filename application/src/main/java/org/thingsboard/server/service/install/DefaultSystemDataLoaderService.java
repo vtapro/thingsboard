@@ -164,6 +164,14 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
     @Value("${security.jwt.tokenSigningKey:thingsboardDefaultSigningKey}")
     private String tokenSigningKey;
 
+    /**
+     * Number of partitions of the rule engine queues created by the installer (Main, HighPriority and
+     * SequentialByOriginator). The number of rule engine replicas that can actually work in parallel is capped by
+     * this value, so it has to be raised together with the replica count of tb-rule-engine.
+     */
+    @Value("${queue.rule-engine.default-partitions:10}")
+    private int ruleEngineDefaultPartitions;
+
     @Bean
     protected BCryptPasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -655,7 +663,7 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
             mainQueue.setName(DataConstants.MAIN_QUEUE_NAME);
             mainQueue.setTopic(DataConstants.MAIN_QUEUE_TOPIC);
             mainQueue.setPollInterval(25);
-            mainQueue.setPartitions(10);
+            mainQueue.setPartitions(ruleEngineDefaultPartitions);
             mainQueue.setConsumerPerPartition(true);
             mainQueue.setPackProcessingTimeout(2000);
             SubmitStrategy mainQueueSubmitStrategy = new SubmitStrategy();
@@ -679,7 +687,7 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
             highPriorityQueue.setName(DataConstants.HP_QUEUE_NAME);
             highPriorityQueue.setTopic(DataConstants.HP_QUEUE_TOPIC);
             highPriorityQueue.setPollInterval(25);
-            highPriorityQueue.setPartitions(10);
+            highPriorityQueue.setPartitions(ruleEngineDefaultPartitions);
             highPriorityQueue.setConsumerPerPartition(true);
             highPriorityQueue.setPackProcessingTimeout(2000);
             SubmitStrategy highPriorityQueueSubmitStrategy = new SubmitStrategy();
@@ -703,7 +711,7 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
             sequentialByOriginatorQueue.setName(DataConstants.SQ_QUEUE_NAME);
             sequentialByOriginatorQueue.setTopic(DataConstants.SQ_QUEUE_TOPIC);
             sequentialByOriginatorQueue.setPollInterval(25);
-            sequentialByOriginatorQueue.setPartitions(10);
+            sequentialByOriginatorQueue.setPartitions(ruleEngineDefaultPartitions);
             sequentialByOriginatorQueue.setPackProcessingTimeout(2000);
             sequentialByOriginatorQueue.setConsumerPerPartition(true);
             SubmitStrategy sequentialByOriginatorQueueSubmitStrategy = new SubmitStrategy();

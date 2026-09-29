@@ -7,8 +7,12 @@
 # here and every pod learns where the others are. It also stores the rule engine partition
 # assignment, so it must be running before tb-core / tb-rule-engine start.
 #
-# Single replica is enough for this cluster; for HA run three replicas on three nodes with
-# ZOO_SERVERS listing all of them (ZooKeeper needs an odd number of members for quorum).
+# 3 node ensemble: ZooKeeper needs an odd number of members for a quorum, so 3 nodes tolerate
+# the loss of one node. It also removes the single point of failure from account/session
+# registration: without it a ZK restart while the platform is under load drops every node.
+#
+# The myid of each pod is derived from its ordinal (tb-zookeeper-0/1/2), and every pod is given the
+# full server list. The client list in 01-config.yaml (ZOOKEEPER_URL) lists the same three members.
 apiVersion: v1
 kind: Service
 metadata:
@@ -19,7 +23,7 @@ metadata:
     app.kubernetes.io/part-of: thingsboard
 spec:
   clusterIP: None
-  # the container resolves the pod name from ZOO_SERVERS before it becomes ready
+  # the containers resolve the pod names from ZOO_SERVERS before they become ready
   publishNotReadyAddresses: true
   selector:
     app.kubernetes.io/name: tb-zookeeper
@@ -38,7 +42,8 @@ metadata:
     app.kubernetes.io/part-of: thingsboard
 spec:
   serviceName: tb-zookeeper
-  replicas: 1
+  replicas: 3
+  podManagementPolicy: Parallel
   selector:
     matchLabels:
       app.kubernetes.io/name: tb-zookeeper
@@ -49,9 +54,28 @@ spec:
         app.kubernetes.io/part-of: thingsboard
     spec:
       terminationGracePeriodSeconds: 30
+      # keep the ensemble members on different nodes: a lost node must not take the quorum with it
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: tb-zookeeper
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: zookeeper
           image: zookeeper:3.9.3
+          # myid has to be unique per pod inside the ensemble; it is the pod ordinal + 1.
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              ORDINAL="${HOSTNAME##*-}"
+              export ZOO_MY_ID=$((ORDINAL + 1))
+              exec /docker-entrypoint.sh zkServer.sh start-foreground
           ports:
             - name: client
               containerPort: 2181
@@ -60,30 +84,33 @@ spec:
             - name: election
               containerPort: 3888
           env:
-            - name: ZOO_MY_ID
-              value: "1"
             - name: ZOO_SERVERS
-              value: server.1=tb-zookeeper-0.tb-zookeeper.thingsboard.svc.cluster.local:2888:3888;2181
+              value: server.1=tb-zookeeper-0.tb-zookeeper.thingsboard.svc.cluster.local:2888:3888;2181 server.2=tb-zookeeper-1.tb-zookeeper.thingsboard.svc.cluster.local:2888:3888;2181 server.3=tb-zookeeper-2.tb-zookeeper.thingsboard.svc.cluster.local:2888:3888;2181
             - name: ZOO_4LW_COMMANDS_WHITELIST
               value: ruok,stat,srvr
             - name: ZOO_TICK_TIME
               value: "2000"
             - name: ZOO_MAX_SESSION_TIMEOUT
               value: "60000"
+            - name: ZOO_INIT_LIMIT
+              value: "10"
+            - name: ZOO_SYNC_LIMIT
+              value: "5"
           volumeMounts:
             - name: data
               mountPath: /data
+            # the image writes zoo.cfg here on startup
             - name: conf
               mountPath: /conf
           readinessProbe:
             tcpSocket:
               port: client
-            initialDelaySeconds: 10
+            initialDelaySeconds: 15
             periodSeconds: 10
           livenessProbe:
             tcpSocket:
               port: client
-            initialDelaySeconds: 30
+            initialDelaySeconds: 40
             periodSeconds: 20
             failureThreshold: 5
           resources:
@@ -94,7 +121,6 @@ spec:
               cpu: "1"
               memory: 1Gi
       volumes:
-        # the image writes zoo.cfg here on startup
         - name: conf
           emptyDir: {}
   volumeClaimTemplates:
@@ -105,4 +131,4 @@ spec:
         storageClassName: local-path
         resources:
           requests:
-            storage: 2Gi
+            storage: 5Gi

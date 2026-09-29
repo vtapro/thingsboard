@@ -1,7 +1,7 @@
 # Production: ThingsBoard microservices HA trên k3s
 
 Tài liệu này mô tả cách đưa fork lên cụm **k3s** dạng **microservices HA**, đúng chuẩn
-production của ThingsBoard. Khác biệt với môi trường dev (xem [local-dev.md](local-dev.md)):
+production của ThingsBoard. Khác biệt với môi trường dev (xem [local-dev-macos.md](local-dev-macos.md)):
 
 | | Dev local | Production (k3s) |
 |---|---|---|
@@ -12,6 +12,14 @@ production của ThingsBoard. Khác biệt với môi trường dev (xem [local-
 | Discovery | không cần | **ZooKeeper** (bắt buộc) |
 | Cache | `caffeine` | `caffeine` trong mỗi pod (TTL ngắn) — deployment này **không dùng Redis** |
 | Số replica | 1 | ≥ 2 mỗi service, có HPA |
+
+> **Cập nhật (2026-09-29): cụm mặc định đã chuyển sang cấu hình HA + scale-out.** `deploy/k3s/` hiện
+> dùng Kafka **3 broker RF=3 / min.insync.replicas=2**, ZooKeeper **3 node**, Cassandra **3 node RF=3**,
+> queue rule-engine/core **32 partition**, và HPA đã bỏ trần cũ (core/rule-engine/js-executor/mqtt tối đa 16,
+> web-ui/http 8) với ràng buộc **max replica ≤ partition**. Mục tiêu: thêm worker node + tăng replica là
+> tăng năng lực chịu tải. Runbook vận hành, công thức partition/replica, node sizing và checklist production
+> nằm ở [`deploy/k3s/SCALING.md`](../deploy/k3s/SCALING.md). Mục 3.3 và §10 dưới đây mô tả cụm 3 node cũ;
+> khi nâng cấp hãy đọc SCALING.md trước.
 
 Code ThingsBoard **không bị sửa để bỏ Kafka/Cassandra**. Việc "không dùng Kafka/Cassandra" chỉ
 áp dụng cho script và tài liệu dev; toàn bộ nhánh Kafka/Cassandra/microservices của ThingsBoard
@@ -66,18 +74,18 @@ cluster. Nếu muốn id ổn định qua các lần restart, dùng `StatefulSet
 ## 2. Build image lên GHCR
 
 Mỗi ThingsBoard service có **một image riêng**, đặt tên theo service, version sản phẩm hiện tại
-**`v4.4.0.2`** (biến `IMAGE_VERSION` trong workflow):
+**`v4.4.0.3`** (tag Git dùng để phát hành; `IMAGE_VERSION` trong workflow hiện vẫn là `v4.4.0.0`):
 
 | Service | Image |
 |---|---|
-| tb-node (monolith / tb-core / tb-rule-engine, kiêm job installer) | `ghcr.io/vtapro/tb-node:v4.4.0.2` |
-| tb-mqtt-transport | `ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.2` |
-| tb-http-transport | `ghcr.io/vtapro/tb-http-transport:v4.4.0.2` |
-| tb-coap-transport | `ghcr.io/vtapro/tb-coap-transport:v4.4.0.2` |
-| tb-lwm2m-transport | `ghcr.io/vtapro/tb-lwm2m-transport:v4.4.0.2` |
-| tb-snmp-transport | `ghcr.io/vtapro/tb-snmp-transport:v4.4.0.2` |
-| tb-edqs | `ghcr.io/vtapro/tb-edqs:v4.4.0.2` |
-| tb-vc-executor | `ghcr.io/vtapro/tb-vc-executor:v4.4.0.2` |
+| tb-node (monolith / tb-core / tb-rule-engine, kiêm job installer) | `ghcr.io/vtapro/tb-node:v4.4.0.3` |
+| tb-mqtt-transport | `ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.3` |
+| tb-http-transport | `ghcr.io/vtapro/tb-http-transport:v4.4.0.3` |
+| tb-coap-transport | `ghcr.io/vtapro/tb-coap-transport:v4.4.0.3` |
+| tb-lwm2m-transport | `ghcr.io/vtapro/tb-lwm2m-transport:v4.4.0.3` |
+| tb-snmp-transport | `ghcr.io/vtapro/tb-snmp-transport:v4.4.0.3` |
+| tb-edqs | `ghcr.io/vtapro/tb-edqs:v4.4.0.3` |
+| tb-vc-executor | `ghcr.io/vtapro/tb-vc-executor:v4.4.0.3` |
 
 Lưu ý: `greeniq-backend` / `greeniq-frontend` trên GHCR đã là của ứng dụng khác
 (`greeniq-backend:v2.8.2.69`), nên nền tảng ThingsBoard dùng nhóm `tb-*` để không đụng tên.
@@ -102,7 +110,7 @@ nên mỗi pod chỉ mang đúng những gì nó chạy.
 > Trong lúc chờ, vẫn build image bằng tay: `docker build -f docker/tb-custom/Dockerfile -t ... .`
 > và `docker push` lên GHCR.
 
-Mỗi image được gắn 4 tag giống nhau: `:v4.4.0.2` (tag để deploy), `:<branch>`, `:sha-<short>`
+Mỗi image được gắn 4 tag giống nhau: `:v4.4.0.3` (tag để deploy), `:<branch>`, `:sha-<short>`
 (truy vết commit) và `:latest` (chỉ trên default branch).
 
 ### 2.1. Build/push khi máy có Docker
@@ -116,18 +124,18 @@ mvn -B -T 1C clean install -DskipTests \
 mkdir -p /tmp/jars && cp application/target/thingsboard-4.4.0-SNAPSHOT-boot.jar /tmp/jars/tb-node.jar
 docker build -f docker/msa/Dockerfile.tb-node \
   --build-context jars=/tmp/jars --build-arg SERVICE_JAR=tb-node.jar \
-  -t ghcr.io/vtapro/tb-node:v4.4.0.2 .
+  -t ghcr.io/vtapro/tb-node:v4.4.0.3 .
 
 # mqtt transport (lặp lại cho http/coap/lwm2m/snmp/edqs/vc-executor, đổi jar tương ứng)
 cp transport/mqtt/target/tb-mqtt-transport-4.4.0-SNAPSHOT-boot.jar /tmp/jars/tb-mqtt-transport.jar
 docker build -f docker/msa/Dockerfile.service \
   --build-context jars=/tmp/jars --build-arg SERVICE_JAR=tb-mqtt-transport.jar \
-  -t ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.2 .
+  -t ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.3 .
 
 # đăng nhập GHCR (PAT cần scope write:packages) rồi push
 echo "$CR_PAT" | docker login ghcr.io -u vtapro --password-stdin
-docker push ghcr.io/vtapro/tb-node:v4.4.0.2
-docker push ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.2
+docker push ghcr.io/vtapro/tb-node:v4.4.0.3
+docker push ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.3
 ```
 
 ### 2.2. Không có Docker ở máy dev — dùng GitHub Actions
@@ -140,7 +148,7 @@ docker push ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.2
 >
 > ```bash
 > git push origin RBAC-Full-User          # code + manifest (không đụng file workflow)
-> git tag -f v4.4.0.2 && git push -f origin v4.4.0.2   # kích hoạt build, image mang tag v4.4.0.2
+> git tag -f v4.4.0.3 && git push -f origin v4.4.0.3   # kích hoạt build, image mang tag v4.4.0.3
 > ```
 >
 > Lưu ý: cho tới khi `gh auth refresh -h github.com -s workflow` (hoặc dùng PAT có scope `workflow`)
@@ -163,7 +171,7 @@ git push origin RBAC-full-groups-tabs
 gh run watch
 
 # 4. kiểm tra image đã lên GHCR (8 package tb-*)
-docker manifest inspect ghcr.io/vtapro/tb-node:v4.4.0.2    # nếu có docker
+docker manifest inspect ghcr.io/vtapro/tb-node:v4.4.0.3    # nếu có docker
 # hoặc xem trực tiếp: https://github.com/vtapro?tab=packages
 ```
 
@@ -511,9 +519,9 @@ kubectl apply -f deploy/k3s/04-kafka.yaml
 kubectl -n thingsboard rollout status statefulset/tb-zookeeper --timeout=5m
 kubectl -n thingsboard rollout status statefulset/tb-kafka --timeout=5m
 
-# 3. image đã mặc định là ghcr.io/vtapro/tb-*:v4.4.0.2 trong manifest;
+# 3. image đã mặc định là ghcr.io/vtapro/tb-*:v4.4.0.3 trong manifest;
 #    chỉ đổi tag khi roll bản mới
-sed -i 's#:v4.4.0.2#:v4.4.0.2#' deploy/k3s/*.yaml
+sed -i 's#:v4.4.0.3#:v4.4.0.3#' deploy/k3s/*.yaml
 
 # 4. cài/cập nhật schema — 1 lần cho mỗi release, TRƯỚC khi rolling service
 kubectl apply -f deploy/k3s/10-install-job.yaml
@@ -609,7 +617,7 @@ Ba việc phải làm sau khi deploy:
 | White labeling, mail template, custom menu/translation | lưu trong `admin_settings` (PostgreSQL, có `tenant_id`) | không dùng state cục bộ → an toàn khi nhiều replica |
 | RBAC (roles, entity groups, user groups, customer hierarchy) | lưu trong `admin_settings`, enforce ở tầng service | mỗi replica có cache TTL 10s → sau khi sửa role, các replica nhận thay đổi trong ≤ 10s |
 | RBAC có thể tắt | `SECURITY_RBAC_ENABLED=false` | quay về đúng hành vi CE, không cần build lại image |
-| Lọc entity theo nhóm | hiện lọc trong bộ nhớ, giới hạn 1000 entity/lần | với tenant lớn cần chuyển sang query theo group (đã ghi trong [access-control-roadmap.md](access-control-roadmap.md)) |
+| Lọc entity theo nhóm | hiện lọc trong bộ nhớ, giới hạn 1000 entity/lần | với tenant lớn cần chuyển sang query theo group (xem `docs/code-audit.md` §12) |
 | Schema | không thêm bảng/cột | nâng cấp ThingsBoard CE bản mới không xung đột DB |
 
 ## 8. Đã vá: Cassandra + danh sách key telemetry

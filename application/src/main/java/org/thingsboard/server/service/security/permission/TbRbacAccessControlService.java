@@ -7,16 +7,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
+import org.thingsboard.server.common.data.Customer;
 import org.thingsboard.server.common.data.HasCustomerId;
 import org.thingsboard.server.common.data.HasTenantId;
+import org.thingsboard.server.common.data.User;
 import org.thingsboard.server.common.data.exception.ThingsboardErrorCode;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
+import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroup;
 import org.thingsboard.server.common.data.rbac.RbacRole;
 import org.thingsboard.server.common.data.rbac.RbacShare;
 import org.thingsboard.server.common.data.rbac.RbacUserGroup;
+import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.dao.settings.ShareService;
 import org.thingsboard.server.dao.settings.UserGroupService;
 import org.thingsboard.server.dao.settings.CustomerHierarchyService;
@@ -31,7 +35,9 @@ import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.dao.device.DeviceService;
 import org.thingsboard.server.dao.asset.AssetService;
+import org.thingsboard.server.dao.customer.CustomerService;
 import org.thingsboard.server.dao.entityview.EntityViewService;
+import org.thingsboard.server.dao.user.UserService;
 import java.util.HashMap;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
@@ -103,6 +109,8 @@ public class TbRbacAccessControlService implements AccessControlService {
     private final EntityViewService entityViewService;
     private final ShareService shareService;
     private final UserGroupService userGroupService;
+    private final UserService userService;
+    private final CustomerService customerService;
 
     /**
      * Server attribute that remembers which user created an entity (see DeviceController.saveRbacOwner).
@@ -139,9 +147,16 @@ public class TbRbacAccessControlService implements AccessControlService {
             // The role declares detailed operations and this one is not granted.
             return false;
         }
-        return (hasGlobalOperation(role, resource, effective)
-                || hasScopedOperation(role, resource, effective))
-                && defaultAccessControlService.hasPermission(user, resource, operation);
+        if (!hasGlobalOperation(role, resource, effective) && !hasScopedOperation(role, resource, effective)) {
+            return false;
+        }
+        if (isMemberResource(resource)) {
+            // The platform never lets a customer user manage the members of its customer; the tenant administrator
+            // opts in by granting the operation in a custom role. The customer scope is enforced on the entity
+            // aware checks, so the entity less check only has to verify the role grant.
+            return true;
+        }
+        return defaultAccessControlService.hasPermission(user, resource, operation);
     }
 
     @Override
@@ -219,6 +234,39 @@ public class TbRbacAccessControlService implements AccessControlService {
         return allowedIds;
     }
 
+    /**
+     * Ids of the customers the user may see: its own customer and, when the role enables the customer hierarchy,
+     * the sub-customers configured by the tenant administrator.
+     */
+    @Override
+    public Set<UUID> getAccessibleCustomerIds(SecurityUser user) {
+        if (user == null || user.getCustomerId() == null) {
+            return null;
+        }
+        RbacRole role = resolveEffectiveRole(user).role();
+        if (role == null
+                || (!isResourceManagedByRole(role, Resource.USER) && !isResourceManagedByRole(role, Resource.CUSTOMER))) {
+            return null;
+        }
+        Set<UUID> customerIds = new HashSet<>();
+        customerIds.add(user.getCustomerId().getId());
+        if (role.isOwnCustomerOnly()) {
+            try {
+                for (String id : customerHierarchyService.getCustomerSubtree(user.getTenantId(),
+                        user.getCustomerId().getId().toString())) {
+                    try {
+                        customerIds.add(UUID.fromString(id));
+                    } catch (IllegalArgumentException e) {
+                        log.warn("[{}] Invalid customer id [{}] in the customer hierarchy", user.getTenantId(), id);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to resolve the customer subtree of user [{}]: {}", user.getId(), e.getMessage());
+            }
+        }
+        return customerIds;
+    }
+
     @Override
     public void checkPermission(SecurityUser user, Resource resource, Operation operation) throws ThingsboardException {
         if (!hasPermission(user, resource, operation)) {
@@ -239,8 +287,9 @@ public class TbRbacAccessControlService implements AccessControlService {
                                                                             I entityId, T entity) throws ThingsboardException {
         if (isSharedWith(user, entityId, operation)) {
             // an explicit share configured by the tenant administrator grants the operation to the user;
-            // the shares of a tenant only reference the entities of that tenant
-            return entity == null || entity.getTenantId() == null || user.getTenantId().equals(entity.getTenantId());
+            // the shares of a tenant only reference the entities of that tenant. The check fails closed: an entity
+            // that is not loaded, or that has no tenant, is never treated as shared.
+            return entity != null && entity.getTenantId() != null && user.getTenantId().equals(entity.getTenantId());
         }
         EffectiveRole effectiveRole = resolveEffectiveRole(user);
         if (effectiveRole.settingsUnavailable()) {
@@ -252,6 +301,9 @@ public class TbRbacAccessControlService implements AccessControlService {
         }
         if (entity != null && entity.getTenantId() != null && !user.getTenantId().equals(entity.getTenantId())) {
             return false;
+        }
+        if (isMemberResource(resource) && user.getCustomerId() != null) {
+            return hasCustomerMemberPermission(user, resource, operation, entityId, entity, role);
         }
         if (user.getCustomerId() != null) {
             return hasCustomerUserPermission(user, resource, operation, entityId, entity, role);
@@ -369,6 +421,8 @@ public class TbRbacAccessControlService implements AccessControlService {
             case DEVICE -> deviceService.findDevicesByTenantId(tenantId, pageLink);
             case ASSET -> assetService.findAssetsByTenantId(tenantId, pageLink);
             case ENTITY_VIEW -> entityViewService.findEntityViewByTenantId(tenantId, pageLink);
+            case USER -> userService.findUsersByTenantId(tenantId, pageLink);
+            case CUSTOMER -> customerService.findCustomersByTenantId(tenantId, pageLink);
             default -> {
                 log.warn("[{}] The resource {} does not support the \"own entities\" scope", tenantId, resource);
                 yield null;
@@ -505,6 +559,85 @@ public class TbRbacAccessControlService implements AccessControlService {
     }
 
     /**
+     * Member management (users and customers) performed by a customer user. The role has to grant the operation
+     * explicitly, then the entity is checked against the customer scope of the user: its own customer always, and
+     * the sub-customers when the role enables the customer hierarchy. A role with the "only entities created by the
+     * user" flag further limits the scope to the members created by the user itself.
+     */
+    private <I extends EntityId, T extends HasTenantId> boolean hasCustomerMemberPermission(SecurityUser user, Resource resource,
+                                                                                            Operation operation, I entityId, T entity,
+                                                                                            RbacRole role) {
+        Operation effective = resolveOperation(role, resource, operation);
+        if (effective == null) {
+            return false;
+        }
+        if (!hasOperationGrant(user.getTenantId(), role, resource, effective, entityId)) {
+            return false;
+        }
+        if (isOwnOnlyResource(role, resource) && entityId != null && !isEntityOwner(user, entity)) {
+            return false;
+        }
+        if (Resource.USER == resource) {
+            return canManageUser(user, operation, entity, role);
+        }
+        return canManageCustomer(user, operation, entityId, entity, role);
+    }
+
+    private boolean canManageUser(SecurityUser user, Operation operation, Object entity, RbacRole role) {
+        if (entity instanceof User target) {
+            if (target.getId() != null && target.getId().equals(user.getId())) {
+                // every user keeps the right to read and update its own profile
+                return true;
+            }
+            if (target.getAuthority() != null && target.getAuthority() != Authority.CUSTOMER_USER) {
+                // a customer user never manages the administrators of the tenant
+                return false;
+            }
+            if (target.getCustomerId() == null) {
+                // creating a member: the controller assigns the customer of the caller
+                return operation == Operation.CREATE;
+            }
+            return isCustomerInUserScope(user, target.getCustomerId(), role);
+        }
+        // the entity was not loaded (create): the controller assigns the customer of the caller
+        return operation == Operation.CREATE;
+    }
+
+    private boolean canManageCustomer(SecurityUser user, Operation operation, EntityId entityId, Object entity, RbacRole role) {
+        if (operation == Operation.CREATE && entityId == null) {
+            // the controller records the new customer as a child of the customer of the caller
+            return true;
+        }
+        if (entity instanceof Customer target) {
+            return isCustomerInUserScope(user, target.getId(), role);
+        }
+        return false;
+    }
+
+    /**
+     * True when the target customer is the customer of the user or one of its descendants (only when the role
+     * enables the customer hierarchy).
+     */
+    private boolean isCustomerInUserScope(SecurityUser user, CustomerId targetCustomerId, RbacRole role) {
+        if (user.getCustomerId() == null || targetCustomerId == null) {
+            return false;
+        }
+        if (user.getCustomerId().equals(targetCustomerId)) {
+            return true;
+        }
+        if (!role.isOwnCustomerOnly()) {
+            return false;
+        }
+        try {
+            return customerHierarchyService.getCustomerSubtree(user.getTenantId(),
+                    user.getCustomerId().getId().toString()).contains(targetCustomerId.getId().toString());
+        } catch (Exception e) {
+            log.warn("Failed to resolve the customer subtree of user [{}]: {}", user.getId(), e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * True when one of the groups that grant the operation is public, i.e. the entity is visible for every customer
      * user that is assigned to a role scoped to that group (see {@link RbacEntityGroup#isPublicGroup()}).
      */
@@ -548,6 +681,18 @@ public class TbRbacAccessControlService implements AccessControlService {
      * Only the entities that can be a member of an entity group may be scoped to groups.
      */
     public static final Set<String> GROUP_SCOPED_RESOURCES = Set.of("DEVICE", "ASSET", "ENTITY_VIEW");
+
+    /**
+     * Resources that describe the members of a customer (the users and the sub-customers). They are special because
+     * the platform only lets the tenant administrator manage them; a custom role may explicitly grant the operation
+     * to a customer user, the customer scope is then enforced by
+     * {@link #hasCustomerMemberPermission(SecurityUser, Resource, Operation, EntityId, HasTenantId, RbacRole)}.
+     */
+    private static final Set<String> MEMBER_RESOURCES = Set.of(Resource.USER.name(), Resource.CUSTOMER.name());
+
+    private static boolean isMemberResource(Resource resource) {
+        return MEMBER_RESOURCES.contains(resource.name());
+    }
 
     /**
      * The role configures the operations READ, WRITE and DELETE. The auxiliary operations of the same entity

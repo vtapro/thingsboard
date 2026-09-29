@@ -146,6 +146,9 @@ public class AssetController extends BaseController {
         if (asset.getId() == null) {
             // remember which user created the asset (used by the RBAC "own entities" scope)
             saveRbacOwner(asset);
+        } else {
+            // the owner is set once, on creation, and must not be rewritten by the client
+            stripRbacOwner(asset);
         }
         return tbAssetService.save(asset, new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
     }
@@ -321,16 +324,13 @@ public class AssetController extends BaseController {
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ASSET, Operation.READ);
-        boolean tenantWide = allowedEntityIds != null;
         if (type != null && type.trim().length() > 0) {
-            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? link -> assetService.findAssetsByTenantIdAndType(tenantId, type, link)
-                    : link -> assetService.findAssetsByTenantIdAndCustomerIdAndType(tenantId, customerId, type, link),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> assetService.findAssetsByTenantIdAndCustomerIdAndType(tenantId, customerId, type, link),
                     Asset::getId));
         } else {
-            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? link -> assetService.findAssetsByTenantId(tenantId, link)
-                    : link -> assetService.findAssetsByTenantIdAndCustomerId(tenantId, customerId, link),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> assetService.findAssetsByTenantIdAndCustomerId(tenantId, customerId, link),
                     Asset::getId));
         }
     }
@@ -363,22 +363,18 @@ public class AssetController extends BaseController {
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ASSET, Operation.READ);
-        boolean tenantWide = allowedEntityIds != null;
         if (type != null && type.trim().length() > 0) {
-            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? link -> assetService.findAssetInfosByTenantIdAndType(tenantId, type, link)
-                    : link -> assetService.findAssetInfosByTenantIdAndCustomerIdAndType(tenantId, customerId, type, link),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> assetService.findAssetInfosByTenantIdAndCustomerIdAndType(tenantId, customerId, type, link),
                     AssetInfo::getId));
         } else if (assetProfileId != null && assetProfileId.length() > 0) {
             AssetProfileId profileId = new AssetProfileId(toUUID(assetProfileId));
-            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? link -> assetService.findAssetInfosByTenantIdAndAssetProfileId(tenantId, profileId, link)
-                    : link -> assetService.findAssetInfosByTenantIdAndCustomerIdAndAssetProfileId(tenantId, customerId, profileId, link),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> assetService.findAssetInfosByTenantIdAndCustomerIdAndAssetProfileId(tenantId, customerId, profileId, link),
                     AssetInfo::getId));
         } else {
-            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? link -> assetService.findAssetInfosByTenantId(tenantId, link)
-                    : link -> assetService.findAssetInfosByTenantIdAndCustomerId(tenantId, customerId, link),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> assetService.findAssetInfosByTenantIdAndCustomerId(tenantId, customerId, link),
                     AssetInfo::getId));
         }
     }

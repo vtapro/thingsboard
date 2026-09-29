@@ -137,6 +137,8 @@ public class EntityViewController extends BaseController {
             saveRbacOwner(entityView);
         } else {
             existingEntityView = checkEntityViewId(entityView.getId(), Operation.WRITE);
+            // the owner is set once, on creation, and must not be rewritten by the client
+            stripRbacOwner(entityView);
         }
         return tbEntityViewService.save(entityView, existingEntityView, new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
     }
@@ -243,16 +245,13 @@ public class EntityViewController extends BaseController {
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ENTITY_VIEW, Operation.READ);
-        boolean tenantWide = allowedEntityIds != null;
         if (type != null && !type.trim().isEmpty()) {
-            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? link -> entityViewService.findEntityViewByTenantIdAndType(tenantId, link, type)
-                    : link -> entityViewService.findEntityViewsByTenantIdAndCustomerIdAndType(tenantId, customerId, link, type),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> entityViewService.findEntityViewsByTenantIdAndCustomerIdAndType(tenantId, customerId, link, type),
                     EntityView::getId));
         } else {
-            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? link -> entityViewService.findEntityViewByTenantId(tenantId, link)
-                    : link -> entityViewService.findEntityViewsByTenantIdAndCustomerId(tenantId, customerId, link),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> entityViewService.findEntityViewsByTenantIdAndCustomerId(tenantId, customerId, link),
                     EntityView::getId));
         }
     }
@@ -283,16 +282,13 @@ public class EntityViewController extends BaseController {
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.ENTITY_VIEW, Operation.READ);
-        boolean tenantWide = allowedEntityIds != null;
         if (type != null && !type.trim().isEmpty()) {
-            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? link -> entityViewService.findEntityViewInfosByTenantIdAndType(tenantId, type, link)
-                    : link -> entityViewService.findEntityViewInfosByTenantIdAndCustomerIdAndType(tenantId, customerId, type, link),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> entityViewService.findEntityViewInfosByTenantIdAndCustomerIdAndType(tenantId, customerId, type, link),
                     EntityViewInfo::getId));
         } else {
-            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? link -> entityViewService.findEntityViewInfosByTenantId(tenantId, link)
-                    : link -> entityViewService.findEntityViewInfosByTenantIdAndCustomerId(tenantId, customerId, link),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> entityViewService.findEntityViewInfosByTenantIdAndCustomerId(tenantId, customerId, link),
                     EntityViewInfo::getId));
         }
     }

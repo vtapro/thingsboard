@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.thingsboard.server.common.data.asset.Asset;
 import org.thingsboard.server.common.data.Device;
+import org.thingsboard.server.common.data.User;
 import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.id.AssetId;
@@ -28,9 +29,11 @@ import org.thingsboard.server.dao.settings.CustomerHierarchyService;
 import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.dao.device.DeviceService;
 import org.thingsboard.server.dao.asset.AssetService;
+import org.thingsboard.server.dao.customer.CustomerService;
 import org.thingsboard.server.dao.entityview.EntityViewService;
 import org.thingsboard.server.dao.settings.ShareService;
 import org.thingsboard.server.dao.settings.UserGroupService;
+import org.thingsboard.server.dao.user.UserService;
 import org.thingsboard.server.dao.settings.EntityGroupService;
 import org.thingsboard.server.dao.settings.RoleService;
 import org.thingsboard.server.service.security.model.SecurityUser;
@@ -72,10 +75,12 @@ public class TbRbacAccessControlServiceTest {
     private final EntityViewService entityViewService = mock(EntityViewService.class);
     private final ShareService shareService = mock(ShareService.class);
     private final UserGroupService userGroupService = mock(UserGroupService.class);
+    private final UserService userService = mock(UserService.class);
+    private final CustomerService customerService = mock(CustomerService.class);
 
     private final TbRbacAccessControlService accessControlService = new TbRbacAccessControlService(
             defaultAccessControlService, roleService, entityGroupService, customerHierarchyService, attributesService,
-            deviceService, assetService, entityViewService, shareService, userGroupService);
+            deviceService, assetService, entityViewService, shareService, userGroupService, userService, customerService);
 
     private SecurityUser customerUser;
     private SecurityUser tenantAdmin;
@@ -414,6 +419,103 @@ public class TbRbacAccessControlServiceTest {
         assertThat(canOnDevice(Operation.WRITE)).isFalse();
     }
 
+    /**
+     * The share check fails closed: an entity that is not loaded, or that carries no tenant, is never treated as
+     * shared, even when a share record references its id.
+     */
+    @Test
+    public void shareDoesNotGrantWhenTheEntityIsNotLoaded() throws Exception {
+        givenRole(tenantAdmin, role(grants("DEVICE", "READ"), Map.of(), false));
+        givenShare("USER", tenantAdmin.getId().getId().toString(), List.of("READ", "RPC_CALL"));
+
+        assertThat(accessControlService.hasPermission(tenantAdmin, Resource.DEVICE, Operation.RPC_CALL,
+                device.getId(), null)).isFalse();
+    }
+
+    @Test
+    public void shareDoesNotGrantWhenTheEntityHasNoTenant() throws Exception {
+        givenRole(tenantAdmin, role(grants("DEVICE", "READ"), Map.of(), false));
+        givenShare("USER", tenantAdmin.getId().getId().toString(), List.of("READ", "RPC_CALL"));
+
+        Device tenantless = new Device(device.getId());
+        tenantless.setTenantId(null);
+        assertThat(accessControlService.hasPermission(tenantAdmin, Resource.DEVICE, Operation.RPC_CALL,
+                device.getId(), tenantless)).isFalse();
+    }
+
+    @Test
+    public void shareDoesNotGrantAnEntityOfAnotherTenant() throws Exception {
+        givenRole(tenantAdmin, role(grants("DEVICE", "READ"), Map.of(), false));
+        givenShare("USER", tenantAdmin.getId().getId().toString(), List.of("READ", "RPC_CALL"));
+
+        Device foreign = new Device(device.getId());
+        foreign.setTenantId(new TenantId(UUID.randomUUID()));
+        assertThat(accessControlService.hasPermission(tenantAdmin, Resource.DEVICE, Operation.RPC_CALL,
+                device.getId(), foreign)).isFalse();
+    }
+
+    @Test
+    public void customerUserWithUserPermissionCreatesMembersOfItsOwnCustomer() throws Exception {
+        givenRole(customerUser, role(grants("USER", "CREATE"), Map.of(), false));
+
+        assertThat(accessControlService.hasPermission(customerUser, Resource.USER, Operation.CREATE,
+                null, user(TENANT_ID, CUSTOMER_ID, Authority.CUSTOMER_USER))).isTrue();
+    }
+
+    @Test
+    public void customerUserWithoutUserPermissionCanNotCreateMembers() throws Exception {
+        givenRole(customerUser, role(grants("DEVICE", "READ"), Map.of(), false));
+
+        assertThat(accessControlService.hasPermission(customerUser, Resource.USER, Operation.CREATE,
+                null, user(TENANT_ID, CUSTOMER_ID, Authority.CUSTOMER_USER))).isFalse();
+    }
+
+    @Test
+    public void customerUserCanNotManageTheMembersOfAnotherCustomer() throws Exception {
+        givenRole(customerUser, role(grants("USER", "WRITE"), Map.of(), false));
+        User otherMember = user(TENANT_ID, OTHER_CUSTOMER_ID, Authority.CUSTOMER_USER);
+
+        assertThat(accessControlService.hasPermission(customerUser, Resource.USER, Operation.WRITE,
+                otherMember.getId(), otherMember)).isFalse();
+    }
+
+    @Test
+    public void customerUserCanNotGrantTheTenantAdministratorAuthority() throws Exception {
+        givenRole(customerUser, role(grants("USER", "CREATE"), Map.of(), false));
+
+        assertThat(accessControlService.hasPermission(customerUser, Resource.USER, Operation.CREATE,
+                null, user(TENANT_ID, CUSTOMER_ID, Authority.TENANT_ADMIN))).isFalse();
+    }
+
+    @Test
+    public void ownCustomerOnlyLetsACustomerUserManageTheMembersOfItsSubCustomers() throws Exception {
+        givenRole(customerUser, role(grants("USER", "READ"), Map.of(), true));
+        givenCustomerSubtree(CUSTOMER_ID, Set.of(CUSTOMER_ID.getId().toString(),
+                CHILD_CUSTOMER_ID.getId().toString()));
+        User childMember = user(TENANT_ID, CHILD_CUSTOMER_ID, Authority.CUSTOMER_USER);
+
+        assertThat(accessControlService.hasPermission(customerUser, Resource.USER, Operation.READ,
+                childMember.getId(), childMember)).isTrue();
+        assertThat(accessControlService.getAccessibleCustomerIds(customerUser))
+                .containsExactlyInAnyOrder(CUSTOMER_ID.getId(), CHILD_CUSTOMER_ID.getId());
+    }
+
+    @Test
+    public void ownOnlyUserRoleIsScopedToTheMembersCreatedByTheUser() throws Exception {
+        User ownedMember = user(TENANT_ID, CUSTOMER_ID, Authority.CUSTOMER_USER);
+        ownedMember.setAdditionalInfoField("rbacOwnerId", TextNode.valueOf(customerUser.getId().getId().toString()));
+        RbacRole role = role(grants("USER", "READ"), Map.of(), false);
+        role.setOwnOnly(Map.of("USER", true));
+        givenRole(customerUser, role);
+        when(userService.findUsersByTenantId(eq(TENANT_ID), any(PageLink.class)))
+                .thenReturn(new PageData<>(List.of(ownedMember), 1, 1, false));
+
+        assertThat(accessControlService.hasPermission(customerUser, Resource.USER, Operation.READ,
+                ownedMember.getId(), ownedMember)).isTrue();
+        assertThat(accessControlService.getAllowedEntityIds(customerUser, Resource.USER, Operation.READ))
+                .containsExactly(ownedMember.getId().getId());
+    }
+
     private void givenShare(String assigneeType, String assigneeId, List<String> operations) {
         RbacShare share = new RbacShare();
         share.setId("share-1");
@@ -507,6 +609,15 @@ public class TbRbacAccessControlServiceTest {
         device.setCustomerId(customerId);
         device.setName("device-" + device.getId().getId());
         return device;
+    }
+
+    private static User user(TenantId tenantId, CustomerId customerId, Authority authority) {
+        User user = new User(new UserId(UUID.randomUUID()));
+        user.setTenantId(tenantId);
+        user.setCustomerId(customerId);
+        user.setAuthority(authority);
+        user.setEmail("user-" + user.getId().getId() + "@test");
+        return user;
     }
 
 }

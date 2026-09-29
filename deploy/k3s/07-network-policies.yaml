@@ -39,6 +39,9 @@ spec:
       ports:
         - port: 9092
           protocol: TCP
+        # KRaft controller quorum between the Kafka brokers (04-kafka.yaml, 3 node HA)
+        - port: 9093
+          protocol: TCP
 ---
 # ---- ZooKeeper: discovery between the ThingsBoard services ---------------------------------
 apiVersion: networking.k8s.io/v1
@@ -61,4 +64,9 @@ spec:
                 values: ["thingsboard"]
       ports:
         - port: 2181
+          protocol: TCP
+        # ZooKeeper ensemble: follower (2888) and leader election (3888) between the 3 nodes
+        - port: 2888
+          protocol: TCP
+        - port: 3888
           protocol: TCP

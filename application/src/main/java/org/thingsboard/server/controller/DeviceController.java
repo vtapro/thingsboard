@@ -201,6 +201,9 @@ public class DeviceController extends BaseController {
         if (device.getId() == null) {
             // remember which user created the device (used by the RBAC "own devices" scope)
             saveRbacOwner(device);
+        } else {
+            // the owner is set once, on creation, and must not be rewritten by the client
+            stripRbacOwner(device);
         }
         return tbDeviceService.save(device, accessToken,
                 new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
@@ -469,16 +472,13 @@ public class DeviceController extends BaseController {
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.DEVICE, Operation.READ);
-        boolean tenantWide = allowedEntityIds != null;
         if (type != null && type.trim().length() > 0) {
-            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? link -> deviceService.findDevicesByTenantIdAndType(tenantId, type, link)
-                    : link -> deviceService.findDevicesByTenantIdAndCustomerIdAndType(tenantId, customerId, type, link),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> deviceService.findDevicesByTenantIdAndCustomerIdAndType(tenantId, customerId, type, link),
                     Device::getId));
         } else {
-            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink, tenantWide
-                    ? link -> deviceService.findDevicesByTenantId(tenantId, link)
-                    : link -> deviceService.findDevicesByTenantIdAndCustomerId(tenantId, customerId, link),
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> deviceService.findDevicesByTenantIdAndCustomerId(tenantId, customerId, link),
                     Device::getId));
         }
     }

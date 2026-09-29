@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-# One shot preparation of the in-cluster Cassandra, run once after the node is up (the deploy script
+# One shot preparation of the in-cluster Cassandra, run once after the nodes are up (the deploy script
 # does it before the ThingsBoard services are rolled):
 #   * wait until the CQL port answers,
-#   * create the keyspace with NetworkTopologyStrategy and one replica per datacenter.
+#   * create/align the keyspace with NetworkTopologyStrategy and 3 replicas per datacenter.
 #
 # ThingsBoard connects without credentials (CASSANDRA_USE_CREDENTIALS=false in 01-config.yaml), the
 # same way the Ubuntu installation guide links a local Cassandra to ThingsBoard, so only the keyspace
@@ -61,8 +61,11 @@ spec:
                 sleep 10
               done
 
-              echo "==> creating the keyspace $CASSANDRA_KEYSPACE_NAME"
-              cql "CREATE KEYSPACE IF NOT EXISTS $CASSANDRA_KEYSPACE_NAME WITH replication = {'class': 'NetworkTopologyStrategy', '$CASSANDRA_LOCAL_DATACENTER': 1} AND durable_writes = true;"
+              echo "==> creating/aligning the keyspace $CASSANDRA_KEYSPACE_NAME (RF=3)"
+              cql "CREATE KEYSPACE IF NOT EXISTS $CASSANDRA_KEYSPACE_NAME WITH replication = {'class': 'NetworkTopologyStrategy', '$CASSANDRA_LOCAL_DATACENTER': 3} AND durable_writes = true;"
+              # the installer only runs CREATE KEYSPACE IF NOT EXISTS, so an existing keyspace keeps RF=1;
+              # ALTER is idempotent and fixes it after the third node joined
+              cql "ALTER KEYSPACE $CASSANDRA_KEYSPACE_NAME WITH replication = {'class': 'NetworkTopologyStrategy', '$CASSANDRA_LOCAL_DATACENTER': 3};"
 
               echo "==> keyspaces:"
               cql "SELECT keyspace_name FROM system_schema.keyspaces;"

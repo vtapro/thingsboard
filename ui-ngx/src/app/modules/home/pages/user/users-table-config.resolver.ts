@@ -37,6 +37,7 @@ import { TenantService } from '@app/core/http/tenant.service';
 import { TenantId } from '@app/shared/models/id/tenant-id';
 import { UserTabsComponent } from '@home/pages/user/user-tabs.component';
 import { isDefinedAndNotNull } from '@core/utils';
+import { hasRbacPermission } from '@core/services/rbac-permissions';
 
 export interface UsersTableRouteData {
   authority: Authority;
@@ -51,6 +52,8 @@ export class UsersTableConfigResolver  {
   private customerId: string;
   private authority: Authority;
   private authUser: User;
+  /** Tenant administrator viewing /users: a read-only list of every user of the tenant. */
+  private allUsers = false;
 
   constructor(private store: Store<AppState>,
               private userService: UserService,
@@ -75,7 +78,8 @@ export class UsersTableConfigResolver  {
       new EntityTableColumn<User>('email', 'user.email', '33%')
     );
 
-    this.config.deleteEnabled = user => user && user.id && user.id.id !== this.authUser.id.id;
+    this.config.deleteEnabled = user => user && user.id && user.id.id !== this.authUser.id.id
+      && hasRbacPermission('USER', 'DELETE');
     this.config.deleteEntityTitle = user => this.translate.instant('user.delete-user-title', { userEmail: user.email });
     this.config.deleteEntityContent = () => this.translate.instant('user.delete-user-text');
     this.config.deleteEntitiesTitle = count => this.translate.instant('user.delete-users-title', {count});
@@ -93,20 +97,41 @@ export class UsersTableConfigResolver  {
     return this.store.pipe(select(selectAuth), take(1)).pipe(
       tap((auth) => {
         this.authUser = auth.userDetails;
-        this.authority = routeParams.tenantId ? Authority.TENANT_ADMIN : Authority.CUSTOMER_USER;
-        if (this.authority === Authority.TENANT_ADMIN) {
+        this.allUsers = false;
+        if (routeParams.tenantId) {
+          this.authority = Authority.TENANT_ADMIN;
           this.tenantId = routeParams.tenantId;
           this.customerId = NULL_UUID;
           this.config.entitiesFetchFunction = pageLink => this.userService.getTenantAdmins(this.tenantId, pageLink);
-        } else {
+        } else if (routeParams.customerId) {
+          this.authority = Authority.CUSTOMER_USER;
           this.tenantId = this.authUser.tenantId.id;
           this.customerId = routeParams.customerId;
           this.config.entitiesFetchFunction = pageLink => this.userService.getCustomerUsers(this.customerId, pageLink);
+          // a customer user manages the members of its own customer only, and only when its role grants it
+          this.config.addEnabled = hasRbacPermission('USER', 'CREATE');
+        } else if (this.authUser.authority === Authority.CUSTOMER_USER) {
+          this.authority = Authority.CUSTOMER_USER;
+          this.tenantId = this.authUser.tenantId.id;
+          this.customerId = this.authUser.customerId?.id;
+          // GET /api/users is available to a customer user and returns the users of its customer, filtered by the role
+          this.config.entitiesFetchFunction = pageLink => this.userService.getUsers(pageLink);
+          this.config.addEnabled = hasRbacPermission('USER', 'CREATE');
+        } else {
+          // tenant administrator: every user of the tenant, read-only (members are managed per customer)
+          this.allUsers = true;
+          this.authority = Authority.TENANT_ADMIN;
+          this.tenantId = this.authUser.tenantId.id;
+          this.customerId = NULL_UUID;
+          this.config.entitiesFetchFunction = pageLink => this.userService.getUsers(pageLink);
+          this.config.addEnabled = false;
         }
         this.updateActionCellDescriptors(auth);
       }),
       mergeMap(() => {
-        if (this.authority === Authority.TENANT_ADMIN) {
+        if (this.allUsers) {
+          return of({title: ''});
+        } else if (this.authority === Authority.TENANT_ADMIN) {
           return this.tenantService.getTenant(this.tenantId);
         } else if (isDefinedAndNotNull(this.customerId)) {
           return this.customerService.getCustomer(this.customerId);
@@ -114,10 +139,13 @@ export class UsersTableConfigResolver  {
         return of({title: ''});
       }),
       map((parentEntity) => {
-        if (this.authority === Authority.TENANT_ADMIN) {
+        if (this.allUsers) {
+          this.config.tableTitle = this.translate.instant('user.users');
+        } else if (this.authority === Authority.TENANT_ADMIN) {
           this.config.tableTitle = parentEntity.title + ': ' + this.translate.instant('user.tenant-admins');
         } else {
-          this.config.tableTitle = parentEntity.title + ': ' + this.translate.instant('user.customer-users');
+          this.config.tableTitle = (parentEntity.title ? parentEntity.title + ': ' : '')
+            + this.translate.instant('user.customer-users');
         }
         return this.config;
       })
@@ -126,7 +154,7 @@ export class UsersTableConfigResolver  {
 
   updateActionCellDescriptors(auth: AuthState) {
     this.config.cellActionDescriptors.splice(0);
-    if (auth.userTokenAccessEnabled) {
+    if (auth.userTokenAccessEnabled && auth.userDetails?.authority === Authority.TENANT_ADMIN) {
       this.config.cellActionDescriptors.push(
         {
           name: this.authority === Authority.TENANT_ADMIN ?
@@ -142,8 +170,10 @@ export class UsersTableConfigResolver  {
 
   saveUser(user: User): Observable<User> {
     user.tenantId = new TenantId(this.tenantId);
-    user.customerId = new CustomerId(this.customerId);
-    user.authority = this.authority;
+    if (!this.allUsers) {
+      user.customerId = new CustomerId(this.customerId);
+      user.authority = this.authority;
+    }
     if (!user.additionalInfo.lang) {
       delete user.additionalInfo.lang;
     }

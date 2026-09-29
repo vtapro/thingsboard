@@ -24,7 +24,7 @@ const routes: Routes = [
     path: 'customers',
     data: {
       breadcrumb: {
-        menuId: MenuId.customers_and_users
+        menuId: MenuId.customers
       }
     },
     children: [
@@ -32,7 +32,7 @@ const routes: Routes = [
         path: '',
         component: EntitiesTableComponent,
         data: {
-          auth: [Authority.TENANT_ADMIN],
+          auth: [Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
           title: 'customer.customers'
         },
         resolve: {
@@ -48,7 +48,7 @@ const routes: Routes = [
             labelFunction: entityDetailsPageBreadcrumbLabelFunction,
             icon: 'supervisor_account'
           } as BreadCrumbConfig<EntityDetailsPageComponent>,
-          auth: [Authority.TENANT_ADMIN],
+          auth: [Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
           title: 'customer.customers'
         },
         resolve: {

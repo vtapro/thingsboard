@@ -30,7 +30,8 @@ export class UserComponent extends EntityComponent<User>{
 
   loginAsUserEnabled$ = this.store.pipe(
     select(selectAuth),
-    map((auth) => auth.userTokenAccessEnabled)
+    // only a tenant administrator may impersonate a user (the endpoint is restricted to that authority)
+    map((auth) => auth.userTokenAccessEnabled && auth.userDetails?.authority === Authority.TENANT_ADMIN)
   );
 
   constructor(protected store: Store<AppState>,

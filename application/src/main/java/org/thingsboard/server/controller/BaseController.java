@@ -664,6 +664,43 @@ public abstract class BaseController {
         }
     }
 
+    /**
+     * Removes the ownership attributes supplied by the client before an update is persisted. The owner is set once,
+     * when the entity is created (see {@link #saveRbacOwner}), and the {@code additionalInfo} of an update is merged
+     * into the stored value, so without this the caller could rewrite the owner of an entity it may write and thereby
+     * escape the "own entities only" scope of its role.
+     */
+    protected void stripRbacOwner(BaseDataWithAdditionalInfo<?> entity) {
+        if (entity == null || !(entity.getAdditionalInfo() instanceof ObjectNode additionalInfo)) {
+            return;
+        }
+        additionalInfo.remove("rbacOwnerId");
+        additionalInfo.remove("rbacOwnerEmail");
+    }
+
+    /**
+     * Keeps the ownership attributes stored on the server when an entity is updated: the owner is set once, on
+     * creation, and a client must not be able to rewrite it (otherwise it could escape the scope of its role).
+     */
+    protected void preserveRbacOwner(BaseDataWithAdditionalInfo<?> entity, BaseDataWithAdditionalInfo<?> oldEntity) {
+        if (entity == null || oldEntity == null) {
+            return;
+        }
+        JsonNode oldInfo = oldEntity.getAdditionalInfo();
+        if (oldInfo == null) {
+            return;
+        }
+        if (!(entity.getAdditionalInfo() instanceof ObjectNode info)) {
+            info = JacksonUtil.newObjectNode();
+            entity.setAdditionalInfo(info);
+        }
+        for (String field : new String[]{"rbacOwnerId", "rbacOwnerEmail"}) {
+            if (oldInfo.has(field) && !info.has(field)) {
+                info.set(field, oldInfo.get(field));
+            }
+        }
+    }
+
     Tenant checkTenantId(TenantId tenantId, Operation operation) throws ThingsboardException {
         return checkEntityId(tenantId, (t, i) -> tenantService.findTenantById(tenantId), operation);
     }

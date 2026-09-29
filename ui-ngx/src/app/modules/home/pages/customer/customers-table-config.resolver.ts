@@ -21,6 +21,8 @@ import { getCurrentAuthState } from '@core/auth/auth.selectors';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { HomeDialogsService } from '@home/dialogs/home-dialogs.service';
+import { Authority } from '@shared/models/authority.enum';
+import { hasRbacPermission } from '@core/services/rbac-permissions';
 
 @Injectable()
 export class CustomersTableConfigResolver  {
@@ -117,6 +119,15 @@ export class CustomersTableConfigResolver  {
     this.config.deleteEnabled = (customer) => customer && (!customer.additionalInfo || !customer.additionalInfo.isPublic);
     this.config.entitySelectionEnabled = (customer) => customer && (!customer.additionalInfo || !customer.additionalInfo.isPublic);
     this.config.detailsReadonly = (customer) => customer && customer.additionalInfo && customer.additionalInfo.isPublic;
+    const platformDeleteEnabled = this.config.deleteEnabled;
+    this.config.deleteEnabled = (customer) => platformDeleteEnabled(customer)
+      && hasRbacPermission('CUSTOMER', 'DELETE');
+    if (authState.authUser?.authority === Authority.CUSTOMER_USER) {
+      // a customer user sees the customers of its scope only; the links to the entities of a customer are tenant admin
+      // features (there is a dedicated Users page for the members)
+      this.config.cellActionDescriptors.splice(0);
+      this.config.addEnabled = hasRbacPermission('CUSTOMER', 'CREATE');
+    }
   }
 
   resolve(): EntityTableConfig<Customer> {

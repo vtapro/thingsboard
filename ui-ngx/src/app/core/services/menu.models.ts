@@ -91,6 +91,7 @@ export enum MenuId {
   asset_profiles = 'asset_profiles',
   customers_and_users = 'customers_and_users',
   customers = 'customers',
+  users = 'users',
   data_processing = 'data_processing',
   calculated_fields = 'calculated_fields',
   rule_chains = 'rule_chains',
@@ -708,6 +709,16 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
     }
   ],
   [
+    MenuId.users,
+    {
+      id: MenuId.users,
+      name: 'user.users',
+      type: 'link',
+      path: '/users',
+      icon: 'mdi:account-multiple-outline'
+    }
+  ],
+  [
     MenuId.data_processing,
     {
       id: MenuId.data_processing,
@@ -979,7 +990,8 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.otaUpdates}
         ]
       },
-      {id: MenuId.customers_and_users},
+      {id: MenuId.customers},
+      {id: MenuId.users},
       {
         id: MenuId.data_processing,
         pages: [
@@ -1082,6 +1094,8 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.entity_views}
         ]
       },
+      {id: MenuId.customers},
+      {id: MenuId.users},
       {id: MenuId.edge_instances}
     ]
   ]
@@ -1122,15 +1136,23 @@ const menuSectionResource: { [id: string]: string } = {
   dashboards: 'DASHBOARD',
   alarms: 'ALARM',
   customers: 'CUSTOMER',
+  users: 'USER',
   rule_chains: 'RULE_CHAIN'
 };
 
-const hasMenuPermission = (id: string): boolean => {
-  if (!getRbacPermissions()) {
-    return true;
-  }
+const hasMenuPermission = (authState: AuthState, id: string): boolean => {
   const resource = menuSectionResource[id];
   if (!resource) {
+    return true;
+  }
+  const authority = authState?.authUser?.authority;
+  const platformAdmin = authority === Authority.TENANT_ADMIN || authority === Authority.SYS_ADMIN;
+  if (!platformAdmin && (resource === 'USER' || resource === 'CUSTOMER')) {
+    // the platform does not let a customer user manage the members of its customer; only an explicit role grants it
+    const permissions = getRbacPermissions();
+    return !!permissions && !!permissions[resource] && hasRbacPermission(resource, 'READ');
+  }
+  if (!getRbacPermissions()) {
     return true;
   }
   // a resource no custom role configures keeps the platform permissions, and "ALL" grants every operation
@@ -1168,7 +1190,7 @@ export const buildUserHome = (currentMenuSections: MenuSection[]): Array<HomeSec
 };
 
 const referenceToMenuSection = (authState: AuthState, reference: MenuReference): MenuSection | undefined => {
-  if (!hasMenuPermission(reference.id as string)) {
+  if (!hasMenuPermission(authState, reference.id as string)) {
     return undefined;
   }
   if (filterMenuReference(authState, reference)) {

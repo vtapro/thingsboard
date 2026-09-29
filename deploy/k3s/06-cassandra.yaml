@@ -8,14 +8,14 @@
 # Why in-cluster: the managed Cassandra outside k3s added a WAN hop (and TLS) to every telemetry
 # read/write, which is the hot path of the platform.
 #
-# Topology: one node, replication factor 1 (like the previous single managed node). To grow:
-#   1. raise .spec.replicas below,
-#   2. the keyspace "greeniq" is created with NetworkTopologyStrategy and one replica per DC, so a
-#      second/third node only helps after raising the replication factor:
-#        ALTER KEYSPACE greeniq WITH replication = {'class': 'NetworkTopologyStrategy', 'DC1': 3};
-#   3. a Cassandra node needs its own volume: with the local-path provisioner each replica is bound
-#      to the node it first started on, so a lost node means a lost replica - use a replicated
-#      storage class (Longhorn, Ceph, ...) if the data must survive a node failure.
+# Topology: 3 nodes, keyspace "greeniq" created with NetworkTopologyStrategy and 3 replicas per DC
+# (06b-cassandra-init.yaml), so the telemetry survives the loss of one node and the write load is
+# spread over three JVMs. Raise the replicas together with the keyspace replication factor, never one
+# without the other.
+#
+# Storage: with the local-path provisioner each replica is bound to the node it first started on, so a
+# lost node means a lost replica (the other two keep serving, and the third is rebuilt). For production
+# use a replicated storage class (Longhorn, Ceph, ...) so a lost node does not lose its replica.
 apiVersion: v1
 kind: Service
 metadata:
@@ -65,7 +65,7 @@ metadata:
     app.kubernetes.io/part-of: thingsboard
 spec:
   serviceName: tb-cassandra-headless
-  replicas: 1
+  replicas: 3
   podManagementPolicy: OrderedReady
   selector:
     matchLabels:
@@ -80,6 +80,16 @@ spec:
         runAsGroup: 999
         fsGroup: 999
       terminationGracePeriodSeconds: 120
+      # spread the replicas over the nodes: losing one node must not take several Cassandra nodes down
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: tb-cassandra
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: cassandra
           image: cassandra:4.1
@@ -106,7 +116,7 @@ spec:
             - name: CASSANDRA_ENDPOINT_SNITCH
               value: GossipingPropertyFileSnitch
             - name: CASSANDRA_SEEDS
-              value: tb-cassandra-0.tb-cassandra-headless.thingsboard.svc.cluster.local
+              value: tb-cassandra-0.tb-cassandra-headless.thingsboard.svc.cluster.local,tb-cassandra-1.tb-cassandra-headless.thingsboard.svc.cluster.local
             # note: JVM heap/GC are left to the image defaults (heap = half of the container memory
             # limit, GC chosen for the Java version); overriding JVM_OPTS there breaks the start with
             # "Multiple garbage collectors selected".
@@ -147,7 +157,7 @@ spec:
         storageClassName: local-path
         resources:
           requests:
-            storage: 20Gi
+            storage: 50Gi
 ---
 # Only pods of this namespace may reach the CQL port.
 apiVersion: networking.k8s.io/v1

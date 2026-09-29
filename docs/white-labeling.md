@@ -71,13 +71,18 @@ Frontend:
   định giữ nguyên hành vi upstream khi branding tắt.
 - Ẩn thành phần vendor: huy hiệu GitHub, nút help, nút "Switch to PE" trong dashboard trang chủ sysadmin.
 
-## 5. Chưa có (roadmap để giống ThingsBoard PE)
+## 5. Các tab cấu hình (đã đủ 5 tab như ThingsBoard PE)
 
-1. Chọn ảnh từ thư viện ("Browse from gallery") + preview cho logo/favicon.
-2. `Logo height, px`.
-3. Palette picker (Customize) cho primary/accent thay vì nhập mã hex.
-4. Advanced CSS.
-5. Các tab riêng: Login (branding theo domain), Mail templates, Custom translation, Custom menu.
+| Tab | Nội dung | File chính |
+|---|---|---|
+| General | title, logo light/dark, favicon, palette (14 preset + Customize), Advanced CSS, ẩn help/vendor | `general-settings.component.*` |
+| Login | branding theo domain (host → tenant), title/subtitle/background, icon | `login-settings.component.*`, `WhiteLabelingController` |
+| Mail templates | 8 luồng email theo tenant, WYSIWYG; FreeMarker đã siết bảo mật (SSTI) | `mail-templates.component.*`, `DefaultMailService` |
+| Custom translation | override bản dịch theo locale, áp khi đổi ngôn ngữ | `custom-translation.component.*` |
+| Custom menu | ghép sidebar theo assignee type, URL ngoài mở tab mới | `custom-menu.component.*`, `CustomMenuController` |
+
+Các mục từng nằm trong roadmap (logo height, palette picker, Advanced CSS, tab Login/Mail/Translation/Menu)
+nay đã hoàn thành.
 
 ## 6. Lưu ý
 

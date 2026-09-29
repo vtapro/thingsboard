@@ -2058,6 +2058,10 @@ queue:
   rule-engine:
     # Deprecated. It will be removed in the nearest releases
     topic: "${TB_QUEUE_RULE_ENGINE_TOPIC:tb_rule_engine}"
+    # Number of partitions of the rule engine queues (Main / HighPriority / SequentialByOriginator) created by the
+    # installer. The parallelism of tb-rule-engine is capped by this value: extra replicas stay idle until the
+    # partitions are raised. Change it together with the HPA max replicas of tb-rule-engine.
+    default-partitions: "${TB_QUEUE_RULE_ENGINE_PARTITIONS:10}"
     # For high-priority notifications that require minimum latency and processing time
     notifications_topic: "${TB_QUEUE_RULE_ENGINE_NOTIFICATIONS_TOPIC:tb_rule_engine.notifications}"
     # Interval in milliseconds to poll messages by Rule Engine

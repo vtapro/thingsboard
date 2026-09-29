@@ -6,19 +6,23 @@
 # Kafka runs in the cluster (KRaft mode, no ZooKeeper needed by Kafka itself) and is the only
 # way the ThingsBoard services talk to each other in microservices mode.
 #
-# Single broker to start with, which is enough for this 2 worker cluster and matches
-# TB_QUEUE_KAFKA_REPLICATION_FACTOR=1 in 01-config.yaml. To move to a 3 broker HA setup later:
-# scale to 3 replicas, give each pod its own node id / quorum voters (or install Strimzi) and
-# raise the replication factor. Topics are created by ThingsBoard itself on first start.
+# 3 broker HA setup:
+#   * every topic is created with replication.factor=3 and min.insync.replicas=2, so one broker may be
+#     lost (maintenance, node failure, rollout) without losing data and without stopping the writers;
+#   * the brokers run as a StatefulSet spread across different nodes (pod anti-affinity);
+#   * the correlation with TB_QUEUE_KAFKA_REPLICATION_FACTOR=3 in 01-config.yaml is intentional: apply
+#     both files together, otherwise topic creation with RF=3 fails on a single broker.
+#
+# Scaling to more brokers: raise .spec.replicas and add the new node id@host:9093 entries to
+# KAFKA_CONTROLLER_QUORUM_VOTERS below. The static KRaft quorum requires every voter to be listed.
 #
 # Note on the dead topics / consumer groups left behind by every rollout: ThingsBoard creates one
 # topic "tb_core.notifications.<pod>" (and similar ones) per pod instance, and Kafka keeps the
 # committed offsets of the consumer group of a pod for the default offsets.retention.minutes
 # (7 days). Neither is used for the cluster membership - that is discovered through the ZooKeeper
 # nodes of 05-zookeeper.yaml - so the leftovers are harmless housekeeping debt, not a correctness
-# problem, and the broker defaults are left untouched on purpose. To reclaim the space run the
-# optional 96-kafka-cleanup.yaml job (it deletes only topics of pods that are not running, and only
-# consumer groups that are "Empty").
+# problem. To reclaim the space run the optional 96-kafka-cleanup.yaml job (it deletes only topics of
+# pods that are not running, and only consumer groups that are "Empty").
 apiVersion: v1
 kind: Service
 metadata:
@@ -29,8 +33,8 @@ metadata:
     app.kubernetes.io/part-of: thingsboard
 spec:
   clusterIP: None
-  # the broker resolves its own name through this Service, so the DNS record has to exist
-  # before the pod is ready (otherwise KRaft never starts: chicken and egg)
+  # the brokers resolve their own names through this Service, so the DNS records have to exist
+  # before the pods are ready (otherwise KRaft never starts: chicken and egg)
   publishNotReadyAddresses: true
   selector:
     app.kubernetes.io/name: tb-kafka
@@ -38,6 +42,9 @@ spec:
     - name: broker
       port: 9092
       targetPort: broker
+    - name: controller
+      port: 9093
+      targetPort: controller
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -49,7 +56,8 @@ metadata:
     app.kubernetes.io/part-of: thingsboard
 spec:
   serviceName: tb-kafka
-  replicas: 1
+  replicas: 3
+  podManagementPolicy: Parallel
   selector:
     matchLabels:
       app.kubernetes.io/name: tb-kafka
@@ -60,39 +68,63 @@ spec:
         app.kubernetes.io/part-of: thingsboard
     spec:
       terminationGracePeriodSeconds: 60
+      # keep the brokers on different nodes: losing a node must not take two replicas down
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: tb-kafka
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: kafka
           image: apache/kafka:3.9.1
+          # The node id and the advertised listener depend on the pod name (tb-kafka-0/1/2), so they are
+          # derived here instead of being hardcoded per pod.
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              ORDINAL="${HOSTNAME##*-}"
+              export KAFKA_NODE_ID=$((ORDINAL + 1))
+              export KAFKA_ADVERTISED_LISTENERS="PLAINTEXT://${HOSTNAME}.tb-kafka.thingsboard.svc.cluster.local:9092"
+              exec /etc/kafka/docker/run
           ports:
             - name: broker
               containerPort: 9092
             - name: controller
               containerPort: 9093
           env:
-            - name: KAFKA_NODE_ID
-              value: "1"
             - name: KAFKA_PROCESS_ROLES
               value: broker,controller
-            # a fixed cluster id is required to format the KRaft storage the first time
+            # a fixed cluster id is required to format the KRaft storage the first time; it must be the same
+            # on every broker
             - name: CLUSTER_ID
               value: thingsboard-kraft-1
             - name: KAFKA_LISTENERS
               value: PLAINTEXT://:9092,CONTROLLER://:9093
-            # pods connect through the cluster local name of the Service
-            - name: KAFKA_ADVERTISED_LISTENERS
-              value: PLAINTEXT://tb-kafka-0.tb-kafka.thingsboard.svc.cluster.local:9092
             - name: KAFKA_CONTROLLER_LISTENER_NAMES
               value: CONTROLLER
             - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
               value: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: PLAINTEXT
+            # static quorum: every voter has to be listed on every broker
             - name: KAFKA_CONTROLLER_QUORUM_VOTERS
-              value: 1@tb-kafka-0.tb-kafka.thingsboard.svc.cluster.local:9093
+              value: 1@tb-kafka-0.tb-kafka.thingsboard.svc.cluster.local:9093,2@tb-kafka-1.tb-kafka.thingsboard.svc.cluster.local:9093,3@tb-kafka-2.tb-kafka.thingsboard.svc.cluster.local:9093
             - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
-              value: "1"
+              value: "3"
             - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
-              value: "1"
+              value: "3"
             - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
-              value: "1"
+              value: "2"
+            - name: KAFKA_DEFAULT_REPLICATION_FACTOR
+              value: "3"
+            - name: KAFKA_MIN_INSYNC_REPLICAS
+              value: "2"
             - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
               value: "0"
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
@@ -100,19 +132,19 @@ spec:
             - name: KAFKA_LOG_DIRS
               value: /var/lib/kafka/data
             - name: KAFKA_HEAP_OPTS
-              value: -Xms512M -Xmx1G
+              value: -Xms1G -Xmx2G
           volumeMounts:
             - name: data
               mountPath: /var/lib/kafka/data
           readinessProbe:
             tcpSocket:
               port: broker
-            initialDelaySeconds: 15
+            initialDelaySeconds: 20
             periodSeconds: 10
           livenessProbe:
             tcpSocket:
               port: broker
-            initialDelaySeconds: 45
+            initialDelaySeconds: 60
             periodSeconds: 20
             failureThreshold: 5
           resources:
@@ -127,7 +159,10 @@ spec:
         name: data
       spec:
         accessModes: ["ReadWriteOnce"]
+        # For production use a replicated storage class (Longhorn, Ceph, ...): with local-path a broker
+        # whose node is lost has to be rebuilt from the other replicas, which is possible with RF=3 but
+        # requires the node to come back with a clean volume.
         storageClassName: local-path
         resources:
           requests:
-            storage: 10Gi
+            storage: 20Gi

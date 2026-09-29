@@ -71,7 +71,7 @@ AdminSettings (JSON, 1 bản ghi / tenant)
 | # | Vấn đề | Trạng thái |
 |---|---|---|
 | M1 | `advancedCss` của tenant được chèn qua `style.textContent` (an toàn với XSS) nhưng CSS có thể gọi `url()` ra ngoài để rò rỉ thông tin phiên của người dùng tenant đó. | ⏳ chấp nhận như PE; khuyến nghị thêm CSP cho trang login |
-| M2 | Quyền theo entity group không dùng được cho các API danh sách (`checkPermission` không có entity) → user chỉ có quyền theo group sẽ bị 403 khi mở trang Devices/Assets. Cần lọc theo group ở tầng query (như PE) nếu muốn dùng thực tế. | ⏳ còn lại (đã ghi trong `docs/access-control-roadmap.md`) |
+| M2 | Quyền theo entity group không dùng được cho các API danh sách (`checkPermission` không có entity) → user chỉ có quyền theo group sẽ bị 403 khi mở trang Devices/Assets. Cần lọc theo group ở tầng query (như PE) nếu muốn dùng thực tế. | ✅ đã làm — enforce trên API danh sách và subscription, xem §12 |
 | M3 | Nhiều `subscribe` trong component không huỷ (`LogoComponent`, `GithubBadgeComponent`, `AppComponent.setupWhiteLabeling`) vì `settings$` là `ReplaySubject` sống lâu → giữ reference component đã destroy. | ⏳ còn lại — nên dùng `takeUntil(this.destroy$)` |
 | M4 | Menu tuỳ biến với `type=url` dùng `routerLink` nên URL ngoài (`https://...`) không mở tab mới mà bị router xử lý như route nội bộ. | ⏳ còn lại — nên render anchor `target="_blank"` cho item loại url |
 | M5 | `list users` trong trang Roles cố định `pageSize=100` → tenant >100 user không gán được role cho user còn lại. | ⏳ còn lại — dùng phân trang/autocomplete của CE |
@@ -93,7 +93,7 @@ AdminSettings (JSON, 1 bản ghi / tenant)
 | L4 | Cột "Created time" của group hiển thị số epoch thô, và model không lưu `createdTime`. | ✅ đã sửa — thêm `RbacEntityGroup.createdTime` + pipe `date` |
 | L5 | Xoá entity group không có xác nhận. | ✅ đã sửa — thêm dialog xác nhận (`DialogService`) |
 | L6 | Nhiều nhãn tiếng Anh hard-code trong `entity-groups.component.html`. | ✅ đã sửa — dùng khoá i18n `entity-group.*` |
-| L7 | (đã bỏ) Stack Docker dùng cho dev trước đây đã được thay bằng môi trường native trên Windows. | ✅ môi trường dev hiện tại: PostgreSQL native + backend Java + UI dev server, xem [local-dev.md](local-dev.md) |
+| L7 | (đã bỏ) Stack Docker dùng cho dev trước đây đã được thay bằng môi trường native trên macOS. | ✅ môi trường dev hiện tại: PostgreSQL native + backend Java + UI dev server, xem [local-dev-macos.md](local-dev-macos.md) |
 | L8 | (đã bỏ cùng stack Docker) `.dockerignore` không còn là một phần của quy trình dev. | ✅ |
 | L11 | (đã bỏ cùng stack Docker) `entrypoint.sh` từng che lỗi install — nay installer chạy trực tiếp bằng Java nên lỗi hiện rõ. | ✅ |
 | L12 | `/api/tenant/whiteLabeling` (POST) thiếu `checkPermission(ADMIN_SETTINGS, WRITE)`. | ✅ đã thêm; đồng thời bổ sung `ADMIN_SETTINGS`/`USER` vào danh sách resource gán được ở trang Roles |

@@ -30,13 +30,18 @@ import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
+import org.thingsboard.server.common.data.rbac.RbacCustomerHierarchy;
+import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.config.annotations.ApiOperation;
+import org.thingsboard.server.dao.settings.CustomerHierarchyService;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.entitiy.customer.TbCustomerService;
+import org.thingsboard.server.service.security.model.SecurityUser;
 import org.thingsboard.server.service.security.permission.Operation;
 import org.thingsboard.server.service.security.permission.Resource;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -64,6 +69,7 @@ import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LI
 public class CustomerController extends BaseController {
 
     private final TbCustomerService tbCustomerService;
+    private final CustomerHierarchyService customerHierarchyService;
 
     public static final String IS_PUBLIC = "isPublic";
     public static final String CUSTOMER_SECURITY_CHECK = "If the user has the authority of 'Tenant Administrator', the server checks that the customer is owned by the same tenant. " +
@@ -126,7 +132,7 @@ public class CustomerController extends BaseController {
                     "Referencing non-existing Customer Id will cause 'Not Found' error." +
                     "Remove 'id', 'tenantId' from the request body example (below) to create new Customer entity. " +
                     TENANT_AUTHORITY_PARAGRAPH)
-    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/customer", method = RequestMethod.POST)
     @ResponseBody
     public Customer saveCustomer(@io.swagger.v3.oas.annotations.parameters.RequestBody(description = "A JSON value representing the customer.") @RequestBody Customer customer,
@@ -136,16 +142,34 @@ public class CustomerController extends BaseController {
                                  @RequestParam(name = "uniquifySeparator", defaultValue = "_") String uniquifySeparator,
                                  @Parameter(description = UNIQUIFY_STRATEGY_DESC)
                                  @RequestParam(name = "uniquifyStrategy", defaultValue = "RANDOM") UniquifyStrategy uniquifyStrategy) throws Exception {
-        customer.setTenantId(getTenantId());
-        checkEntity(customer.getId(), customer, Resource.CUSTOMER);
-        return tbCustomerService.save(customer, new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
+        SecurityUser currentUser = getCurrentUser();
+        customer.setTenantId(currentUser.getTenantId());
+        Customer oldCustomer = null;
+        if (customer.getId() != null) {
+            oldCustomer = checkCustomerId(customer.getId(), Operation.WRITE);
+        } else {
+            checkEntity(null, customer, Resource.CUSTOMER);
+        }
+        if (oldCustomer != null) {
+            preserveRbacOwner(customer, oldCustomer);
+        } else {
+            saveRbacOwner(customer);
+        }
+        Customer savedCustomer = tbCustomerService.save(customer,
+                new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), currentUser);
+        if (oldCustomer == null && Authority.CUSTOMER_USER.equals(currentUser.getAuthority())
+                && currentUser.getCustomerId() != null && savedCustomer.getId() != null) {
+            // the customer created by a customer user becomes a sub-customer of its own customer
+            addToCustomerHierarchy(currentUser, savedCustomer.getId());
+        }
+        return savedCustomer;
     }
 
     @ApiOperation(value = "Delete Customer (deleteCustomer)",
             notes = "Deletes the Customer and all customer Users. " +
                     "All assigned Dashboards, Assets, Devices, etc. will be unassigned but not deleted. " +
                     "Referencing non-existing Customer Id will cause an error." + TENANT_AUTHORITY_PARAGRAPH)
-    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/customer/{customerId}", method = RequestMethod.DELETE)
     @ResponseStatus(value = HttpStatus.OK)
     public void deleteCustomer(@Parameter(description = CUSTOMER_ID_PARAM_DESCRIPTION)
@@ -153,13 +177,17 @@ public class CustomerController extends BaseController {
         checkParameter(CUSTOMER_ID, strCustomerId);
         CustomerId customerId = new CustomerId(toUUID(strCustomerId));
         Customer customer = checkCustomerId(customerId, Operation.DELETE);
-        tbCustomerService.delete(customer, getCurrentUser());
+        SecurityUser currentUser = getCurrentUser();
+        tbCustomerService.delete(customer, currentUser);
+        if (Authority.CUSTOMER_USER.equals(currentUser.getAuthority())) {
+            removeFromCustomerHierarchy(currentUser.getTenantId(), customerId);
+        }
     }
 
     @ApiOperation(value = "Get Tenant Customers (getCustomers)",
             notes = "Returns a page of customers owned by tenant. " +
                     PAGE_DATA_PARAMETERS + TENANT_AUTHORITY_PARAGRAPH)
-    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @GetMapping(value = "/customers")
     public PageData<Customer> getCustomers(
             @Parameter(description = PAGE_SIZE_DESCRIPTION, required = true)
@@ -173,19 +201,62 @@ public class CustomerController extends BaseController {
             @Parameter(description = SORT_ORDER_DESCRIPTION, schema = @Schema(allowableValues = {"ASC", "DESC"}))
             @RequestParam(required = false) String sortOrder) throws ThingsboardException {
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
-        TenantId tenantId = getCurrentUser().getTenantId();
-        return checkNotNull(customerService.findCustomersByTenantId(tenantId, pageLink));
+        SecurityUser currentUser = getCurrentUser();
+        TenantId tenantId = currentUser.getTenantId();
+        Set<UUID> scope = accessControlService.getAllowedEntityIds(currentUser, Resource.CUSTOMER, Operation.READ);
+        if (currentUser.getCustomerId() != null) {
+            // a customer user always sees its own customer at least, and the sub-customers when its role allows it
+            Set<UUID> accessible = accessControlService.getAccessibleCustomerIds(currentUser);
+            if (accessible == null) {
+                accessible = Set.of(currentUser.getCustomerId().getId());
+            }
+            scope = intersect(scope, accessible);
+        }
+        return checkNotNull(fetchEntityScope(scope, pageLink,
+                link -> customerService.findCustomersByTenantId(tenantId, link), Customer::getId));
     }
 
     @ApiOperation(value = "Get Tenant Customer by Customer title (getTenantCustomer)",
             notes = "Get the Customer using Customer Title. " + TENANT_AUTHORITY_PARAGRAPH)
-    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @GetMapping(value = "/tenant/customers")
     public Customer getTenantCustomer(
             @Parameter(description = "A string value representing the Customer title.")
             @RequestParam String customerTitle) throws ThingsboardException {
         TenantId tenantId = getCurrentUser().getTenantId();
-        return checkNotNull(customerService.findCustomerByTenantIdAndTitle(tenantId, customerTitle), "Customer with title [" + customerTitle + "] is not found");
+        Customer customer = checkNotNull(customerService.findCustomerByTenantIdAndTitle(tenantId, customerTitle),
+                "Customer with title [" + customerTitle + "] is not found");
+        checkCustomerId(customer.getId(), Operation.READ);
+        return customer;
+    }
+
+    private void addToCustomerHierarchy(SecurityUser currentUser, CustomerId childId) {
+        RbacCustomerHierarchy hierarchy = customerHierarchyService.getCustomerHierarchy(currentUser.getTenantId());
+        if (hierarchy == null) {
+            hierarchy = new RbacCustomerHierarchy();
+        }
+        hierarchy.getParents().put(childId.getId().toString(), currentUser.getCustomerId().getId().toString());
+        customerHierarchyService.saveCustomerHierarchy(currentUser.getTenantId(), hierarchy);
+    }
+
+    private void removeFromCustomerHierarchy(TenantId tenantId, CustomerId customerId) {
+        RbacCustomerHierarchy hierarchy = customerHierarchyService.getCustomerHierarchy(tenantId);
+        if (hierarchy != null && hierarchy.getParents() != null
+                && hierarchy.getParents().remove(customerId.getId().toString()) != null) {
+            customerHierarchyService.saveCustomerHierarchy(tenantId, hierarchy);
+        }
+    }
+
+    private static Set<UUID> intersect(Set<UUID> first, Set<UUID> second) {
+        if (first == null) {
+            return second;
+        }
+        if (second == null) {
+            return first;
+        }
+        Set<UUID> result = new HashSet<>(first);
+        result.retainAll(second);
+        return result;
     }
 
     @Hidden

@@ -182,16 +182,39 @@ public class UserController extends BaseController {
             @RequestBody User user,
             @Parameter(description = "Send activation email (or use activation link)", schema = @Schema(defaultValue = "true"))
             @RequestParam(required = false, defaultValue = "true") boolean sendActivationMail, HttpServletRequest request) throws ThingsboardException {
-        if (!Authority.SYS_ADMIN.equals(getCurrentUser().getAuthority())) {
-            user.setTenantId(getCurrentUser().getTenantId());
+        SecurityUser currentUser = getCurrentUser();
+        if (!Authority.SYS_ADMIN.equals(currentUser.getAuthority())) {
+            user.setTenantId(currentUser.getTenantId());
         }
-        checkEntity(user.getId(), user, Resource.USER);
-        return tbUserService.save(getTenantId(), getCurrentUser().getCustomerId(), user, sendActivationMail, request, getCurrentUser());
+        User oldUser = null;
+        if (user.getId() != null) {
+            oldUser = checkUserId(user.getId(), Operation.WRITE);
+        }
+        if (Authority.CUSTOMER_USER.equals(currentUser.getAuthority())) {
+            // a customer user may only manage the customer users of its own customer
+            user.setAuthority(Authority.CUSTOMER_USER);
+            user.setCustomerId(currentUser.getCustomerId());
+            if (oldUser != null) {
+                // never let the client move an existing user to another customer or authority
+                user.setAuthority(oldUser.getAuthority());
+                user.setCustomerId(oldUser.getCustomerId());
+            }
+        } else if (user.getAuthority() == Authority.SYS_ADMIN && !Authority.SYS_ADMIN.equals(currentUser.getAuthority())) {
+            throw new ThingsboardException(YOU_DON_T_HAVE_PERMISSION_TO_PERFORM_THIS_OPERATION,
+                    ThingsboardErrorCode.PERMISSION_DENIED);
+        }
+        if (oldUser == null) {
+            checkEntity(null, user, Resource.USER);
+            saveRbacOwner(user);
+        } else {
+            preserveRbacOwner(user, oldUser);
+        }
+        return tbUserService.save(getTenantId(), currentUser.getCustomerId(), user, sendActivationMail, request, currentUser);
     }
 
     @ApiOperation(value = "Send or re-send the activation email",
             notes = "Force send the activation email to the user. Useful to resend the email if user has accidentally deleted it. " + SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
-    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @PostMapping(value = "/user/sendActivationMail")
     @ResponseStatus(value = HttpStatus.OK)
     public void sendActivationEmail(
@@ -213,7 +236,7 @@ public class UserController extends BaseController {
     @ApiOperation(value = "Get activation link (getActivationLink)",
             notes = "Get the activation link for the user. " +
                     "The base url for activation link is configurable in the general settings of system administrator. " + SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
-    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @GetMapping(value = "/user/{userId}/activationLink", produces = "text/plain")
     public String getActivationLink(@Parameter(description = USER_ID_PARAM_DESCRIPTION)
                                     @PathVariable(USER_ID) String strUserId,
@@ -224,7 +247,7 @@ public class UserController extends BaseController {
     @ApiOperation(value = "Get activation link info (getActivationLinkInfo)",
             notes = "Get the activation link info for the user. " +
                     "The base url for activation link is configurable in the general settings of system administrator. " + SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
-    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @GetMapping(value = "/user/{userId}/activationLinkInfo")
     public UserActivationLink getActivationLinkInfo(@Parameter(description = USER_ID_PARAM_DESCRIPTION)
                                                     @PathVariable(USER_ID) String strUserId,
@@ -239,7 +262,7 @@ public class UserController extends BaseController {
     @ApiOperation(value = "Delete User (deleteUser)",
             notes = "Deletes the User, it's credentials and all the relations (from and to the User). " +
                     "Referencing non-existing User Id will cause an error. " + SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
-    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @DeleteMapping(value = "/user/{userId}")
     @ResponseStatus(value = HttpStatus.OK)
     public void deleteUser(
@@ -275,11 +298,23 @@ public class UserController extends BaseController {
             @RequestParam(required = false) String sortOrder) throws ThingsboardException {
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         SecurityUser currentUser = getCurrentUser();
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(currentUser, Resource.USER, Operation.READ);
         if (Authority.TENANT_ADMIN.equals(currentUser.getAuthority())) {
-            return checkNotNull(userService.findUsersByTenantId(currentUser.getTenantId(), pageLink));
-        } else {
-            return checkNotNull(userService.findCustomerUsers(currentUser.getTenantId(), currentUser.getCustomerId(), pageLink));
+            return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                    link -> userService.findUsersByTenantId(currentUser.getTenantId(), link), User::getId));
         }
+        Set<UUID> accessibleCustomerIds = accessControlService.getAccessibleCustomerIds(currentUser);
+        List<CustomerId> customerIds = new ArrayList<>();
+        if (accessibleCustomerIds != null) {
+            accessibleCustomerIds.forEach(id -> customerIds.add(new CustomerId(id)));
+        } else if (currentUser.getCustomerId() != null) {
+            customerIds.add(currentUser.getCustomerId());
+        }
+        if (customerIds.isEmpty()) {
+            return new PageData<>(List.of(), 0, 0, false);
+        }
+        return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                link -> userService.findUsersByCustomerIds(currentUser.getTenantId(), customerIds, link), User::getId));
     }
 
     @ApiOperation(value = "Find users by query (findUsersByQuery)",
@@ -364,12 +399,14 @@ public class UserController extends BaseController {
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         TenantId tenantId = getCurrentUser().getTenantId();
-        return checkNotNull(userService.findCustomerUsers(tenantId, customerId, pageLink));
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(getCurrentUser(), Resource.USER, Operation.READ);
+        return checkNotNull(fetchEntityScope(allowedEntityIds, pageLink,
+                link -> userService.findCustomerUsers(tenantId, customerId, link), User::getId));
     }
 
     @ApiOperation(value = "Enable/Disable User credentials (setUserCredentialsEnabled)",
             notes = "Enables or Disables user credentials. Useful when you would like to block user account without deleting it. " + PAGE_DATA_PARAMETERS + TENANT_AUTHORITY_PARAGRAPH)
-    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @PostMapping(value = "/user/{userId}/userCredentialsEnabled")
     public void setUserCredentialsEnabled(
             @Parameter(description = USER_ID_PARAM_DESCRIPTION)

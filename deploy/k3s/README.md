@@ -7,7 +7,7 @@
 
 These manifests describe the **production** topology of this fork: one image, several
 deployments, each one started with a different `TB_SERVICE_TYPE`. Local development keeps
-using PostgreSQL + `in-memory` queue (see `docs/local-dev.md`); Kafka, ZooKeeper and Cassandra
+using PostgreSQL + `in-memory` queue (see `docs/local-dev-macos.md`); Kafka, ZooKeeper and Cassandra
 are required here only.
 
 Only PostgreSQL is a **managed cluster on a dedicated server outside k3s** (TLS enabled, public
@@ -22,19 +22,23 @@ the cache is in-process (caffeine) with short TTLs.
 The production domain of this deployment is **`app.greeniq.vn`** (see `30-ingress.yaml`);
 the MQTT endpoint is the `LoadBalancer` of `tb-mqtt-transport` on port `1883`.
 
-Target cluster: **1 k3s server (control plane) + 2 workers**, plus one dedicated data server.
-Every Deployment spreads its replicas over the workers with `topologySpreadConstraints`; sizing
-numbers and the small-cluster tuning are in `docs/production-k3s.md` section 3.3.
+Target cluster (production HA): **3 k3s servers (control plane, embedded etcd) + 6 workers,
+8 vCPU / 16 GiB each** — the 3 node Kafka/ZooKeeper/Cassandra ensembles need roughly
+3 × (Kafka 1 GiB + ZooKeeper 0.5 GiB + Cassandra 3 GiB) on top of the ThingsBoard pods, and the
+pod anti-affinity rules spread each ensemble over different nodes. A smaller cluster can run the
+same manifests but loses the node-failure tolerance; sizing numbers and the small-cluster tuning are
+in `docs/production-k3s.md` section 3.3. Every Deployment spreads its replicas over the workers with
+`topologySpreadConstraints`.
 
 | Directory/file | Content |
 |---|---|
 | `00-namespace.yaml` | `thingsboard` namespace |
 | `01-config.yaml` | `ConfigMap` with the shared (non secret) environment |
 | `02-secret.example.yaml` | template of the `Secret` — create the real one with `kubectl`, never commit values |
-| `04-kafka.yaml` | in-cluster Kafka (KRaft, single broker, local-path PVC) |
-| `05-zookeeper.yaml` | in-cluster ZooKeeper (discovery of the ThingsBoard cluster) |
-| `06-cassandra.yaml` | in-cluster Cassandra (telemetry + latest telemetry, local-path PVC) |
-| `06b-cassandra-init.yaml` | one shot job that creates the `greeniq` keyspace |
+| `04-kafka.yaml` | in-cluster Kafka (KRaft, **3 brokers, RF=3 / min.insync.replicas=2**, local-path PVC) |
+| `05-zookeeper.yaml` | in-cluster ZooKeeper (**3 node ensemble**, discovery of the ThingsBoard cluster) |
+| `06-cassandra.yaml` | in-cluster Cassandra (**3 nodes**, telemetry + latest telemetry, local-path PVC) |
+| `06b-cassandra-init.yaml` | one shot job that creates/aligns the `greeniq` keyspace (**RF=3**) |
 | `09-cache-specs.yaml` | cache specs shared by the services (no Redis) |
 | `10-install-job.yaml` | one shot schema install/upgrade (`RUN_INSTALL_ONLY=true`) |
 | `20-tb-core.yaml` | REST API + entity/telemetry handling, 2 replicas, HPA |
@@ -45,8 +49,9 @@ numbers and the small-cluster tuning are in `docs/production-k3s.md` section 3.3
 | `25-tb-web-ui.yaml` | web UI |
 | `26-tb-js-executor.yaml` | JS executor (rule engine scripts) |
 | `30-haproxy.yaml` | HAProxy: `app.greeniq.vn` (HTTP/HTTPS) and the public MQTT port |
-| `40-hpa.yaml` | horizontal pod autoscalers (CPU based, min 1 pod) |
+| `40-hpa.yaml` | horizontal pod autoscalers (CPU based; **max replicas kept <= the matching queue partitions**) |
 | `30-ingress.yaml` | ingress for the web UI and `/api` |
+| `SCALING.md` | runbook "thêm node + thêm pod = tăng chịu tải", công thức partition/replica, node sizing |
 
 The managed PostgreSQL must accept the public IPs of the k3s nodes (whitelist them in the
 provider console) and is reached over TLS. See `docs/production-k3s.md` section 3 for the

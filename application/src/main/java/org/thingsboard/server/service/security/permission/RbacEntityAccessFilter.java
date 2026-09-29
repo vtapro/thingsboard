@@ -68,6 +68,10 @@ public final class RbacEntityAccessFilter {
      * Counts the entities of the query the user is allowed to read. The DAO count can not be scoped by the custom
      * roles, so the count is based on the first {@link #SCAN_SIZE} entities of the query: it is exact when the result
      * of the query is not larger, otherwise it is the number of the allowed entities of the scanned part.
+     *
+     * <p>The returned value is never larger than the real number of the allowed entities: when the scan is truncated
+     * the count is a lower bound, so a caller that uses it to size a page never promises more entities than the user
+     * may actually read.
      */
     public static long countAllowedEntities(AccessControlService accessControlService, EntityService entityService,
                                             SecurityUser user, TenantId tenantId, CustomerId customerId,
@@ -86,7 +90,9 @@ public final class RbacEntityAccessFilter {
             // the custom role did not filter the scanned entities, so the total count of the DAO is used
             return totalCount;
         }
-        return allowed.size();
+        // the scan is truncated: the count of the allowed entities of the scanned part is a lower bound of the real
+        // count, and it is capped by the total count of the DAO
+        return Math.min(allowed.size(), totalCount);
     }
 
     /**

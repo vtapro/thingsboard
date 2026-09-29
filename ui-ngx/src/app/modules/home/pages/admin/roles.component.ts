@@ -88,10 +88,10 @@ export class RolesComponent extends PageComponent implements OnInit {
   readonly groupScopedResources = GROUP_ENTITY_TYPES;
   readonly entityTypes = GROUP_ENTITY_TYPES;
   /**
-   * Entity types a user may create itself, so the "only entities created by the user" scope is meaningful. The other
-   * ones (dashboard, customer, user, rule chain, ...) are created by the tenant administrator only.
+   * Resources a user may create itself, so the "only entities created by the user" scope is meaningful. For the
+   * members (users and customers) this is what lets a manager add the members of its own team.
    */
-  readonly ownScopedResources = GROUP_ENTITY_TYPES;
+  readonly ownScopedResources = [...GROUP_ENTITY_TYPES, 'USER', 'CUSTOMER'];
 
   /**
    * PE like permission matrix: the operations offered for each entity type.
