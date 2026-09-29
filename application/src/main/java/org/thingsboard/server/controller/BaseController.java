@@ -690,10 +690,9 @@ public abstract class BaseController {
         if (oldInfo == null) {
             return;
         }
-        if (!(entity.getAdditionalInfo() instanceof ObjectNode info)) {
-            info = JacksonUtil.newObjectNode();
-            entity.setAdditionalInfo(info);
-        }
+        ObjectNode info = entity.getAdditionalInfo() instanceof ObjectNode existing
+                ? existing : JacksonUtil.newObjectNode();
+        entity.setAdditionalInfo(info);
         for (String field : new String[]{"rbacOwnerId", "rbacOwnerEmail"}) {
             if (oldInfo.has(field) && !info.has(field)) {
                 info.set(field, oldInfo.get(field));
