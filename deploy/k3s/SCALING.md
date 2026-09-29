@@ -22,7 +22,7 @@ sửa kiến trúc. Điều kiện để điều đó đúng nằm ở 2 chỗ:
 | `tb-js-executor` | partitions của topic `tb_js_executor` (30) | `TB_QUEUE_KAFKA_JE_TOPIC_PROPERTIES` | 16 |
 | `tb-mqtt-transport` / `tb-http-transport` | số connection + CPU/RAM của node (là producer, không bị partition) | `22-*`, `23-*` + HPA | 16 / 8 |
 | Cassandra (telemetry) | số node × replication factor, disk, IO | `06-cassandra.yaml`, `06b-*` (RF=3) | — |
-| PostgreSQL (entities) | instance + RTT + connection pool | `01-config.yaml` (`SPRING_DATASOURCE_URL`) | — |
+| PostgreSQL (entities) | 3 instance CloudNativePG + PgBouncer pool; thêm node/instance khi CPU hoặc IOPS thiếu | `13-postgres-cluster.yaml` | — |
 
 Quy tắc: **nâng partition TRƯỚC, nâng HPA max SAU**, và luôn giữ `max replicas <= partitions`.
 
@@ -33,6 +33,8 @@ Quy tắc: **nâng partition TRƯỚC, nâng HPA max SAU**, và luôn giữ `max
 | Kafka | 1 GiB / 0.5 vCPU | 3 | 3 GiB |
 | ZooKeeper | 0.5 GiB / 0.2 vCPU | 3 | 1.5 GiB |
 | Cassandra | 3 GiB / 1 vCPU | 3 | 9 GiB |
+| PostgreSQL (CloudNativePG) | 1 GiB request / 4 GiB limit | 3 | 3 GiB request (12 GiB limit) |
+| PgBouncer (Pooler) | 128 MiB / 100m | 2 | ~0.3 GiB |
 | TB services (core/RE/web-ui/js/transports) | 1-3 GiB tuỳ service | 10-20 | 15-30 GiB |
 
 Khuyến nghị production: **3 k3s server (control plane HA, embedded etcd) + 6 worker × 8 vCPU / 16 GiB**.

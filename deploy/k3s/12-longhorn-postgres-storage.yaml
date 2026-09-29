@@ -1,0 +1,39 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Storage classes for the in-cluster PostgreSQL (CloudNativePG).
+#
+# Longhorn is installed separately (see 03-longhorn.md) because it ships CRDs and privileged
+# DaemonSets. The default `longhorn` StorageClass keeps 3 replicas; the class below is tuned for
+# the database:
+#   * numberOfReplicas 2 -> the database already replicates at the PostgreSQL level (3 instances),
+#     so a third block-level copy only adds write latency and disk usage;
+#   * reclaimPolicy Retain -> deleting the PVC must never delete the database volume;
+#   * dataLocality best-effort -> prefer the replica on the node that runs the pod.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn-postgres
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  numberOfReplicas: "2"
+  staleReplicaTimeout: "30"
+  fsType: ext4
+  dataLocality: best-effort
+  unmapMarkSnapChainRemoved: ignored
+  disableRevisionCounter: "true"
+---
+# Used by the ScheduledBackup of the CloudNativePG cluster (method: volumeSnapshot).
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: longhorn-snapshot
+driver: driver.longhorn.io
+deletionPolicy: Delete
+parameters:
+  type: snap

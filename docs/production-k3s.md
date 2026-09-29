@@ -14,7 +14,7 @@ production của ThingsBoard. Khác biệt với môi trường dev (xem [local-
 | Số replica | 1 | ≥ 2 mỗi service, có HPA |
 
 > **Cập nhật (2026-09-29): cụm mặc định đã chuyển sang cấu hình HA + scale-out.** `deploy/k3s/` hiện
-> dùng Kafka **3 broker RF=3 / min.insync.replicas=2**, ZooKeeper **3 node**, Cassandra **3 node RF=3**,
+> dùng PostgreSQL **trong cụm (CloudNativePG 3 instance trên Longhorn)**, Kafka **3 broker RF=3 / min.insync.replicas=2**, ZooKeeper **3 node**, Cassandra **3 node RF=3**,
 > queue rule-engine/core **32 partition**, và HPA đã bỏ trần cũ (core/rule-engine/js-executor/mqtt tối đa 16,
 > web-ui/http 8) với ràng buộc **max replica ≤ partition**. Mục tiêu: thêm worker node + tăng replica là
 > tăng năng lực chịu tải. Runbook vận hành, công thức partition/replica, node sizing và checklist production
@@ -191,7 +191,14 @@ kubectl -n thingsboard create secret docker-registry ghcr \
 và thêm `imagePullSecrets: [{name: ghcr}]` vào `spec.template.spec` của từng Deployment (hoặc gắn
 vào ServiceAccount của namespace).
 
-## 3. Data plane: 2 database managed ngoài cụm + hạ tầng trong cụm
+## 3. Data plane: database trong cụm (lịch sử: 2 database managed ngoài cụm)
+
+> **Cập nhật (2026-09-29):** PostgreSQL **đã chuyển vào trong cụm k3s** — CloudNativePG 3 instance
+> trên volume Longhorn (`deploy/k3s/12-longhorn-postgres-storage.yaml`,
+> `deploy/k3s/13-postgres-cluster.yaml`), truy cập qua PgBouncer pooler
+> `tb-pg-pooler-rw:5432`. Cách cài Longhorn/CNPG và migrate dữ liệu:
+> [`deploy/k3s/03-longhorn.md`](../deploy/k3s/03-longhorn.md). Mô tả PostgreSQL managed (CloudClusters)
+> bên dưới chỉ còn là lịch sử / phương án quay lui.
 
 > **Cập nhật (2026-09-27):** Cassandra **đã chuyển vào trong cụm k3s** — `deploy/k3s/06-cassandra.yaml`
 > (StatefulSet 1 node, PVC local-path, service `tb-cassandra`) + `06b-cassandra-init.yaml` (tạo keyspace
@@ -200,11 +207,11 @@ vào ServiceAccount của namespace).
 > trong namespace (NetworkPolicy). Toàn bộ mô tả CloudClusters/TLS/truststore bên dưới chỉ còn dùng khi
 > muốn quay lại Cassandra managed ở ngoài cụm.
 
-PostgreSQL và Cassandra là **2 cluster managed, nằm ngoài k3s**, đều bật SSL:
+**Lịch sử:** PostgreSQL và Cassandra từng là 2 cluster managed, nằm ngoài k3s, đều bật SSL:
 
 | | Endpoint | Port | Ghi chú |
 |---|---|---|---|
-| PostgreSQL | `postgresql-215231-0.cloudclusters.net` | `10012` | database **`greeniq`**, user `vtheanh04@gmail.com` — đặt trong `SPRING_DATASOURCE_URL` |
+| PostgreSQL (cũ) | `postgresql-215231-0.cloudclusters.net` | `10012` | database **`greeniq`**; nay thay bằng `tb-pg-pooler-rw:5432` trong cụm |
 | Cassandra | `cassandra-215233-0.cloudclusters.net` | `19948` | keyspace **`greeniq`**, user `vtheanh04@gmail.com` — đặt trong `CASSANDRA_URL` / `CASSANDRA_KEYSPACE_NAME` |
 
 ```text
@@ -491,7 +498,7 @@ Toàn bộ biến dưới đây do `thingsboard.yml` định nghĩa, đặt qua 
 | `TB_QUEUE_KAFKA_REPLICATION_FACTOR` | `3` | số bản sao của mỗi topic |
 | `ZOOKEEPER_ENABLED` / `ZOOKEEPER_URL` | `true` / `tb-zookeeper:2181` | discovery giữa các service |
 | `ZOOKEEPER_SESSION_TIMEOUT_MS` | `30000` | tăng khi mạng chập chờn để tránh rebalance liên tục |
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://tb-postgres:5432/thingsboard` | |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://tb-pg-pooler-rw.thingsboard.svc.cluster.local:5432/greeniq?sslmode=require` | PostgreSQL trong cụm qua PgBouncer pooler |
 | `spring.jpa.hibernate.ddl-auto` | đã là `none` trong `thingsboard.yml` | schema chỉ do job install tạo/cập nhật |
 | `DATABASE_TS_TYPE` / `DATABASE_TS_LATEST_TYPE` | `cassandra` | hybrid: entities ở Postgres, telemetry (kể cả latest) ở Cassandra; bắt buộc có bản vá §8.1 khi `DATABASE_TS_LATEST_TYPE=cassandra` |
 | `CASSANDRA_URL` / `CASSANDRA_KEYSPACE_NAME` | `tb-cassandra:9042` / `thingsboard` | |
