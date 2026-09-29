@@ -1,26 +1,34 @@
-#!/usr/bin/env bash
-# SPDX-FileCopyrightText: Copyright The ThingsBoard Authors
+#!/bin/bash
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Cai schema ThingsBoard vao PostgreSQL (chay 1 lan, va moi khi co migration moi).
-#
-# Installer doc CA `sql/` VA `json/` tu cung mot `install.data_dir`, nhung hai thu muc nay nam o
-# hai module khac nhau (dao/src/main/resources/sql va application/src/main/data), nen script gom
-# chung vao application/target/tb-data truoc khi chay.
-#
-# Dung: ./scripts/install-tb-schema.sh [--demo|--no-demo]
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+usage() {
+    cat <<'USAGE'
+Cai schema ThingsBoard vao PostgreSQL (chay 1 lan, va moi khi co migration moi).
+
+Dung: ./scripts/install-tb-schema.sh [tuy chon]
+  --demo      nap ca du lieu demo (mac dinh)
+  --no-demo   chi schema, khong demo
+  -h, --help  hien huong dan nay
+
+Script gom application/src/main/data va dao/src/main/resources/sql vao
+application/target/tb-data roi chay ThingsboardInstallApplication.
+USAGE
+}
+
 LOAD_DEMO=true
 for arg in "$@"; do
     case "$arg" in
         --demo) LOAD_DEMO=true ;;
         --no-demo) LOAD_DEMO=false ;;
-        -h|--help) sed -n '2,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) usage; exit 0 ;;
         *) echo "Tham so khong hop le: $arg (dung -h de xem huong dan)" >&2; exit 2 ;;
     esac
 done

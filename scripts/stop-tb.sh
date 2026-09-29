@@ -1,8 +1,8 @@
-#!/usr/bin/env bash
-# SPDX-FileCopyrightText: Copyright The ThingsBoard Authors
+#!/bin/bash
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Dung ThingsBoard backend dang chay boi scripts/start-tb.sh.
 
 set -euo pipefail
 

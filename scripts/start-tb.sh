@@ -1,28 +1,31 @@
-#!/usr/bin/env bash
-# SPDX-FileCopyrightText: Copyright The ThingsBoard Authors
+#!/bin/bash
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Chay ThingsBoard backend o moi truong dev local tren macOS (khong Docker), dung cau hinh chuan CE:
-#   - PostgreSQL cho entities VA timeseries
-#   - queue in-memory (khong can Kafka/ZooKeeper)
-#   - UI chay rieng bang Angular dev server (ng serve)
-#
-# Yeu cau: da build bang
-#   mvn -B -T 1C clean install -DskipTests -Dpkg.skip=true -Dskip.ui.build=true
-# va da co application/target/classpath.txt (xem docs/local-dev.md).
-#
-# Dung: ./scripts/start-tb.sh [-f|--force] [-h|--help]
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+usage() {
+    cat <<'USAGE'
+Chay ThingsBoard backend dev local tren macOS (khong Docker).
+
+Dung: ./scripts/start-tb.sh [tuy chon]
+  -f, --force   restart neu backend dang chay
+  -h, --help    hien huong dan nay
+
+Yeu cau: da build (xem docs/local-dev-macos.md) va co application/target/classpath.txt.
+USAGE
+}
+
 FORCE=0
 for arg in "$@"; do
     case "$arg" in
         -f|--force) FORCE=1 ;;
-        -h|--help) sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) usage; exit 0 ;;
         *) echo "Tham so khong hop le: $arg (dung -h de xem huong dan)" >&2; exit 2 ;;
     esac
 done
