@@ -117,6 +117,13 @@ Credential DB cũ cần lấy lại từ console CloudClusters vì `tb-secrets` 
 
 ## 6. Giới hạn cần biết
 
+* **PgBouncer pooler làm chậm truy vấn nhỏ.** Đo trên cụm này (30 query `select 1`, 8 client):
+  primary trực tiếp `tb-pg-rw` ~1,4 ms/query (~5,9k tps); qua pooler `tb-pg-pooler-rw` ~5,5 ms/query
+  (~1,4k tps); pooler không TLS ~3 ms. Nguyên nhân là TLS + hop phụ ở cả hai chân. ThingsBoard đã có
+  HikariCP riêng nên `01-config.yaml` trỏ thẳng vào `tb-pg-rw`; pooler vẫn giữ trong cụm để dùng khi
+  số pod tăng (khi đó `số pod × SPRING_DATASOURCE_MAXIMUM_POOL_SIZE` vượt `max_connections` = 300).
+* **Sau khi restore phải chạy `VACUUM ANALYZE`** (đã làm): `pg_dump` không mang theo thống kê cột và
+  các trang dữ liệu bị "phình" do bulk insert, planner dễ chọn plan xấu/seq scan.
 * Longhorn nhân bản ở tầng block: mỗi ghi đi qua mạng tới 2 replica. Vì vậy class
   `longhorn-postgres` cố ý để 2 replica và `dataLocality=best-effort`; đừng nâng lên 3 mà không đo lại.
 * Snapshot Longhorn chỉ cho restore theo mốc backup. Muốn **PITR/DR ra ngoài cụm** phải thêm

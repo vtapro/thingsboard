@@ -79,4 +79,8 @@ spec:
                 | PGPASSWORD="$DST_PASS" psql -v ON_ERROR_STOP=1 -q "$DST"
               echo "==> verify"
               PGPASSWORD="$DST_PASS" psql "$DST" -c "select (select count(*) from information_schema.tables where table_schema='public') as tables, (select count(*) from device) as devices, (select count(*) from tb_user) as users, (select count(*) from admin_settings) as settings, (select count(*) from alarm) as alarms;"
+              # pg_dump does not carry the column statistics and the restore leaves bloated pages:
+              # without this the planner may pick sequential scans / bad plans right after the cutover.
+              echo "==> vacuum analyze"
+              PGPASSWORD="$DST_PASS" psql "$DST" -c "VACUUM (ANALYZE);"
               echo "==> done"
