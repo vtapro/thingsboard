@@ -97,7 +97,11 @@ spec:
                 [ -z "$pod" ] && continue
                 is_pod_suffix "$pod" || continue
                 is_live "$pod" && continue
-                state=$($K/kafka-consumer-groups.sh --bootstrap-server $BS --describe --group "$g" --state 2>/dev/null | awk 'NR>1{print $2}' | tail -1)
+                # Kafka 3.9 prints: GROUP  COORDINATOR (ID)  ASSIGNMENT-STRATEGY  STATE  #MEMBERS
+                # The coordinator column contains a space, so the state is extracted by name instead
+                # of by column position (the old "column 2" assumption never matched "Empty").
+                state=$($K/kafka-consumer-groups.sh --bootstrap-server $BS --describe --group "$g" --state 2>/dev/null \
+                  | grep -oE '\b(Empty|Stable|PreparingRebalance|CompletingRebalance|Dead)\b' | head -1)
                 [ "$state" = "Empty" ] || continue
                 echo "delete_group $g (state=$state)"
                 if [ "$DRY" != "true" ]; then
