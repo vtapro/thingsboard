@@ -32,6 +32,15 @@ Cụm chạy PostgreSQL **trong** k3s thay cho managed database bên ngoài. Ba 
 
 ## 2. Cài đặt một lần
 
+**Cách nhanh (idempotent, làm đúng các bước bên dưới):**
+
+```bash
+KUBECTL=/Applications/Lens.app/Contents/Resources/arm64/kubectl ./scripts/install-k3s-postgres.sh
+# hoặc: KUBECONFIG=~/.kube/config ./scripts/install-k3s-postgres.sh
+```
+
+Hoặc làm thủ công từng bước:
+
 ```bash
 # Longhorn (StorageClass longhorn + longhorn-static, namespace longhorn-system)
 kubectl apply -f https://raw.githubusercontent.com/longhorn/longhorn/v1.13.0/deploy/longhorn.yaml
