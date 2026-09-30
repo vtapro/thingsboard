@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -41,8 +42,10 @@ import org.thingsboard.server.service.security.permission.Operation;
 import org.thingsboard.server.service.security.permission.Resource;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -165,6 +168,36 @@ public class CustomerController extends BaseController {
         return savedCustomer;
     }
 
+    /**
+     * Creates a customer as a child of the given parent (used by the "Manage customers" page of a customer).
+     */
+    @ApiOperation(value = "Create a sub-customer (saveSubCustomer)",
+            notes = "Creates a customer and records it as a child of the given parent customer. "
+                    + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
+    @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
+    @PostMapping(value = "/customer/{parentCustomerId}/subCustomer")
+    @ResponseBody
+    public Customer saveSubCustomer(
+            @Parameter(description = CUSTOMER_ID_PARAM_DESCRIPTION)
+            @PathVariable("parentCustomerId") String strParentCustomerId,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "A JSON value representing the customer.")
+            @RequestBody Customer customer) throws Exception {
+        checkParameter(CUSTOMER_ID, strParentCustomerId);
+        SecurityUser currentUser = getCurrentUser();
+        CustomerId parentCustomerId = new CustomerId(toUUID(strParentCustomerId));
+        checkCustomerId(parentCustomerId, Operation.WRITE);
+        customer.setId(null);
+        customer.setTenantId(currentUser.getTenantId());
+        checkEntity(null, customer, Resource.CUSTOMER);
+        saveRbacOwner(customer);
+        Customer savedCustomer = tbCustomerService.save(customer,
+                new NameConflictStrategy(NameConflictPolicy.FAIL, "_", UniquifyStrategy.RANDOM), currentUser);
+        if (savedCustomer.getId() != null && !parentCustomerId.equals(savedCustomer.getId())) {
+            addCustomerParent(currentUser.getTenantId(), savedCustomer.getId(), parentCustomerId);
+        }
+        return savedCustomer;
+    }
+
     @ApiOperation(value = "Delete Customer (deleteCustomer)",
             notes = "Deletes the Customer and all customer Users. " +
                     "All assigned Dashboards, Assets, Devices, etc. will be unassigned but not deleted. " +
@@ -217,6 +250,83 @@ public class CustomerController extends BaseController {
                 link -> customerService.findCustomersByTenantId(tenantId, link), Customer::getId));
     }
 
+    @ApiOperation(value = "Get sub-customers of a customer (getSubCustomers)",
+            notes = "Returns a page of the customers whose parent is the given customer (customer hierarchy). " +
+                    PAGE_DATA_PARAMETERS + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
+    @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
+    @GetMapping(value = "/customer/{customerId}/subCustomers")
+    public PageData<Customer> getSubCustomers(
+            @Parameter(description = CUSTOMER_ID_PARAM_DESCRIPTION)
+            @PathVariable(CUSTOMER_ID) String strCustomerId,
+            @Parameter(description = PAGE_SIZE_DESCRIPTION, required = true)
+            @RequestParam int pageSize,
+            @Parameter(description = PAGE_NUMBER_DESCRIPTION, required = true)
+            @RequestParam int page,
+            @Parameter(description = CUSTOMER_TEXT_SEARCH_DESCRIPTION)
+            @RequestParam(required = false) String textSearch,
+            @Parameter(description = SORT_PROPERTY_DESCRIPTION, schema = @Schema(allowableValues = {"createdTime", "title", "email", "country", "city"}))
+            @RequestParam(required = false) String sortProperty,
+            @Parameter(description = SORT_ORDER_DESCRIPTION, schema = @Schema(allowableValues = {"ASC", "DESC"}))
+            @RequestParam(required = false) String sortOrder) throws ThingsboardException {
+        checkParameter(CUSTOMER_ID, strCustomerId);
+        CustomerId customerId = new CustomerId(toUUID(strCustomerId));
+        checkCustomerId(customerId, Operation.READ);
+        SecurityUser currentUser = getCurrentUser();
+        TenantId tenantId = currentUser.getTenantId();
+        PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
+        List<CustomerId> childIds = new ArrayList<>();
+        for (Map.Entry<String, String> entry : customerHierarchyService.getCustomerHierarchy(tenantId).getParents().entrySet()) {
+            if (customerId.getId().toString().equals(entry.getValue())) {
+                try {
+                    childIds.add(new CustomerId(UUID.fromString(entry.getKey())));
+                } catch (IllegalArgumentException ignored) {
+                    // an invalid id in the hierarchy document is skipped
+                }
+            }
+        }
+        if (childIds.isEmpty()) {
+            return new PageData<>(List.of(), 0, 0, false);
+        }
+        Set<UUID> allowedEntityIds = accessControlService.getAllowedEntityIds(currentUser, Resource.CUSTOMER, Operation.READ);
+        List<Customer> children = new ArrayList<>(customerService.findCustomersByTenantIdAndIds(tenantId, childIds));
+        children.removeIf(customer -> allowedEntityIds != null && !allowedEntityIds.contains(customer.getId().getId()));
+        return pageCustomersInMemory(children, pageLink, sortProperty, sortOrder, textSearch);
+    }
+
+    /**
+     * The customer hierarchy is stored as a tenant settings document, so the sub-customer page is built in memory
+     * (the number of sub-customers of one customer is expected to stay small).
+     */
+    private static PageData<Customer> pageCustomersInMemory(List<Customer> customers, PageLink pageLink,
+                                                            String sortProperty, String sortOrder, String textSearch) {
+        String term = textSearch == null ? null : textSearch.trim().toLowerCase();
+        if (term != null && !term.isEmpty()) {
+            customers.removeIf(customer -> !containsIgnoreCase(customer.getTitle(), term)
+                    && !containsIgnoreCase(customer.getEmail(), term));
+        }
+        Comparator<Customer> comparator = switch (sortProperty == null ? "createdTime" : sortProperty) {
+            case "title" -> Comparator.comparing(c -> c.getTitle() == null ? "" : c.getTitle(), String.CASE_INSENSITIVE_ORDER);
+            case "email" -> Comparator.comparing(c -> c.getEmail() == null ? "" : c.getEmail(), String.CASE_INSENSITIVE_ORDER);
+            case "country" -> Comparator.comparing(c -> c.getCountry() == null ? "" : c.getCountry(), String.CASE_INSENSITIVE_ORDER);
+            case "city" -> Comparator.comparing(c -> c.getCity() == null ? "" : c.getCity(), String.CASE_INSENSITIVE_ORDER);
+            default -> Comparator.comparing(Customer::getCreatedTime);
+        };
+        if (sortOrder == null || !"ASC".equalsIgnoreCase(sortOrder)) {
+            comparator = comparator.reversed();
+        }
+        customers.sort(comparator);
+        int pageSize = Math.max(pageLink.getPageSize(), 1);
+        int from = Math.min(pageLink.getPage() * pageSize, customers.size());
+        int to = Math.min(from + pageSize, customers.size());
+        List<Customer> content = new ArrayList<>(customers.subList(from, to));
+        int totalPages = (int) Math.ceil((double) customers.size() / pageSize);
+        return new PageData<>(content, totalPages, customers.size(), to < customers.size());
+    }
+
+    private static boolean containsIgnoreCase(String value, String term) {
+        return value != null && value.toLowerCase().contains(term);
+    }
+
     @ApiOperation(value = "Get Tenant Customer by Customer title (getTenantCustomer)",
             notes = "Get the Customer using Customer Title. " + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
@@ -232,12 +342,16 @@ public class CustomerController extends BaseController {
     }
 
     private void addToCustomerHierarchy(SecurityUser currentUser, CustomerId childId) {
-        RbacCustomerHierarchy hierarchy = customerHierarchyService.getCustomerHierarchy(currentUser.getTenantId());
+        addCustomerParent(currentUser.getTenantId(), childId, currentUser.getCustomerId());
+    }
+
+    private void addCustomerParent(TenantId tenantId, CustomerId childId, CustomerId parentId) {
+        RbacCustomerHierarchy hierarchy = customerHierarchyService.getCustomerHierarchy(tenantId);
         if (hierarchy == null) {
             hierarchy = new RbacCustomerHierarchy();
         }
-        hierarchy.getParents().put(childId.getId().toString(), currentUser.getCustomerId().getId().toString());
-        customerHierarchyService.saveCustomerHierarchy(currentUser.getTenantId(), hierarchy);
+        hierarchy.getParents().put(childId.getId().toString(), parentId.getId().toString());
+        customerHierarchyService.saveCustomerHierarchy(tenantId, hierarchy);
     }
 
     private void removeFromCustomerHierarchy(TenantId tenantId, CustomerId customerId) {

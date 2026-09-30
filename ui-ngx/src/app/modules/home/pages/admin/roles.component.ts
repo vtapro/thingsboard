@@ -85,8 +85,9 @@ export class RolesComponent extends PageComponent implements OnInit {
    * Only devices, assets and entity views may be a member of an entity group, so only their permissions can be
    * scoped to groups (same rule as the backend validation).
    */
-  readonly groupScopedResources = GROUP_ENTITY_TYPES;
-  readonly entityTypes = GROUP_ENTITY_TYPES;
+  // entity groups now also exist for the members (users) and for the customers, like in ThingsBoard PE
+  readonly groupScopedResources = [...GROUP_ENTITY_TYPES, 'USER', 'CUSTOMER'];
+  readonly entityTypes = [...GROUP_ENTITY_TYPES, 'USER', 'CUSTOMER'];
   /**
    * Resources a user may create itself, so the "only entities created by the user" scope is meaningful. For the
    * members (users and customers) this is what lets a manager add the members of its own team.

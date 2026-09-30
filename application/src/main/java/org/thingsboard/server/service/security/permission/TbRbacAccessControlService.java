@@ -680,7 +680,7 @@ public class TbRbacAccessControlService implements AccessControlService {
     /**
      * Only the entities that can be a member of an entity group may be scoped to groups.
      */
-    public static final Set<String> GROUP_SCOPED_RESOURCES = Set.of("DEVICE", "ASSET", "ENTITY_VIEW");
+    public static final Set<String> GROUP_SCOPED_RESOURCES = Set.of("DEVICE", "ASSET", "ENTITY_VIEW", "CUSTOMER", "USER");
 
     /**
      * Resources that describe the members of a customer (the users and the sub-customers). They are special because

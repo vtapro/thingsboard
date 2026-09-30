@@ -21,6 +21,13 @@ production của ThingsBoard. Khác biệt với môi trường dev (xem [local-
 > nằm ở [`deploy/k3s/SCALING.md`](../deploy/k3s/SCALING.md). Mục 3.3 và §10 dưới đây mô tả cụm 3 node cũ;
 > khi nâng cấp hãy đọc SCALING.md trước.
 
+> **Cập nhật (2026-09-30): release `v4.4.0.5`** — bản này gồm: bảo vệ tài khoản `TENANT_ADMIN` (tenant admin
+> không disable/enable được tài khoản quản trị, `Login as` chỉ áp cho customer user, xem
+> [rbac-members.md](rbac-members.md)), nhóm thực thể cho **Customers/Users** (bấm vào item group — kể cả nhóm
+> **All** — mở trang thành viên, `EntityGroupController` chấp nhận `CUSTOMER`/`USER`), và các fix RBAC /
+> customer hierarchy đang có trên nhánh. Cụm production chạy đúng 8 image `ghcr.io/vtapro/tb-*:v4.4.0.5`.
+> Schema không đổi so với `v4.4.0.4` nên **bỏ qua job `tb-install`** khi roll bản này.
+
 Code ThingsBoard **không bị sửa để bỏ Kafka/Cassandra**. Việc "không dùng Kafka/Cassandra" chỉ
 áp dụng cho script và tài liệu dev; toàn bộ nhánh Kafka/Cassandra/microservices của ThingsBoard
 CE vẫn nguyên vẹn (xem mục 8 để có bằng chứng kiểm tra).
@@ -74,18 +81,19 @@ cluster. Nếu muốn id ổn định qua các lần restart, dùng `StatefulSet
 ## 2. Build image lên GHCR
 
 Mỗi ThingsBoard service có **một image riêng**, đặt tên theo service, version sản phẩm hiện tại
-**`v4.4.0.4`** (tag Git dùng để phát hành; `IMAGE_VERSION` trong workflow hiện vẫn là `v4.4.0.0`):
+**`v4.4.0.5`** (tag Git dùng để phát hành; `IMAGE_VERSION` trong workflow vẫn là `v4.4.0.0` — release
+`v4.4.0.5` phát hành bằng git tag, xem §2.2):
 
 | Service | Image |
 |---|---|
-| tb-node (monolith / tb-core / tb-rule-engine, kiêm job installer) | `ghcr.io/vtapro/tb-node:v4.4.0.4` |
-| tb-mqtt-transport | `ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.4` |
-| tb-http-transport | `ghcr.io/vtapro/tb-http-transport:v4.4.0.4` |
-| tb-coap-transport | `ghcr.io/vtapro/tb-coap-transport:v4.4.0.4` |
-| tb-lwm2m-transport | `ghcr.io/vtapro/tb-lwm2m-transport:v4.4.0.4` |
-| tb-snmp-transport | `ghcr.io/vtapro/tb-snmp-transport:v4.4.0.4` |
-| tb-edqs | `ghcr.io/vtapro/tb-edqs:v4.4.0.4` |
-| tb-vc-executor | `ghcr.io/vtapro/tb-vc-executor:v4.4.0.4` |
+| tb-node (monolith / tb-core / tb-rule-engine, kiêm job installer) | `ghcr.io/vtapro/tb-node:v4.4.0.5` |
+| tb-mqtt-transport | `ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.5` |
+| tb-http-transport | `ghcr.io/vtapro/tb-http-transport:v4.4.0.5` |
+| tb-coap-transport | `ghcr.io/vtapro/tb-coap-transport:v4.4.0.5` |
+| tb-lwm2m-transport | `ghcr.io/vtapro/tb-lwm2m-transport:v4.4.0.5` |
+| tb-snmp-transport | `ghcr.io/vtapro/tb-snmp-transport:v4.4.0.5` |
+| tb-edqs | `ghcr.io/vtapro/tb-edqs:v4.4.0.5` |
+| tb-vc-executor | `ghcr.io/vtapro/tb-vc-executor:v4.4.0.5` |
 
 Lưu ý: `greeniq-backend` / `greeniq-frontend` trên GHCR đã là của ứng dụng khác
 (`greeniq-backend:v2.8.2.69`), nên nền tảng ThingsBoard dùng nhóm `tb-*` để không đụng tên.
@@ -110,7 +118,7 @@ nên mỗi pod chỉ mang đúng những gì nó chạy.
 > Trong lúc chờ, vẫn build image bằng tay: `docker build -f docker/tb-custom/Dockerfile -t ... .`
 > và `docker push` lên GHCR.
 
-Mỗi image được gắn 4 tag giống nhau: `:v4.4.0.4` (tag để deploy), `:<branch>`, `:sha-<short>`
+Mỗi image được gắn 4 tag giống nhau: `:v4.4.0.5` (tag để deploy), `:<branch>`, `:sha-<short>`
 (truy vết commit) và `:latest` (chỉ trên default branch).
 
 ### 2.1. Build/push khi máy có Docker
@@ -124,18 +132,18 @@ mvn -B -T 1C clean install -DskipTests \
 mkdir -p /tmp/jars && cp application/target/thingsboard-4.4.0-SNAPSHOT-boot.jar /tmp/jars/tb-node.jar
 docker build -f docker/msa/Dockerfile.tb-node \
   --build-context jars=/tmp/jars --build-arg SERVICE_JAR=tb-node.jar \
-  -t ghcr.io/vtapro/tb-node:v4.4.0.4 .
+  -t ghcr.io/vtapro/tb-node:v4.4.0.5 .
 
 # mqtt transport (lặp lại cho http/coap/lwm2m/snmp/edqs/vc-executor, đổi jar tương ứng)
 cp transport/mqtt/target/tb-mqtt-transport-4.4.0-SNAPSHOT-boot.jar /tmp/jars/tb-mqtt-transport.jar
 docker build -f docker/msa/Dockerfile.service \
   --build-context jars=/tmp/jars --build-arg SERVICE_JAR=tb-mqtt-transport.jar \
-  -t ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.4 .
+  -t ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.5 .
 
 # đăng nhập GHCR (PAT cần scope write:packages) rồi push
 echo "$CR_PAT" | docker login ghcr.io -u vtapro --password-stdin
-docker push ghcr.io/vtapro/tb-node:v4.4.0.4
-docker push ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.4
+docker push ghcr.io/vtapro/tb-node:v4.4.0.5
+docker push ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.5
 ```
 
 ### 2.2. Không có Docker ở máy dev — dùng GitHub Actions
@@ -147,8 +155,8 @@ docker push ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.4
 > tag đó — workflow chạy với `type=ref,event=tag` và image sẽ được gắn đúng tag phiên bản:
 >
 > ```bash
-> git push origin RBAC-Full-User          # code + manifest (không đụng file workflow)
-> git tag -f v4.4.0.4 && git push -f origin v4.4.0.4   # kích hoạt build, image mang tag v4.4.0.4
+> git push origin RBAC-Full-User-Div      # code + manifest (không đụng file workflow)
+> git tag -f v4.4.0.5 && git push -f origin v4.4.0.5   # kích hoạt build, image mang tag v4.4.0.5
 > ```
 >
 > Lưu ý: cho tới khi `gh auth refresh -h github.com -s workflow` (hoặc dùng PAT có scope `workflow`)
@@ -171,7 +179,7 @@ git push origin RBAC-full-groups-tabs
 gh run watch
 
 # 4. kiểm tra image đã lên GHCR (8 package tb-*)
-docker manifest inspect ghcr.io/vtapro/tb-node:v4.4.0.4    # nếu có docker
+docker manifest inspect ghcr.io/vtapro/tb-node:v4.4.0.5    # nếu có docker
 # hoặc xem trực tiếp: https://github.com/vtapro?tab=packages
 ```
 
@@ -526,9 +534,8 @@ kubectl apply -f deploy/k3s/04-kafka.yaml
 kubectl -n thingsboard rollout status statefulset/tb-zookeeper --timeout=5m
 kubectl -n thingsboard rollout status statefulset/tb-kafka --timeout=5m
 
-# 3. image đã mặc định là ghcr.io/vtapro/tb-*:v4.4.0.4 trong manifest;
-#    chỉ đổi tag khi roll bản mới
-sed -i 's#:v4.4.0.4#:v4.4.0.4#' deploy/k3s/*.yaml
+# 3. image đã mặc định là ghcr.io/vtapro/tb-*:v4.4.0.5 trong manifest;
+#    chỉ đổi tag khi roll bản mới, ví dụ: sed -i '' 's#:v4.4.0.5#:v4.4.0.6#' deploy/k3s/*.yaml
 
 # 4. cài/cập nhật schema — 1 lần cho mỗi release, TRƯỚC khi rolling service
 kubectl apply -f deploy/k3s/10-install-job.yaml

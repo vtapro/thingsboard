@@ -162,11 +162,17 @@ export class UsersTableConfigResolver  {
             this.translate.instant('user.login-as-tenant-admin') :
             this.translate.instant('user.login-as-customer-user'),
           icon: 'mdi:login',
-          isEnabled: () => true,
+          // the backend only hands out the token of a customer user to a tenant administrator, so the action
+          // stays visible but disabled for the other administrators (same as ThingsBoard PE)
+          isEnabled: (user) => this.canLoginAsUser(user),
           onAction: ($event, entity) => this.loginAsUser($event, entity)
         }
       );
     }
+  }
+
+  private canLoginAsUser(user: User): boolean {
+    return !!user && user.authority === Authority.CUSTOMER_USER;
   }
 
   saveUser(user: User): Observable<User> {

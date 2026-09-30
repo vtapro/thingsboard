@@ -14,7 +14,7 @@ Cách cài đặt/chạy chi tiết: [local-dev-macos.md](local-dev-macos.md).
 | 5 | Login branding theo domain | ✅ | ✅ | bảng `domain` map host → tenant |
 | 6 | RBAC: role, phân quyền theo resource/operation, gán user | ✅ | ✅ | thêm `ADMIN_SETTINGS`, `USER` |
 | 7 | RBAC enforce sau cờ `security.rbac.enabled`, fallback về CE | ✅ | ✅ | role chỉ siết resource được khai báo |
-| 8 | Entity groups + tab ALL/GROUPS trong bảng entity | ✅ | ✅ | API theo từng group, không ghi đè cả danh sách |
+| 8 | Entity groups + tab ALL/GROUPS trong bảng entity | ✅ | ✅ | API theo từng group, không ghi đè cả danh sách; nhóm có cả cho Customers/Users — bấm vào nhóm (kể cả "All") mở trang thành viên, xem [rbac-members.md](rbac-members.md) §7 |
 | 9 | Quyền theo entity group (scope) | ✅ | ✅ | áp cho DEVICE/ASSET/ENTITY_VIEW; lọc cả API danh sách |
 | 10 | User groups + customer hierarchy | ✅ | ✅ | role gán theo nhóm, lan quyền theo cây customer |
 | 11 | Trang Roles: 4 tab, mỗi entity type một tab quyền, thông báo lưu | ✅ | ✅ | |
@@ -22,7 +22,7 @@ Cách cài đặt/chạy chi tiết: [local-dev-macos.md](local-dev-macos.md).
 | 13 | Deploy production trên k3s (microservices, domain `app.greeniq.vn`) | 🟡 | 🟡 | 8 image riêng theo từng service (`ghcr.io/vtapro/tb-*`), manifest ở `deploy/k3s/`: **PostgreSQL trong cụm (CloudNativePG 3 instance trên Longhorn + PgBouncer)**; Cassandra + Kafka + ZooKeeper chạy trong cụm; cache caffeine — **không dùng Redis**; edge là HAProxy; workflow GHCR ở `.github/workflows/publish-images.yml` |
 | 14 | Đo tải / năng lực hệ thống | ✅ | — | bộ công cụ ở `deploy/loadtest/`, kết quả ở [capacity-load-test.md](capacity-load-test.md): an toàn ≤ 500 thiết bị × 1 msg/s, trần ~1.000 msg/s; 2.000 msg/s bắt đầu mất dữ liệu |
 | 15 | Automation (hẹn giờ điều khiển thiết bị) | ✅ | ✅ | rule hẹn giờ theo ngày/tuần/cron → gửi server-side RPC (bật/tắt máy bơm, tưới cây…); lưu trong `admin_settings` key `automation` (không thêm bảng); API `/api/tenant/automation`; trang **Automation** ở menu trái; test local 15/15 PASS (`scripts/test-automation-local.py`) |
-| 16 | Quản lý thành viên theo quyền (USER/CUSTOMER RBAC) | ✅ | ✅ | user có quyền `USER`/`CUSTOMER` tự thêm/xoá thành viên và customer con; scope `ownOnly` + `ownCustomerOnly`; menu Users/Customers hiện theo quyền; xem [rbac-members.md](rbac-members.md) |
+| 16 | Quản lý thành viên theo quyền (USER/CUSTOMER RBAC) | ✅ | ✅ | user có quyền `USER`/`CUSTOMER` tự thêm/xoá thành viên và customer con; scope `ownOnly` + `ownCustomerOnly`; menu Users/Customers hiện theo quyền; tài khoản `TENANT_ADMIN` chỉ system admin mới disable/enable và `Login as` chỉ áp cho customer user; xem [rbac-members.md](rbac-members.md) |
 
 ## 2. Môi trường local hiện tại (native, không Docker)
 

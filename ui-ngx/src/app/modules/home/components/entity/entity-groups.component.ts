@@ -73,17 +73,29 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
 
   /** Opens the entities of one group, like the "All: Devices" page of ThingsBoard PE. */
   openGroup(group: EntityGroup): void {
-    this.router.navigate(['/entities', this.groupPath(), 'groups', group.id]);
+    const route = this.groupRoute();
+    if (!route) {
+      return;
+    }
+    // like PE: the group (including "All") opens its own page with the members of the group
+    this.router.navigate([...route, 'groups', group.id]);
   }
 
-  private groupPath(): string {
+  /** List page of the entity type; the group page is mounted below it as <list>/groups/<groupId>. */
+  private groupRoute(): string[] {
     switch (this.entityType) {
       case 'ASSET':
-        return 'assets';
+        return ['/entities', 'assets'];
       case 'ENTITY_VIEW':
-        return 'entityViews';
+        return ['/entities', 'entityViews'];
+      case 'CUSTOMER':
+        return ['/customers'];
+      case 'USER':
+        return ['/users'];
+      case 'DEVICE':
+        return ['/entities', 'devices'];
       default:
-        return 'devices';
+        return null;
     }
   }
 
@@ -141,6 +153,10 @@ export class EntityGroupsComponent extends PageComponent implements OnInit {
         return 'entity-group.asset-groups';
       case 'ENTITY_VIEW':
         return 'entity-group.entity-view-groups';
+      case 'CUSTOMER':
+        return 'customer.group-customer';
+      case 'USER':
+        return 'customer.group-user';
       default:
         return 'entity-group.device-groups';
     }

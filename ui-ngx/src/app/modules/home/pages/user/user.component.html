@@ -14,7 +14,7 @@
   <button mat-stroked-button color="primary"
           [disabled]="(isLoading$ | async)"
           (click)="onEntityAction($event, 'disableAccount')"
-          [class.!hidden]="isEdit || !isUserActivated() || !isUserCredentialsEnabled()">
+          [class.!hidden]="isEdit || !isUserActivated() || !isUserCredentialsEnabled() || !canDisableAccount()">
     {{'user.disable-account' | translate }}
   </button>
   <button mat-stroked-button color="primary"
@@ -37,7 +37,7 @@
   </button>
   @if (loginAsUserEnabled$ | async) {
     <button mat-stroked-button color="primary"
-            [disabled]="(isLoading$ | async)"
+            [disabled]="(isLoading$ | async) || !canLoginAsUser()"
             (click)="onEntityAction($event, 'loginAsUser')"
             [class.!hidden]="isEdit">
       {{ (entity?.authority === authority.TENANT_ADMIN ? 'user.login-as-tenant-admin' : 'user.login-as-customer-user') | translate }}

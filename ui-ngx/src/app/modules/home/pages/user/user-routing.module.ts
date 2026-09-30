@@ -3,11 +3,14 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { EntitiesTableComponent } from '../../components/entity/entities-table.component';
+import { EntityGroupEntitiesComponent } from '../../components/entity/entity-group-entities.component';
+import { EntityGroupResolver } from '../../components/entity/entity-group.resolver';
 import { UsersTableConfigResolver } from '@modules/home/pages/user/users-table-config.resolver';
 import { Authority } from '@shared/models/authority.enum';
 import { EntityDetailsPageComponent } from '@home/components/entity/entity-details-page.component';
 import { ConfirmOnExitGuard } from '@core/guards/confirm-on-exit.guard';
 import { entityDetailsPageBreadcrumbLabelFunction } from '@home/pages/home-pages.models';
+import { entityGroupBreadcrumbLabelFunction } from '@home/pages/home-pages.models';
 import { BreadCrumbConfig } from '@shared/components/breadcrumb';
 import { MenuId } from '@core/services/menu.models';
 
@@ -30,6 +33,33 @@ const routes: Routes = [
         resolve: {
           entitiesTableConfig: UsersTableConfigResolver
         }
+      },
+      {
+        path: 'groups',
+        data: {
+          breadcrumb: {
+            label: 'entity-group.groups',
+            icon: 'layers'
+          } as BreadCrumbConfig<any>
+        },
+        children: [
+          {
+            path: ':groupId',
+            component: EntityGroupEntitiesComponent,
+            data: {
+              auth: [Authority.TENANT_ADMIN],
+              entityType: 'USER',
+              breadcrumb: {
+                labelFunction: entityGroupBreadcrumbLabelFunction,
+                icon: 'layers'
+              } as BreadCrumbConfig<any>
+            },
+            resolve: {
+              entitiesTableConfig: UsersTableConfigResolver,
+              entityGroup: EntityGroupResolver
+            }
+          }
+        ]
       },
       {
         path: ':entityId',

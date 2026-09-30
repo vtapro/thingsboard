@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Injectable } from '@angular/core';
 
-import { Router } from '@angular/router';
+import { ActivatedRouteSnapshot, Router } from '@angular/router';
 
 import {
   DateEntityTableColumn,
@@ -58,6 +58,12 @@ export class CustomersTableConfigResolver  {
         onAction: ($event, entity) => this.manageCustomerUsers($event, entity)
       },
       {
+        name: this.translate.instant('customer.manage-customers'),
+        icon: 'mdi:account-multiple-outline',
+        isEnabled: (customer) => true,
+        onAction: ($event, entity) => this.manageSubCustomers($event, entity)
+      },
+      {
         name: this.translate.instant('customer.manage-customer-assets'),
         nameFunction: (customer) => {
           return customer.additionalInfo && customer.additionalInfo.isPublic
@@ -80,15 +86,15 @@ export class CustomersTableConfigResolver  {
         onAction: ($event, entity) => this.manageCustomerDevices($event, entity)
       },
       {
-        name: this.translate.instant('customer.manage-customer-dashboards'),
+        name: this.translate.instant('customer.manage-customer-entity-views'),
         nameFunction: (customer) => {
           return customer.additionalInfo && customer.additionalInfo.isPublic
-            ? this.translate.instant('customer.manage-public-dashboards')
-            : this.translate.instant('customer.manage-customer-dashboards');
+            ? this.translate.instant('customer.manage-public-entity-views')
+            : this.translate.instant('customer.manage-customer-entity-views');
         },
-        icon: 'dashboard',
+        icon: 'mdi:view-quilt-outline',
         isEnabled: (customer) => true,
-        onAction: ($event, entity) => this.manageCustomerDashboards($event, entity)
+        onAction: ($event, entity) => this.manageCustomerEntityViews($event, entity)
       });
     if (authState.edgesSupportEnabled) {
       this.config.cellActionDescriptors.push(
@@ -105,6 +111,20 @@ export class CustomersTableConfigResolver  {
         }
       );
     }
+
+    this.config.cellActionDescriptors.push(
+      {
+        name: this.translate.instant('customer.manage-customer-dashboards'),
+        nameFunction: (customer) => {
+          return customer.additionalInfo && customer.additionalInfo.isPublic
+            ? this.translate.instant('customer.manage-public-dashboards')
+            : this.translate.instant('customer.manage-customer-dashboards');
+        },
+        icon: 'dashboard',
+        isEnabled: (customer) => true,
+        onAction: ($event, entity) => this.manageCustomerDashboards($event, entity)
+      }
+    );
 
     this.config.deleteEntityTitle = customer => this.translate.instant('customer.delete-customer-title', { customerTitle: customer.title });
     this.config.deleteEntityContent = () => this.translate.instant('customer.delete-customer-text');
@@ -130,10 +150,28 @@ export class CustomersTableConfigResolver  {
     }
   }
 
-  resolve(): EntityTableConfig<Customer> {
-    this.config.tableTitle = this.translate.instant('customer.customers');
+  resolve(route: ActivatedRouteSnapshot): EntityTableConfig<Customer> {
+    const customerId = route?.params?.customerId;
+    if (customerId) {
+      // the sub-customers page of one customer (the "Manage customers" action)
+      this.config.tableTitle = this.translate.instant('customer.sub-customers');
+      this.config.entitiesFetchFunction = pageLink => this.customerService.getSubCustomers(customerId, pageLink);
+      this.config.addEnabled = true;
+      // a customer created here becomes a child of the customer whose page is open
+      this.config.saveEntity = customer => this.customerService.saveSubCustomer(customerId, customer);
+    } else {
+      this.config.tableTitle = this.translate.instant('customer.customers');
+      this.config.saveEntity = customer => this.customerService.saveCustomer(customer);
+    }
 
     return this.config;
+  }
+
+  manageSubCustomers($event: Event, customer: Customer) {
+    if ($event) {
+      $event.stopPropagation();
+    }
+    this.router.navigateByUrl(`customers/${customer.id.id}/subCustomers`);
   }
 
   private openCustomer($event: Event, customer: Customer, config: EntityTableConfig<Customer>) {
@@ -156,6 +194,13 @@ export class CustomersTableConfigResolver  {
       $event.stopPropagation();
     }
     this.router.navigateByUrl(`customers/${customer.id.id}/assets`);
+  }
+
+  manageCustomerEntityViews($event: Event, customer: Customer) {
+    if ($event) {
+      $event.stopPropagation();
+    }
+    this.router.navigateByUrl(`customers/${customer.id.id}/entityViews`);
   }
 
   manageCustomerDevices($event: Event, customer: Customer) {
@@ -187,8 +232,14 @@ export class CustomersTableConfigResolver  {
       case 'manageUsers':
         this.manageCustomerUsers(action.event, action.entity);
         return true;
+      case 'manageCustomers':
+        this.manageSubCustomers(action.event, action.entity);
+        return true;
       case 'manageAssets':
         this.manageCustomerAssets(action.event, action.entity);
+        return true;
+      case 'manageEntityViews':
+        this.manageCustomerEntityViews(action.event, action.entity);
         return true;
       case 'manageDevices':
         this.manageCustomerDevices(action.event, action.entity);

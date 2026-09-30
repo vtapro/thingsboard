@@ -151,6 +151,11 @@ public class EntityGroupController extends BaseController {
         }
     }
 
-    private static final List<String> ALLOWED_ENTITY_TYPES = List.of("DEVICE", "ASSET", "ENTITY_VIEW");
+    /**
+     * Entity types that may be grouped: the classic PE ones plus the members of this fork (customers and users),
+     * for which the platform also creates an "All" group.
+     */
+    private static final List<String> ALLOWED_ENTITY_TYPES =
+            List.of("DEVICE", "ASSET", "ENTITY_VIEW", "CUSTOMER", "USER");
 
 }

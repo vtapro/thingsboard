@@ -27,6 +27,16 @@ export class CustomerService {
     return this.http.get<Customer>(`/api/customer/${customerId}`, defaultHttpOptionsFromConfig(config));
   }
 
+  public getSubCustomers(customerId: string, pageLink: PageLink, config?: RequestConfig): Observable<PageData<Customer>> {
+    return this.http.get<PageData<Customer>>(`/api/customer/${customerId}/subCustomers${pageLink.toQuery()}`,
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  public saveSubCustomer(parentCustomerId: string, customer: Customer, config?: RequestConfig): Observable<Customer> {
+    return this.http.post<Customer>(`/api/customer/${parentCustomerId}/subCustomer`, customer,
+      defaultHttpOptionsFromConfig(config));
+  }
+
   public getCustomersByIds(customerIds: Array<string>, config?: RequestConfig): Observable<Array<Customer>> {
     return this.http.get<Array<Customer>>(`/api/customers?customerIds=${customerIds.join(',')}`, defaultHttpOptionsFromConfig(config));
   }

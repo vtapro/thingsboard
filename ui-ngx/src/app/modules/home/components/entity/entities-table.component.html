@@ -6,19 +6,25 @@
 -->
 @if (groupsTabEnabled()) {
   <div class="tb-entities-tabs">
-    <button type="button" class="tb-entities-tab" [class.tb-active]="!groupsTab" (click)="groupsTab = false">
+    <button type="button" class="tb-entities-tab" [class.tb-active]="!groupsTab && !hierarchyTab"
+            (click)="selectTab('all')">
       {{ 'entity-group.all' | translate }}
     </button>
-    <button type="button" class="tb-entities-tab" [class.tb-active]="groupsTab" (click)="groupsTab = true">
+    <button type="button" class="tb-entities-tab" [class.tb-active]="groupsTab" (click)="selectTab('groups')">
       {{ 'entity-group.groups' | translate }}
     </button>
+    @if (hierarchyTabEnabled()) {
+      <button type="button" class="tb-entities-tab" [class.tb-active]="hierarchyTab" (click)="selectTab('hierarchy')">
+        {{ 'customer.hierarchy' | translate }}
+      </button>
+    }
   </div>
 }
 <!--
   NOTE: the table must not be wrapped into a structural directive (@if/@else), the component resolves
   the "entityTableHeader" anchor with a static ViewChild and creates the custom header inside it.
 -->
-<div class="tb-entities-content" [class.tb-entities-hidden]="groupsTabEnabled() && groupsTab">
+<div class="tb-entities-content" [class.tb-entities-hidden]="groupsTabEnabled() && (groupsTab || hierarchyTab)">
 <mat-drawer-container hasBackdrop="false" class="tb-absolute-fill">
   @if (entitiesTableConfig.detailsPanelEnabled) {
     <mat-drawer
@@ -397,5 +403,10 @@
 @if (groupsTab) {
   <div class="tb-entities-content">
     <tb-entity-groups [entityType]="groupsEntityType()"></tb-entity-groups>
+  </div>
+}
+@if (hierarchyTab) {
+  <div class="tb-entities-content">
+    <tb-customer-hierarchy></tb-customer-hierarchy>
   </div>
 }

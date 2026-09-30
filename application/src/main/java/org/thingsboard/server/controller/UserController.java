@@ -161,6 +161,16 @@ public class UserController extends BaseController {
         UserId userId = new UserId(toUUID(strUserId));
         SecurityUser authUser = getCurrentUser();
         User user = checkUserId(userId, Operation.READ);
+        if (user.getId().equals(authUser.getId())) {
+            throw new ThingsboardException("You don't have permission to login as yourself.",
+                    ThingsboardErrorCode.PERMISSION_DENIED);
+        }
+        if (Authority.TENANT_ADMIN.equals(authUser.getAuthority()) && !Authority.CUSTOMER_USER.equals(user.getAuthority())) {
+            // a tenant administrator only impersonates the users of its customers; impersonating another
+            // administrator (or a system administrator) would hand out permissions the account does not have
+            throw new ThingsboardException("You don't have permission to login as a tenant administrator.",
+                    ThingsboardErrorCode.PERMISSION_DENIED);
+        }
         UserPrincipal principal = new UserPrincipal(UserPrincipal.Type.USER_NAME, user.getEmail());
         UserCredentials credentials = userService.findUserCredentialsByUserId(authUser.getTenantId(), userId);
         SecurityUser securityUser = new SecurityUser(user, credentials.isEnabled(), principal);
@@ -415,7 +425,17 @@ public class UserController extends BaseController {
             @RequestParam(required = false, defaultValue = "true") boolean userCredentialsEnabled) throws ThingsboardException {
         checkParameter(USER_ID, strUserId);
         UserId userId = new UserId(toUUID(strUserId));
-        checkUserId(userId, Operation.WRITE);
+        User user = checkUserId(userId, Operation.WRITE);
+        if (Authority.TENANT_ADMIN.equals(user.getAuthority())
+                && !Authority.SYS_ADMIN.equals(getCurrentUser().getAuthority())) {
+            // A tenant administrator owns the tenant: neither the user itself nor a colleague that is allowed to
+            // manage users may lock the tenant out, and nobody of the tenant may revert a suspension decided by
+            // the system administrator. Only the system administrator, who provisions the tenant, may lock and
+            // unlock a tenant administrator account.
+            throw new ThingsboardException("You don't have permission to "
+                    + (userCredentialsEnabled ? "enable" : "disable") + " a tenant administrator account.",
+                    ThingsboardErrorCode.PERMISSION_DENIED);
+        }
         TenantId tenantId = getCurrentUser().getTenantId();
         userService.setUserCredentialsEnabled(tenantId, userId, userCredentialsEnabled);
 

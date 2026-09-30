@@ -1,0 +1,31 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<div class="tb-hierarchy">
+  <div class="tb-hierarchy-tree">
+    @for (node of visibleNodes; track node.id) {
+      <div class="tb-hierarchy-node" [class.tb-selected]="selected?.id === node.id"
+           [style.paddingLeft.px]="node.level * 18 + 8" (click)="select(node)">
+        @if (node.expandable) {
+          <button type="button" class="tb-hierarchy-toggle" (click)="toggle(node, $event)">
+            <mat-icon>{{ isExpanded(node) ? 'expand_more' : 'chevron_right' }}</mat-icon>
+          </button>
+        } @else {
+          <span class="tb-hierarchy-toggle"></span>
+        }
+        <mat-icon class="tb-hierarchy-icon">{{ node.icon }}</mat-icon>
+        <span class="tb-hierarchy-label">{{ node.translatable ? (node.label | translate) : node.label }}</span>
+      </div>
+    }
+  </div>
+  <div class="tb-hierarchy-panel">
+    @if (selected?.kind === 'group') {
+      <tb-entity-groups [entityType]="selected.entityType"></tb-entity-groups>
+    } @else {
+      <div class="tb-hierarchy-empty">{{ 'admin.roles-hierarchy-empty' | translate }}</div>
+    }
+  </div>
+</div>

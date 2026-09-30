@@ -22,7 +22,12 @@ public class DefaultEntityGroupService implements EntityGroupService {
 
     public static final String ENTITY_GROUPS_SETTINGS_KEY = "entityGroups";
     public static final String ALL_GROUP_NAME = "All";
-    private static final List<String> DEFAULT_GROUP_ENTITY_TYPES = List.of("DEVICE", "ASSET", "ENTITY_VIEW");
+    /**
+     * Entity types that always have an "All" group: the classic PE ones plus the members of this fork
+     * (customers and users), so the Groups tab of the Users / Customers pages always shows "All" too.
+     */
+    private static final List<String> DEFAULT_GROUP_ENTITY_TYPES =
+            List.of("DEVICE", "ASSET", "ENTITY_VIEW", "CUSTOMER", "USER");
 
     private final AdminSettingsService adminSettingsService;
     private final TenantSettingsLocks locks = new TenantSettingsLocks();

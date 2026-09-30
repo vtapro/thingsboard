@@ -1,0 +1,77 @@
+// SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+// SPDX-License-Identifier: Apache-2.0
+
+.tb-hierarchy {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.tb-hierarchy-tree {
+  width: 360px;
+  min-width: 260px;
+  height: 100%;
+  overflow: auto;
+  padding: 8px 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.tb-hierarchy-node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px 4px 0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.tb-hierarchy-node:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.tb-hierarchy-node.tb-selected {
+  background: rgba(48, 63, 159, 0.08);
+}
+
+.tb-hierarchy-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.tb-hierarchy-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tb-hierarchy-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  margin-right: 4px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.tb-hierarchy-panel {
+  flex: 1;
+  height: 100%;
+  overflow: auto;
+}
+
+.tb-hierarchy-empty {
+  padding: 24px;
+  color: rgba(0, 0, 0, 0.54);
+}

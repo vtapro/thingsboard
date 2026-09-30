@@ -37,22 +37,25 @@ export class AddEntitiesDialogComponent implements OnInit {
   }
 
   ngOnInit() {
-    const path = this.data.entityType === 'DEVICE' ? 'devices'
-      : this.data.entityType === 'ASSET' ? 'assets' : 'entityViews';
+    const url = this.data.entityType === 'DEVICE' ? '/api/tenant/devices'
+      : this.data.entityType === 'ASSET' ? '/api/tenant/assets'
+      : this.data.entityType === 'ENTITY_VIEW' ? '/api/tenant/entityViews'
+      : this.data.entityType === 'USER' ? '/api/users'
+      : '/api/customers';
     this.selectedIds = [...(this.data.selectedIds || [])];
-    this.loadEntities(path, 0, []);
+    this.loadEntities(url, 0, []);
   }
 
   /** Loads the entities of the type page by page: the first page alone would hide the entities of a large tenant. */
-  private loadEntities(path: string, page: number, entities: Array<{id: string; name: string}>): void {
-    this.http.get<{data: Array<{id: {id: string}; name: string}>; hasNext: boolean}>(
-      `/api/tenant/${path}?pageSize=${AddEntitiesDialogComponent.PAGE_SIZE}&page=${page}`,
+  private loadEntities(url: string, page: number, entities: Array<{id: string; name: string}>): void {
+    this.http.get<{data: Array<{id: {id: string}; name?: string; title?: string; email?: string}>; hasNext: boolean}>(
+      `${url}?pageSize=${AddEntitiesDialogComponent.PAGE_SIZE}&page=${page}`,
       defaultHttpOptionsFromConfig(undefined)).subscribe({
       next: pageData => {
         const loaded = entities.concat((pageData?.data || [])
-          .map(entity => ({id: entity.id.id, name: entity.name})));
+          .map(entity => ({id: entity.id.id, name: entity.name ?? entity.title ?? entity.email})));
         if (pageData?.hasNext && page + 1 < AddEntitiesDialogComponent.MAX_PAGES) {
-          this.loadEntities(path, page + 1, loaded);
+          this.loadEntities(url, page + 1, loaded);
         } else {
           this.truncated = !!pageData?.hasNext;
           this.entities = loaded;

@@ -73,9 +73,18 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
   }
 
   ngOnInit(): void {
-    this.columns = this.entityType === 'ENTITY_VIEW'
-      ? ['createdTime', 'name', 'type']
-      : ['createdTime', 'name', 'profile', 'label'];
+    switch (this.entityType) {
+      case 'ENTITY_VIEW':
+        this.columns = ['createdTime', 'name', 'type'];
+        break;
+      case 'CUSTOMER':
+      case 'USER':
+        // the members only have a name (the customer title / the user email) and their creation time
+        this.columns = ['createdTime', 'name'];
+        break;
+      default:
+        this.columns = ['createdTime', 'name', 'profile', 'label'];
+    }
     // the group and the config of the entity type are resolved by the router
     this.group = this.route.snapshot.data.entityGroup;
     this.tableConfig = this.route.snapshot.data.entitiesTableConfig;
@@ -158,7 +167,8 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
     return {
       id: this.entityIdString(entity),
       createdTime: Number(entity?.createdTime) || 0,
-      name: entity?.name,
+      // a customer is named by its title, a user by its email
+      name: entity?.name ?? entity?.title ?? entity?.email,
       label: entity?.label,
       deviceProfileName: entity?.deviceProfileName,
       assetProfileName: entity?.assetProfileName,
@@ -219,6 +229,12 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
       data: {entitiesTableConfig: this.tableConfig}
     }).afterClosed().subscribe((created: any) => {
       if (created?.id?.id) {
+        if (this.group.allGroup) {
+          // every entity of the type belongs to "All" by definition: the group itself can not be updated
+          this.pageIndex = 0;
+          this.reload();
+          return;
+        }
         const updated: EntityGroupInfo = {...this.group, entityIds: [...(this.group.entityIds || []), created.id.id]};
         this.http.post('/api/tenant/entityGroup/group', updated,
           defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe(() => {
@@ -236,6 +252,10 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
         return '/entities/assets';
       case 'ENTITY_VIEW':
         return '/entities/entityViews';
+      case 'CUSTOMER':
+        return '/customers';
+      case 'USER':
+        return '/users';
       default:
         return '/entities/devices';
     }
@@ -247,6 +267,10 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
         return 'asset.assets';
       case 'ENTITY_VIEW':
         return 'entity-view.entity-views';
+      case 'CUSTOMER':
+        return 'customer.customers';
+      case 'USER':
+        return 'user.users';
       default:
         return 'device.devices';
     }
@@ -258,6 +282,10 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
         return 'asset.name';
       case 'ENTITY_VIEW':
         return 'entity-view.name';
+      case 'CUSTOMER':
+        return 'customer.customer';
+      case 'USER':
+        return 'user.email';
       default:
         return 'device.name';
     }
@@ -269,6 +297,10 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
         return '/api/tenant/assets';
       case 'ENTITY_VIEW':
         return '/api/tenant/entityViews';
+      case 'CUSTOMER':
+        return '/api/customers';
+      case 'USER':
+        return '/api/users';
       default:
         return '/api/tenant/devices';
     }
@@ -375,7 +407,9 @@ export class EntityGroupEntitiesComponent extends PageComponent implements OnIni
    * resolved with two small batches of calls (entities then their profiles).
    */
   private enrichProfiles(entities: GroupEntity[]): void {
-    if (this.entityType === 'ENTITY_VIEW' || !entities.length) {
+    // only devices and assets have a profile; the members (customers/users) have none
+    if (this.entityType === 'ENTITY_VIEW' || this.entityType === 'CUSTOMER'
+        || this.entityType === 'USER' || !entities.length) {
       return;
     }
     const entityApi = this.entityType === 'ASSET' ? '/api/asset/' : '/api/device/';

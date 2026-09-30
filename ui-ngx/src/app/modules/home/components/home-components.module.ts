@@ -191,6 +191,7 @@ import { EventsDialogComponent } from '@home/dialogs/events-dialog.component';
 import { NotificationBellModule } from '@home/components/notification/notification-bell.module';
 import { GithubBadgeModule } from '@home/components/github-badge/github-badge.module';
 import { EntityGroupsComponent } from '@home/components/entity/entity-groups.component';
+import { CustomerHierarchyComponent } from '@home/components/entity/customer-hierarchy.component';
 import { AddEntitiesDialogComponent } from '@home/components/entity/add-entities-dialog.component';
 import { EntityGroupDialogComponent } from '@home/components/entity/entity-group-dialog.component';
 import { EntityShareDialogComponent } from '@home/components/entity/entity-share-dialog.component';
@@ -202,6 +203,7 @@ import { EntityGroupEntitiesComponent } from '@home/components/entity/entity-gro
       RouterTabsComponent,
       EntitiesTableComponent,
       EntityGroupsComponent,
+      CustomerHierarchyComponent,
       AddEntitiesDialogComponent,
       EntityGroupDialogComponent,
       EntityShareDialogComponent,

@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
-import { ChangeDetectorRef, Component, Inject, Optional } from '@angular/core';
+import { ChangeDetectorRef, Component, Inject, OnInit, Optional } from '@angular/core';
 import { select, Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { EntityComponent } from '../../components/entity/entity.component';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { User } from '@shared/models/user.model';
 import { selectAuth } from '@core/auth/auth.selectors';
-import { map } from 'rxjs/operators';
+import { map, take } from 'rxjs/operators';
 import { Authority } from '@shared/models/authority.enum';
 import { isDefinedAndNotNull, validateEmail } from '@core/utils';
 import { EntityTableConfig } from '@home/models/entity/entities-table-config.models';
@@ -22,7 +22,7 @@ import { UnitSystems } from '@shared/models/unit.models';
     styleUrls: ['./user.component.scss'],
     standalone: false
 })
-export class UserComponent extends EntityComponent<User>{
+export class UserComponent extends EntityComponent<User> implements OnInit {
 
   authority = Authority;
   languageList = env.supportedLangs;
@@ -34,6 +34,8 @@ export class UserComponent extends EntityComponent<User>{
     map((auth) => auth.userTokenAccessEnabled && auth.userDetails?.authority === Authority.TENANT_ADMIN)
   );
 
+  private authUserAuthority: Authority;
+
   constructor(protected store: Store<AppState>,
               @Optional() @Inject('entity') protected entityValue: User,
               @Optional() @Inject('entitiesTableConfig') protected entitiesTableConfigValue: EntityTableConfig<User>,
@@ -41,6 +43,30 @@ export class UserComponent extends EntityComponent<User>{
               protected cd: ChangeDetectorRef,
               protected translate: TranslateService) {
     super(store, fb, entityValue, entitiesTableConfigValue, cd);
+  }
+
+  ngOnInit(): void {
+    super.ngOnInit();
+    this.store.pipe(select(selectAuth), take(1)).subscribe(auth => this.authUserAuthority = auth.userDetails?.authority);
+  }
+
+  /**
+   * A tenant administrator account is provisioned by the system administrator: disabling it locks the whole
+   * tenant out, so only the system administrator may do it (same rule the backend enforces).
+   */
+  canDisableAccount(): boolean {
+    if (this.entity?.authority !== Authority.TENANT_ADMIN) {
+      return true;
+    }
+    return this.authUserAuthority === Authority.SYS_ADMIN;
+  }
+
+  /**
+   * The impersonation endpoint only returns the token of a customer user to a tenant administrator, so the button
+   * is shown (ThingsBoard PE greys it out instead of hiding it) but stays disabled for the other administrators.
+   */
+  canLoginAsUser(): boolean {
+    return this.entity?.authority === Authority.CUSTOMER_USER;
   }
 
   hideDelete() {

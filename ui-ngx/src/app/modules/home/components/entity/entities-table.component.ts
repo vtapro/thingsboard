@@ -71,6 +71,7 @@ export class EntitiesTableComponent extends PageComponent implements IEntitiesTa
   entitiesTableConfig: EntityTableConfig<BaseData<HasId>>;
 
   groupsTab = false;
+  hierarchyTab = false;
 
   groupsEntityType(): EntityType {
     return this.entitiesTableConfig?.entityType;
@@ -80,7 +81,19 @@ export class EntitiesTableComponent extends PageComponent implements IEntitiesTa
     // entity groups are managed by the tenant administrator only (the API requires TENANT_ADMIN)
     const authority = getCurrentAuthState(this.store).authUser?.authority;
     return authority === Authority.TENANT_ADMIN
-      && [EntityType.DEVICE, EntityType.ASSET, EntityType.ENTITY_VIEW].includes(this.groupsEntityType());
+      && [EntityType.DEVICE, EntityType.ASSET, EntityType.ENTITY_VIEW, EntityType.CUSTOMER, EntityType.USER]
+        .includes(this.groupsEntityType());
+  }
+
+  /** The Hierarchy tab (parent customer of every customer) is specific to the Customers page. */
+  hierarchyTabEnabled(): boolean {
+    const authority = getCurrentAuthState(this.store).authUser?.authority;
+    return authority === Authority.TENANT_ADMIN && this.groupsEntityType() === EntityType.CUSTOMER;
+  }
+
+  selectTab(tab: 'all' | 'groups' | 'hierarchy'): void {
+    this.groupsTab = tab === 'groups';
+    this.hierarchyTab = tab === 'hierarchy';
   }
 
   translations: EntityTypeTranslation;
