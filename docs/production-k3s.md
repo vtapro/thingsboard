@@ -27,6 +27,12 @@ production của ThingsBoard. Khác biệt với môi trường dev (xem [local-
 > **All** — mở trang thành viên, `EntityGroupController` chấp nhận `CUSTOMER`/`USER`), và các fix RBAC /
 > customer hierarchy đang có trên nhánh. Cụm production chạy đúng 8 image `ghcr.io/vtapro/tb-*:v4.4.0.5`.
 > Schema không đổi so với `v4.4.0.4` nên **bỏ qua job `tb-install`** khi roll bản này.
+>
+> Đã roll cụm production (2026-09-30): 9/9 deployment ThingsBoard (`tb-core`, `tb-rule-engine`, `tb-web-ui`,
+> `tb-js-executor`, `tb-mqtt-transport`, `tb-http-transport`, `tb-coap-transport`, `tb-lwm2m-transport`,
+> `tb-snmp-transport`) chạy `v4.4.0.5`, tất cả pod Running; `https://app.greeniq.vn` trả về bundle UI mới
+> (có `canLoginAsUser`) và `/api/noauth/whiteLabeling` = 200. Roll bằng `kubectl -n thingsboard set image`
+> nên không ghi đè các giá trị drift khác trong cụm.
 
 Code ThingsBoard **không bị sửa để bỏ Kafka/Cassandra**. Việc "không dùng Kafka/Cassandra" chỉ
 áp dụng cho script và tài liệu dev; toàn bộ nhánh Kafka/Cassandra/microservices của ThingsBoard
