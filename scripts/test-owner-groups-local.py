@@ -38,7 +38,9 @@ c1, c2 = customers[0]["id"]["id"], customers[1]["id"]["id"]
 r = session.get(BASE + "/api/tenant/entityGroup")
 user_groups = {g["name"] for g in r.json()["groups"] if g["entityType"] == "USER"}
 check("default user groups of PE exist",
-      {"All", "Tenant Administrators", "Tenant Users"} <= user_groups, sorted(user_groups))
+      {"All", "Customer Administrators", "Customer Users"} <= user_groups, sorted(user_groups))
+check("the groups that followed the authority of the user are gone",
+      not ({"Tenant Administrators", "Tenant Users"} & user_groups), sorted(user_groups))
 
 suffix = int(time.time())
 group_id = "owner-test-%d" % suffix
@@ -63,10 +65,9 @@ try:
     members = {m["name"]: m for m in r.json()["groups"]}
     check("the All group is always a membership", members.get("All", {}).get("member") is True,
           list(members.keys()))
-    check("a customer user belongs to Tenant Users", members.get("Tenant Users", {}).get("member") is True,
-          {k: v["member"] for k, v in members.items()})
-    check("a customer user is not a Tenant Administrator",
-          members.get("Tenant Administrators", {}).get("member") is False,
+    check("a new customer user is a plain Customer User",
+          members.get("Customer Users", {}).get("member") is True
+          and members.get("Customer Administrators", {}).get("member") is False,
           {k: v["member"] for k, v in members.items()})
 
     r = session.post(BASE + "/api/tenant/entityGroup/group", json={

@@ -25,13 +25,16 @@ public class DefaultEntityGroupService implements EntityGroupService {
 
     public static final String ENTITY_GROUPS_SETTINGS_KEY = "entityGroups";
     public static final String ALL_GROUP_NAME = "All";
+
+    private static final String TENANT_ADMINS_GROUP_NAME = "Tenant Administrators";
+    private static final String TENANT_USERS_GROUP_NAME = "Tenant Users";
+
     /**
-     * Default user groups of PE: they follow the authority of the user, so a role may grant permissions to the
-     * administrators of the tenant or to its users without listing the users one by one.
+     * User groups that used to be created by the platform and follow the authority of the user. ThingsBoard PE does
+     * not create them (the profiles of a customer user below are the way to grant permissions to a set of users), so
+     * they are removed from the settings of a tenant that still stores them.
      */
-    public static final String TENANT_ADMINS_GROUP_NAME = "Tenant Administrators";
-    public static final String TENANT_USERS_GROUP_NAME = "Tenant Users";
-    public static final List<String> DEFAULT_USER_GROUP_NAMES =
+    public static final List<String> LEGACY_AUTHORITY_GROUP_NAMES =
             List.of(TENANT_ADMINS_GROUP_NAME, TENANT_USERS_GROUP_NAME);
     /**
      * The two profiles of a customer user of PE: an administrator of the customer may create and manage the devices,
@@ -43,25 +46,6 @@ public class DefaultEntityGroupService implements EntityGroupService {
     public static final String CUSTOMER_USERS_GROUP_NAME = "Customer Users";
     public static final List<String> CUSTOMER_PROFILE_GROUP_NAMES =
             List.of(CUSTOMER_ADMINS_GROUP_NAME, CUSTOMER_USERS_GROUP_NAME);
-
-    /**
-     * True when the membership of the group is derived from the platform instead of being maintained by the tenant
-     * administrator: the two default user groups follow the authority of the user, so the "Manage owner and groups"
-     * dialog shows them but never changes them.
-     */
-    public static boolean isAuthorityManagedUserGroup(RbacEntityGroup group) {
-        return group != null && "USER".equals(group.getEntityType())
-                && DEFAULT_USER_GROUP_NAMES.contains(group.getName());
-    }
-
-    /**
-     * True when the group selects the profile of a customer user (administrator or plain user). The tenant
-     * administrator changes it in the "Manage owner and groups" dialog.
-     */
-    public static boolean isCustomerProfileGroup(RbacEntityGroup group) {
-        return group != null && "USER".equals(group.getEntityType())
-                && CUSTOMER_PROFILE_GROUP_NAMES.contains(group.getName());
-    }
 
     /**
      * Entity types that always have an "All" group: the classic PE ones plus the members of this fork
@@ -114,15 +98,9 @@ public class DefaultEntityGroupService implements EntityGroupService {
                 settings.getGroups().add(group);
             }
         }
-        for (String name : DEFAULT_USER_GROUP_NAMES) {
-            boolean exists = settings.getGroups().stream()
-                    .anyMatch(group -> "USER".equals(group.getEntityType()) && name.equals(group.getName()));
-            if (!exists) {
-                settings.getGroups().add(defaultUserGroup(tenantId, name, TENANT_ADMINS_GROUP_NAME.equals(name)
-                        ? "Tenant administrators of the tenant (kept in sync by the platform)"
-                        : "Users of the tenant (kept in sync by the platform)"));
-            }
-        }
+        // the groups that followed the authority of the user are not part of the model of PE any more
+        settings.getGroups().removeIf(group -> "USER".equals(group.getEntityType())
+                && LEGACY_AUTHORITY_GROUP_NAMES.contains(group.getName()));
         // the two profiles of the customer users of PE
         for (String name : CUSTOMER_PROFILE_GROUP_NAMES) {
             boolean exists = settings.getGroups().stream()
@@ -191,30 +169,11 @@ public class DefaultEntityGroupService implements EntityGroupService {
     }
 
     /**
-     * A tenant administrator belongs to "Tenant Administrators", a customer user to "Tenant Users"; the other
-     * default group is left by the user. Returns true when the membership changed.
+     * A customer user always has one of the two profiles of a customer user. Returns true when the membership
+     * changed.
      */
     private boolean updateMembership(RbacEntityGroupSettings settings, String entity, Authority authority) {
         boolean changed = false;
-        String expectedGroup = Authority.TENANT_ADMIN.equals(authority)
-                ? TENANT_ADMINS_GROUP_NAME : TENANT_USERS_GROUP_NAME;
-        for (RbacEntityGroup group : settings.getGroups()) {
-            if (!"USER".equals(group.getEntityType()) || !DEFAULT_USER_GROUP_NAMES.contains(group.getName())) {
-                continue;
-            }
-            if (group.getEntityIds() == null) {
-                group.setEntityIds(new ArrayList<>());
-            }
-            boolean expected = expectedGroup.equals(group.getName());
-            boolean member = group.getEntityIds().contains(entity);
-            if (expected && !member) {
-                group.getEntityIds().add(entity);
-                changed = true;
-            } else if (!expected && member) {
-                group.getEntityIds().remove(entity);
-                changed = true;
-            }
-        }
         if (Authority.CUSTOMER_USER.equals(authority)) {
             // A new customer user is a plain user; the tenant administrator promotes it to the administrator of its
             // customer by moving it to the "Customer Administrators" group in the dialog.

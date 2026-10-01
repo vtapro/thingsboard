@@ -9,8 +9,7 @@
 #   - "Only entities created by the user" (ownOnly) duoc ghi nhan (rbacOwnerId) va loc danh sach
 #   - customer user khong co quyen CREATE bi tu choi (403)
 #   - chi SYS_ADMIN tao duoc tai khoan TENANT_ADMIN (tenant admin bi tu choi 403)
-#   - nhom user he thong (All / Tenant Administrators / Tenant Users) khong the bi doi bang
-#     POST /api/tenant/entityGroup/members, nhom thuong thi doi duoc
+#   - nhom he thong "All" khong the bi doi bang POST /api/tenant/entityGroup/members, nhom thuong thi doi duoc
 #
 # Chay:
 #   python -m pip install requests
@@ -194,24 +193,16 @@ try:
     if r.status_code == 200:
         created["users"].append(r.json()["id"]["id"])
 
-    # --- the system groups can not be changed through the membership API --------------------------
+    # --- only the "All" group is a system group ---------------------------------------------------
     r = session.get(BASE + f"/api/tenant/entityGroup/members/USER/{creator_id}")
     members = {m["name"]: m for m in r.json()["groups"]}
-    check("the default user groups are reported as system groups",
-          members["Tenant Users"]["system"] is True and members["Tenant Administrators"]["system"] is True,
+    check("the 'All' group is reported as a system group",
+          members["All"]["system"] is True
+          and members["Customer Users"]["system"] is False
+          and members["Customer Administrators"]["system"] is False,
           {k: v.get("system") for k, v in members.items()})
-
-    all_group = members["All"]["id"]
-    admins_group = members["Tenant Administrators"]["id"]
-    r = session.post(BASE + f"/api/tenant/entityGroup/members/USER/{creator_id}",
-                     json={"groupIds": [all_group, admins_group]})
-    membership = {m["name"]: m["member"] for m in r.json()["groups"]}
-    check("the authority group of a customer user is not changed by the dialog",
-          membership["Tenant Administrators"] is False and membership["Tenant Users"] is True, membership)
-    r = session.get(BASE + f"/api/tenant/entityGroup/members/USER/{creator_id}")
-    membership = {m["name"]: m["member"] for m in r.json()["groups"]}
-    check("the membership is still the authority based one after a reload",
-          membership["Tenant Administrators"] is False and membership["Tenant Users"] is True, membership)
+    check("the groups that followed the authority of the user are gone",
+          "Tenant Users" not in members and "Tenant Administrators" not in members, sorted(members))
 
     # --- a custom group is still editable ---------------------------------------------------------
     group_id = "create-test-group-%d" % suffix

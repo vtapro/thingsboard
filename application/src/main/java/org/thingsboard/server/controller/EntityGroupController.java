@@ -154,10 +154,6 @@ public class EntityGroupController extends BaseController {
                 // the "All" group of the type contains every entity of the tenant, its membership is implicit
                 continue;
             }
-            if (DefaultEntityGroupService.isAuthorityManagedUserGroup(group)) {
-                // the default user groups follow the authority of the user, so the dialog can not change them
-                continue;
-            }
             if (group.getEntityIds() == null) {
                 group.setEntityIds(new java.util.ArrayList<>());
             }
@@ -211,8 +207,7 @@ public class EntityGroupController extends BaseController {
             boolean member = group.isAllGroup()
                     || (group.getEntityIds() != null && group.getEntityIds().contains(target));
             members.add(new EntityGroupMembers.Member(group.getId(), group.getName(), group.getDescription(),
-                    group.isPublicGroup(), group.isAllGroup(),
-                    group.isAllGroup() || DefaultEntityGroupService.isAuthorityManagedUserGroup(group), member));
+                    group.isPublicGroup(), group.isAllGroup(), group.isAllGroup(), member));
         }
         return new EntityGroupMembers(entityId, members);
     }

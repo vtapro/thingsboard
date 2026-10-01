@@ -124,24 +124,22 @@ PE, gộp 2 việc:
 
 ### Nhóm user mặc định (giống PE)
 
-Mỗi tenant được tạo sẵn 3 nhóm cho user, đúng như bộ chọn nhóm của PE:
+Mỗi tenant có 3 nhóm cho user, đúng như bộ chọn nhóm của PE:
 
-| Nhóm | Ai thuộc nhóm | Sửa được trong dialog? |
+| Nhóm | Nội dung | Sửa được trong dialog? |
 |---|---|---|
-| `All` | mọi user của tenant | không — nhóm hệ thống |
-| `Tenant Administrators` | user authority `TENANT_ADMIN` | không — thành viên suy ra từ authority |
-| `Tenant Users` | user authority `CUSTOMER_USER` | không — thành viên suy ra từ authority |
+| `All` | mọi user của tenant | không — nhóm hệ thống (nhãn `Auto`) |
+| `Customer Administrators` | profile quản trị customer (xem §9) | **có** — đổi profile của user ở đây |
+| `Customer Users` | profile chỉ-xem của customer | **có** |
 
-Quy tắc đồng bộ: khi tạo/sửa user (`POST /api/user`), nền tảng tự thêm user vào nhóm theo authority của họ và bỏ
-khỏi nhóm còn lại; khi mở dialog (hoặc gọi API membership) hệ thống đồng bộ lại user đang xem, nên cả những user
-tạo trước khi có 2 nhóm này cũng hiện đúng; khi xoá user thì user được bỏ khỏi mọi nhóm user.
+Trước đây fork tạo thêm 2 nhóm suy ra từ authority (`Tenant Administrators` / `Tenant Users`) và đồng bộ thành
+viên theo authority. **PE không có 2 nhóm này** nên đã bỏ: không còn được tạo, các bản ghi cũ bị dọn khỏi settings
+khi đọc, và `POST /api/user` không còn tự gán nhóm theo authority. Việc gom nhóm để gán role nay dùng đúng 2 nhóm
+profile ở trên (hoặc nhóm thường do tenant admin tạo, ví dụ theo phòng ban).
 
-Hai nhóm theo authority là **nhóm hệ thống**: API membership trả `"system": true` và
-`POST /api/tenant/entityGroup/members/...` **bỏ qua** chúng, nên dialog chỉ hiển thị trạng thái (checkbox bị khoá,
-kèm nhãn `Auto`) thay vì cho sửa rồi âm thầm bị đồng bộ lại. Lý do: nếu cho sửa thì role scope theo nhóm
-"Tenant Users" sẽ không còn nghĩa "mọi customer user của tenant", hoặc thay đổi sẽ bị lần đồng bộ kế tiếp ghi đè
-(đúng lỗi "tick 2 nhóm này không lưu được" đã gặp). Muốn gán quyền cho một tập user tuỳ ý thì tạo **nhóm thường**
-(tab Groups của trang Users) rồi thêm user vào nhóm đó — nhóm thường vẫn sửa được bình thường.
+Nhóm `All` là **nhóm hệ thống**: API membership trả `"system": true` và `POST /api/tenant/entityGroup/members/...`
+bỏ qua nó, nên dialog chỉ hiển thị trạng thái (checkbox bị khoá, kèm nhãn `Auto`). Khi xoá user, user được bỏ khỏi
+mọi nhóm user.
 
 ### API
 
@@ -203,7 +201,7 @@ Mỗi tenant được cấp sẵn **2 role** và **2 nhóm USER** cùng tên, n�
 
 - Customer user mới **mặc định thuộc `Customer Users`** (chỉ xem). Tenant admin vào **Manage owner and groups**,
   chuyển user sang `Customer Administrators` là user có quyền tạo/sửa như PE; chuyển ngược lại là thu hồi ngay.
-- Hai nhóm này **sửa được** trong dialog (khác 3 nhóm hệ thống `All`/`Tenant Administrators`/`Tenant Users`).
+- Hai nhóm này **sửa được** trong dialog (khác nhóm hệ thống `All` bị khoá).
 - Nhóm user cùng tên (dùng để gán role) được sinh tự động và **lấy thành viên từ nhóm entity** — dialog là nơi
   duy nhất quản lý thành viên; role của profile được gán sẵn cho nhóm đó.
 - Muốn tinh chỉnh profile: sửa role `Customer Administrator` / `Customer User` ở trang **Roles** (role là mặc định
