@@ -24,6 +24,11 @@
         "public-group": "Public group: visible to every customer user of the group",
         "auto": "Auto",
         "system-group": "The membership of this group is managed automatically by the platform (it follows the entity type or the authority of the user) and can not be changed here.",
+        "effective-roles": "Effective roles",
+        "no-roles": "No custom role — the platform permissions of this account type apply.",
+        "no-owner-hint": "Owner: a tenant administrator account belongs to the tenant, not to a customer, so it has no owner to change.",
+        "system-hint": "The groups are kept by the platform and can not be edited here. Permissions are not set per user: go to Security → Roles, create/edit a role and assign it to this user. To grant the same role to several users at once, create a regular group in the GROUPS tab of the Users page, add the users to it and assign the role to that group.",
+        "tenant-admin-hint": "A tenant administrator starts with the full permissions of the tenant; assigning a role only narrows what it may do.",
         "no-groups": "There is no entity group of this type yet. Create one in the Groups tab of the entity page.",
         "saved": "Owner and groups updated",
         "save-failed": "Failed to update the owner"

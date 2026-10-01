@@ -71,3 +71,31 @@
   border: 1px dashed rgba(0, 0, 0, .12);
   border-radius: 4px;
 }
+
+.tb-manage-owner-roles {
+  margin-top: 12px;
+  font-size: 12px;
+
+  .tb-manage-owner-roles-label {
+    color: rgba(0, 0, 0, .54);
+    margin-right: 6px;
+  }
+
+  .tb-manage-owner-roles-value {
+    font-weight: 500;
+  }
+}
+
+.tb-manage-owner-info {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  background: #eef4fb;
+  color: #305680;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.tb-manage-owner-info-line {
+  margin-top: 6px;
+}

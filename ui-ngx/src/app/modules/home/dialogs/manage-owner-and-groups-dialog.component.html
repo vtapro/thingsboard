@@ -59,6 +59,27 @@
         <div class="tb-manage-owner-groups-empty">{{ 'owner-and-groups.no-groups' | translate }}</div>
       </ng-template>
     </div>
+    @if (data.ownerEditable === false) {
+      <div class="tb-manage-owner-hint">{{ 'owner-and-groups.no-owner-hint' | translate }}</div>
+    }
+    <div class="tb-manage-owner-roles">
+      <span class="tb-manage-owner-roles-label">{{ 'owner-and-groups.effective-roles' | translate }}</span>
+      @if (!rolesLoaded) {
+        <span class="tb-manage-owner-roles-value">{{ 'common.loading' | translate }}</span>
+      } @else if (effectiveRoleNames.length) {
+        <span class="tb-manage-owner-roles-value">{{ effectiveRoleNames.join(', ') }}</span>
+      } @else {
+        <span class="tb-manage-owner-roles-value">{{ 'owner-and-groups.no-roles' | translate }}</span>
+      }
+    </div>
+    @if (onlySystemGroups || data.ownerEditable === false) {
+      <div class="tb-manage-owner-info">
+        {{ 'owner-and-groups.system-hint' | translate }}
+        @if (isTenantAdmin) {
+          <div class="tb-manage-owner-info-line">{{ 'owner-and-groups.tenant-admin-hint' | translate }}</div>
+        }
+      </div>
+    }
   </mat-dialog-content>
   <mat-dialog-actions align="end">
     <button mat-button type="button" (click)="cancel()">{{ 'action.cancel' | translate }}</button>

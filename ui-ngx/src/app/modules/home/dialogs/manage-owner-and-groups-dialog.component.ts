@@ -1,14 +1,17 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
 import { Component, Inject, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { EntityGroupMember, EntityGroupService } from '@core/http/entity-group.service';
+import { defaultHttpOptionsFromConfig } from '@core/http/http-utils';
 import { UserService } from '@core/http/user.service';
 import { EntityType } from '@shared/models/entity-type.models';
 import { User } from '@shared/models/user.model';
+import { Authority } from '@shared/models/authority.enum';
 import { CustomerId } from '@shared/models/id/customer-id';
 import { DialogComponent } from '@shared/components/dialog.component';
 import { Router } from '@angular/router';
@@ -44,12 +47,19 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
   formGroup: UntypedFormGroup;
   loading = true;
   saving = false;
+  /**
+   * Names of the custom roles that grant the permissions of the user (assigned to the user directly or through one
+   * of its user groups). An empty list means the platform permissions of its authority apply.
+   */
+  effectiveRoleNames: string[] = [];
+  rolesLoaded = false;
 
   constructor(protected store: Store<AppState>,
               protected router: Router,
               @Inject(MAT_DIALOG_DATA) public data: ManageOwnerAndGroupsDialogData,
               public dialogRef: MatDialogRef<ManageOwnerAndGroupsDialogComponent, boolean>,
               private fb: UntypedFormBuilder,
+              private http: HttpClient,
               private entityGroupService: EntityGroupService,
               private userService: UserService) {
     super(store, router, dialogRef);
@@ -70,6 +80,60 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
         this.loading = false;
       }
     });
+    this.loadEffectiveRoles();
+  }
+
+  private loadEffectiveRoles(): void {
+    if (this.data.entityType !== EntityType.USER || !this.data.entityId) {
+      this.rolesLoaded = true;
+      return;
+    }
+    const userId = this.data.entityId;
+    const options = defaultHttpOptionsFromConfig({ignoreLoading: true, ignoreErrors: true});
+    this.http.get<{ roles: Array<{ id: string; name: string; userIds?: string[] }> }>(
+      '/api/tenant/role', options).subscribe({
+      next: (settings) => {
+        const roles = settings?.roles || [];
+        const roleIds = new Set<string>();
+        roles.forEach(role => {
+          if (role.userIds && role.userIds.includes(userId)) {
+            roleIds.add(role.id);
+          }
+        });
+        this.http.get<{ groups: Array<{ userIds?: string[]; roleIds?: string[] }> }>(
+          '/api/tenant/userGroup', options).subscribe({
+          next: (userGroups) => {
+            (userGroups?.groups || []).forEach(group => {
+              if (group.userIds && group.userIds.includes(userId)) {
+                (group.roleIds || []).forEach(roleId => roleIds.add(roleId));
+              }
+            });
+            this.effectiveRoleNames = roles.filter(role => roleIds.has(role.id)).map(role => role.name);
+            this.rolesLoaded = true;
+          },
+          error: () => {
+            this.rolesLoaded = true;
+          }
+        });
+      },
+      error: () => {
+        this.rolesLoaded = true;
+      }
+    });
+  }
+
+  /** A tenant administrator belongs to the tenant, so it has no owner customer (the field is not applicable). */
+  get ownerNotApplicable(): boolean {
+    return !this.data.ownerEditable;
+  }
+
+  /** True when every group of the list is maintained by the platform, so nothing is editable here. */
+  get onlySystemGroups(): boolean {
+    return this.groups.length > 0 && this.groups.every(group => group.system);
+  }
+
+  get isTenantAdmin(): boolean {
+    return this.data.user?.authority === Authority.TENANT_ADMIN;
   }
 
   isMember(group: EntityGroupMember): boolean {
