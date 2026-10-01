@@ -218,6 +218,12 @@ public class UserController extends BaseController {
         } else if (user.getAuthority() == Authority.SYS_ADMIN && !Authority.SYS_ADMIN.equals(currentUser.getAuthority())) {
             throw new ThingsboardException(YOU_DON_T_HAVE_PERMISSION_TO_PERFORM_THIS_OPERATION,
                     ThingsboardErrorCode.PERMISSION_DENIED);
+        } else if (user.getAuthority() == Authority.TENANT_ADMIN && oldUser == null
+                && !Authority.SYS_ADMIN.equals(currentUser.getAuthority())) {
+            // A tenant administrator manages the users of its customers; the administrator accounts of the tenant are
+            // provisioned by the system administrator (same rule as ThingsBoard PE).
+            throw new ThingsboardException("Only a system administrator may create a tenant administrator account.",
+                    ThingsboardErrorCode.PERMISSION_DENIED);
         }
         boolean ownerChanged = oldUser != null && !Objects.equals(oldUser.getCustomerId(), user.getCustomerId());
         if (ownerChanged) {

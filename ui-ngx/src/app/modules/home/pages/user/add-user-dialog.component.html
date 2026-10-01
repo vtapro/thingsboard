@@ -23,6 +23,17 @@
   }
   <div mat-dialog-content>
     <tb-user></tb-user>
+    @if (data.ownerRequired) {
+      <tb-entity-autocomplete
+        [formControl]="ownerControl"
+        [required]="true"
+        [appearance]="'outline'"
+        [labelText]="'owner-and-groups.owner' | translate"
+        [placeholder]="'owner-and-groups.owner-placeholder' | translate"
+        [entityType]="entityType.CUSTOMER">
+      </tb-entity-autocomplete>
+      <div class="tb-manage-owner-hint">{{ 'user.owner-required-hint' | translate }}</div>
+    }
     <mat-form-field class="mat-block" appearance="outline">
       <mat-label translate>user.activation-method</mat-label>
       <mat-select [ngModelOptions]="{standalone: true}" [(ngModel)]="activationMethod">
@@ -44,7 +55,8 @@
     </button>
     <button mat-raised-button color="primary"
             type="submit"
-            [disabled]="(isLoading$ | async) || detailsForm.invalid || !detailsForm.dirty">
+            [disabled]="(isLoading$ | async) || detailsForm.invalid || !detailsForm.dirty
+                        || (data.ownerRequired && !ownerControl.value)">
       {{ 'action.add' | translate }}
     </button>
   </div>

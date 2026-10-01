@@ -57,6 +57,7 @@ import {
   AddEntitiesToEdgeDialogData
 } from '@home/dialogs/add-entities-to-edge-dialog.component';
 import { HomeDialogsService } from '@home/dialogs/home-dialogs.service';
+import { hasExplicitRbacPermission } from '@core/services/rbac-permissions';
 import { Widget } from '@shared/models/widget.models';
 import { EntityAliases } from '@shared/models/alias.models';
 import {
@@ -161,8 +162,9 @@ export class DashboardsTableConfigResolver {
         this.config.cellActionDescriptors = this.configureCellActions(this.config.componentsData.dashboardScope);
         this.config.groupActionDescriptors = this.configureGroupActions(this.config.componentsData.dashboardScope);
         this.config.addActionDescriptors = this.configureAddActions(this.config.componentsData.dashboardScope);
-        this.config.addEnabled = !(this.config.componentsData.dashboardScope === 'customer_user' ||
-          this.config.componentsData.dashboardScope === 'edge_customer_user');
+        // A customer user may create dashboards when its role grants DASHBOARD:CREATE; the backend assigns the new
+        // dashboard to the customer of its creator, so it is visible for the user right away.
+        this.config.addEnabled = this.config.componentsData.dashboardScope !== 'edge_customer_user';
         this.config.entitiesDeleteEnabled = this.config.componentsData.dashboardScope === 'tenant';
         this.config.deleteEnabled = () => this.config.componentsData.dashboardScope === 'tenant';
         return this.config;
@@ -350,6 +352,16 @@ export class DashboardsTableConfigResolver {
           icon: 'add',
           isEnabled: () => true,
           onAction: ($event) => this.addDashboardsToCustomer($event)
+        }
+      );
+    }
+    if (dashboardScope === 'customer_user') {
+      actions.push(
+        {
+          name: this.translate.instant('dashboard.create-new-dashboard'),
+          icon: 'insert_drive_file',
+          isEnabled: () => hasExplicitRbacPermission('DASHBOARD', 'CREATE'),
+          onAction: ($event) => this.config.getTable().addEntity($event)
         }
       );
     }

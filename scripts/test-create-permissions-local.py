@@ -5,8 +5,10 @@
 
 # Test ket thuc den ket thuc cho quyen tao entity cua customer user (RBAC cua fork nay):
 #   - customer user co role DEVICE:CREATE tao duoc device, device thuoc dung customer cua nguoi tao
+#   - customer user co role DASHBOARD:CREATE tao duoc dashboard va dashboard duoc gan cho customer cua ho
 #   - "Only entities created by the user" (ownOnly) duoc ghi nhan (rbacOwnerId) va loc danh sach
 #   - customer user khong co quyen CREATE bi tu choi (403)
+#   - chi SYS_ADMIN tao duoc tai khoan TENANT_ADMIN (tenant admin bi tu choi 403)
 #   - nhom user he thong (All / Tenant Administrators / Tenant Users) khong the bi doi bang
 #     POST /api/tenant/entityGroup/members, nhom thuong thi doi duoc
 #
@@ -69,7 +71,7 @@ try:
         "permissions": {
             "DEVICE": ["CREATE", "READ", "WRITE", "DELETE"],
             "ASSET": ["CREATE", "READ"],
-            "DASHBOARD": ["READ"]
+            "DASHBOARD": ["CREATE", "READ", "WRITE"]
         },
         "ownOnly": {"DEVICE": True},
         "userIds": []
@@ -148,6 +150,49 @@ try:
     # --- a customer user without the role can not create a device ---------------------------------
     r = plain.post(BASE + "/api/device", json={"name": "plain-device-%d" % suffix})
     check("customer user without DEVICE:CREATE is denied", r.status_code == 403, r.status_code)
+
+    # --- dashboards --------------------------------------------------------------------------------
+    r = creator.post(BASE + "/api/dashboard", json={"title": "creator-dashboard-%d" % suffix})
+    check("customer user with DASHBOARD:CREATE creates a dashboard", r.status_code == 200, r.status_code)
+    dashboard = r.json() if r.status_code == 200 else {}
+    if r.status_code == 200:
+        dashboard_id = dashboard["id"]["id"]
+        r = creator.get(BASE + f"/api/customer/{customer_id}/dashboards", params={"pageSize": 50, "page": 0})
+        titles = [d["title"] for d in r.json()["data"]] if r.status_code == 200 else []
+        check("the dashboard is assigned to the customer of its creator",
+              dashboard.get("title") in titles, titles[:5])
+
+        # the user may keep editing what it created (the dashboard is assigned to its customer)
+        dashboard["title"] = dashboard["title"] + " (edited)"
+        r = creator.post(BASE + "/api/dashboard", json=dashboard)
+        check("the customer user updates its own dashboard", r.status_code == 200, r.status_code)
+
+        r = plain.post(BASE + "/api/dashboard", json={"title": "plain-dashboard-%d" % suffix})
+        check("customer user without DASHBOARD:CREATE is denied", r.status_code == 403, r.status_code)
+
+    # --- only the system administrator provisions the tenant administrators --------------------------
+    tenant_id = session.get(BASE + "/api/auth/user").json()["tenantId"]["id"]
+    r = session.post(BASE + "/api/user", params={"sendActivationMail": "false"}, json={
+        "email": "forbidden-admin-%d@local.test" % suffix,
+        "authority": "TENANT_ADMIN",
+        "tenantId": {"entityType": "TENANT", "id": tenant_id},
+        "firstName": "forbidden",
+    })
+    check("tenant admin can not create another tenant admin", r.status_code == 403, r.status_code)
+
+    sysadmin = requests.Session()
+    r = sysadmin.post(BASE + "/api/auth/login", json={"username": "sysadmin@thingsboard.org", "password": "sysadmin"})
+    check("login system admin", r.status_code == 200, r.status_code)
+    sysadmin.headers["X-Authorization"] = "Bearer " + r.json()["token"]
+    r = sysadmin.post(BASE + "/api/user", params={"sendActivationMail": "false"}, json={
+        "email": "sysadmin-made-admin-%d@local.test" % suffix,
+        "authority": "TENANT_ADMIN",
+        "tenantId": {"entityType": "TENANT", "id": tenant_id},
+        "firstName": "made-by-sysadmin",
+    })
+    check("system admin creates a tenant admin", r.status_code == 200, r.status_code)
+    if r.status_code == 200:
+        created["users"].append(r.json()["id"]["id"])
 
     # --- the system groups can not be changed through the membership API --------------------------
     r = session.get(BASE + f"/api/tenant/entityGroup/members/USER/{creator_id}")

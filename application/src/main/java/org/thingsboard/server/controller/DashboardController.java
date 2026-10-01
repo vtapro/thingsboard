@@ -42,6 +42,7 @@ import org.thingsboard.server.common.data.id.EdgeId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
+import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.config.annotations.ApiOperation;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.entitiy.dashboard.TbDashboardService;
@@ -167,15 +168,26 @@ public class DashboardController extends BaseController {
                     TENANT_AUTHORITY_PARAGRAPH)
     @ApiResponse(responseCode = "200", description = "OK",
             content = @Content(schema = @Schema(implementation = Dashboard.class)))
-    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @PostMapping(value = "/dashboard")
     public void saveDashboard(@io.swagger.v3.oas.annotations.parameters.RequestBody(description = "A JSON value representing the dashboard.")
                               @RequestBody Dashboard dashboard,
                               @RequestHeader(name = HttpHeaders.ACCEPT_ENCODING, required = false) String acceptEncodingHeader,
                               HttpServletResponse response) throws Exception {
         dashboard.setTenantId(getTenantId());
+        boolean created = dashboard.getId() == null;
         checkEntity(dashboard.getId(), dashboard, Resource.DASHBOARD);
         var savedDashboard = tbDashboardService.save(dashboard, getCurrentUser());
+        SecurityUser currentUser = getCurrentUser();
+        if (created && Authority.CUSTOMER_USER.equals(currentUser.getAuthority())) {
+            // A customer user creates the dashboard of its own customer: assign it, otherwise the dashboard would
+            // belong to the tenant and the user would not even see what it has just created (same as ThingsBoard PE).
+            Customer customer = customerService.findCustomerById(currentUser.getTenantId(), currentUser.getCustomerId());
+            if (customer != null) {
+                savedDashboard = tbDashboardService.assignDashboardToCustomer(savedDashboard, customer, currentUser);
+            }
+            accessControlService.onEntityCreated(currentUser);
+        }
         response.setContentType(APPLICATION_JSON_VALUE);
         compressResponseWithGzipIFAccepted(acceptEncodingHeader, response, JacksonUtil.writeValueAsBytes(savedDashboard));
     }

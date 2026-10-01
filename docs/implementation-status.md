@@ -27,6 +27,7 @@ Cách cài đặt/chạy chi tiết: [local-dev-macos.md](local-dev-macos.md).
 | 18 | Manage owner and groups (theo chuẩn PE) | ✅ | ✅ | Dialog trong panel chi tiết user: đổi owner (customer sở hữu user, chỉ `CUSTOMER_USER`) + gán user vào các user group; API `entityGroup/members/{entityType}/{id}`; guard quyền + invalidate token khi đổi owner; xem [rbac-members.md](rbac-members.md) §8 |
 | 19 | Xuất dữ liệu widget (CSV/XLS/XLSX) | — | ✅ | Menu tải xuống trên header mỗi widget (giống PE): Time series (1 dòng/timestamp, cột `<entity> · <key> (unit)`) + Latest values; XLSX nhiều sheet bằng JSZip, không thêm dependency; xem [widget-export.md](widget-export.md) |
 | 20 | Customer user tạo device/asset/entity view theo role | ✅ | ✅ | role có `CREATE` thì nút Add hiện (devices dùng wizard, ẩn ô chọn customer); backend gán `customerId` của người tạo + `rbacOwnerId` trước khi kiểm quyền, `ownOnly` được áp ở nhánh customer user; nhóm hệ thống `All`/`Tenant Administrators`/`Tenant Users` trả `system: true` và không sửa được qua dialog — xem [rbac-members.md](rbac-members.md) §8–§9 |
+| 21 | Quyền tạo theo role (dashboard) + ai tạo tài khoản nào | ✅ | ✅ | role `DASHBOARD:CREATE` cho customer user → dashboard tự gán cho customer của người tạo; trang Users của tenant admin chỉ tạo **customer user** (dialog có ô Owner); chỉ `SYS_ADMIN` tạo được `TENANT_ADMIN` — xem [rbac-members.md](rbac-members.md) §9 |
 
 ## 2. Môi trường local hiện tại (native, không Docker)
 

@@ -4,12 +4,13 @@ import { Component, Inject, OnInit, ViewChild } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
-import { UntypedFormGroup } from '@angular/forms';
+import { UntypedFormControl, UntypedFormGroup, Validators } from '@angular/forms';
 import { UserComponent } from '@modules/home/pages/user/user.component';
 import { Authority } from '@shared/models/authority.enum';
 import { ActivationLinkInfo, ActivationMethod, activationMethodTranslations, User } from '@shared/models/user.model';
 import { CustomerId } from '@shared/models/id/customer-id';
 import { UserService } from '@core/http/user.service';
+import { EntityType } from '@shared/models/entity-type.models';
 import { Observable } from 'rxjs';
 import {
   ActivationLinkDialogComponent,
@@ -21,8 +22,15 @@ import { Router } from '@angular/router';
 
 export interface AddUserDialogData {
   tenantId: string;
-  customerId: string;
+  /** Owner of the new user; the tenant administrator page lets the caller choose it instead (see ownerRequired). */
+  customerId: string | null;
   authority: Authority;
+  /**
+   * Page of the tenant administrator: a user is always a customer user there, so the owner (the customer the user
+   * belongs to) is chosen in this dialog. The administrator accounts of a tenant are provisioned by the system
+   * administrator.
+   */
+  ownerRequired?: boolean;
 }
 
 @Component({
@@ -35,6 +43,10 @@ export class AddUserDialogComponent extends DialogComponent<AddUserDialogCompone
 
   detailsForm: UntypedFormGroup;
   user: User;
+  entityType = EntityType;
+
+  /** The customer that owns the new user (only when the caller has to choose it, see {@link AddUserDialogData}). */
+  ownerControl = new UntypedFormControl(null, Validators.required);
 
   activationMethods = Object.keys(ActivationMethod);
   activationMethodEnum = ActivationMethod;
@@ -66,11 +78,11 @@ export class AddUserDialogComponent extends DialogComponent<AddUserDialogCompone
   }
 
   add(): void {
-    if (this.detailsForm.valid) {
+    if (this.detailsForm.valid && (!this.data.ownerRequired || this.ownerControl.valid)) {
       this.user = {...this.user, ...this.userComponent.entityForm.value};
       this.user.authority = this.data.authority;
       this.user.tenantId = new TenantId(this.data.tenantId);
-      this.user.customerId = new CustomerId(this.data.customerId);
+      this.user.customerId = new CustomerId(this.data.ownerRequired ? this.ownerControl.value : this.data.customerId);
       if (!this.user.additionalInfo.lang) {
         delete this.user.additionalInfo.lang;
       }

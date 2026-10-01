@@ -44,7 +44,7 @@ spec:
               app.kubernetes.io/name: tb-js-executor
       containers:
         - name: tb-js-executor
-          image: ghcr.io/vtapro/tb-js-executor:v4.4.0.8
+          image: ghcr.io/vtapro/tb-js-executor:v4.4.0.9
           imagePullPolicy: Always
           envFrom:
             - configMapRef:

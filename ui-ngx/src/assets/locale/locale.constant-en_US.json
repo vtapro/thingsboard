@@ -7880,6 +7880,7 @@
         "add": "Add user",
         "delete": "Delete user",
         "add-user-text": "Add new user",
+        "owner-required-hint": "The user belongs to the selected customer and sees the data of that customer. The administrator accounts of the tenant are created by the system administrator.",
         "no-users-text": "No users found",
         "user-details": "User details",
         "delete-user-title": "Are you sure you want to delete the user '{{userEmail}}'?",

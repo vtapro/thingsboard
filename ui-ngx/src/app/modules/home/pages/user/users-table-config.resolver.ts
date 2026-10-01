@@ -196,15 +196,25 @@ export class UsersTableConfigResolver  {
   }
 
   addUser(): Observable<User> {
+    // The users page of the tenant administrator creates the users of its customers; the administrator accounts of
+    // the tenant are provisioned by the system administrator (the backend refuses the other authorities).
+    const data: AddUserDialogData = this.allUsers
+      ? {
+          tenantId: this.tenantId,
+          customerId: null,
+          authority: Authority.CUSTOMER_USER,
+          ownerRequired: true
+        }
+      : {
+          tenantId: this.tenantId,
+          customerId: this.customerId,
+          authority: this.authority
+        };
     return this.dialog.open<AddUserDialogComponent, AddUserDialogData,
       User>(AddUserDialogComponent, {
       disableClose: true,
       panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
-      data: {
-        tenantId: this.tenantId,
-        customerId: this.customerId,
-        authority: this.authority
-      }
+      data
     }).afterClosed();
   }
 

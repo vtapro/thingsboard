@@ -325,8 +325,22 @@ public class TbRbacAccessControlService implements AccessControlService {
      * True when the role limits this resource to the entities created by the user itself.
      */
     private static boolean isOwnOnlyResource(RbacRole role, Resource resource) {
-        return role.getOwnOnly() != null && Boolean.TRUE.equals(role.getOwnOnly().get(resource.name()));
+        // the owner of an entity is stored in its additional info, so the flag only applies to the resources that
+        // have one (a dashboard of a customer user is scoped by the customer that owns it instead)
+        return supportsOwnerIndex(resource)
+                && role.getOwnOnly() != null && Boolean.TRUE.equals(role.getOwnOnly().get(resource.name()));
     }
+
+    /**
+     * Resources whose entities can be limited to the ones created by the user: they carry the creator in the
+     * additional info (see {@link #RBAC_OWNER_ATTRIBUTE}).
+     */
+    private static boolean supportsOwnerIndex(Resource resource) {
+        return OWNER_INDEX_RESOURCES.contains(resource);
+    }
+
+    private static final Set<Resource> OWNER_INDEX_RESOURCES =
+            Set.of(Resource.DEVICE, Resource.ASSET, Resource.ENTITY_VIEW, Resource.USER, Resource.CUSTOMER);
 
     /**
      * The entity belongs to the user when its server attribute "rbacOwnerId" is the user id.
@@ -567,6 +581,13 @@ public class TbRbacAccessControlService implements AccessControlService {
         if (!hasOperationGrant(user.getTenantId(), role, resource, effective, entityId)) {
             return false;
         }
+        if (CUSTOMER_TENANT_WIDE_RESOURCES.contains(resource)) {
+            // A dashboard is a tenant level entity that is assigned to the customer of its creator: an explicit role
+            // grant of the tenant administrator is honored, and an existing dashboard has to be visible to the
+            // customer user (that is, assigned to its customer).
+            return entityId == null
+                    || defaultAccessControlService.hasPermission(user, resource, Operation.READ, entityId, entity);
+        }
         // A customer user keeps the platform isolation, the role may only widen it inside the customer scope of the
         // user: the entity has to belong to the own customer of the user or, when the role enables the customer
         // hierarchy, to one of the sub-customers configured by the tenant administrator. A new entity is created
@@ -574,6 +595,12 @@ public class TbRbacAccessControlService implements AccessControlService {
         return belongsToOwnCustomer(user, entity)
                 || (role.isOwnCustomerOnly() && userBelongsToCustomerSubtree(user, entity));
     }
+
+    /**
+     * Tenant level entities that a customer user may handle when its role grants the operation: they are assigned
+     * to a customer instead of carrying the customer id of their owner (see the dashboard assignment API).
+     */
+    private static final Set<Resource> CUSTOMER_TENANT_WIDE_RESOURCES = Set.of(Resource.DASHBOARD);
 
     /**
      * True when the entity belongs to the own customer of the user. A new entity carries the customer assigned by

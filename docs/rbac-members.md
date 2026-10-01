@@ -177,27 +177,53 @@ khác không đổi) → chuyển user sang customer B (**200**, đọc lại th
 
 ## 9. Quyền tạo entity của customer user (audit 2026-10-01)
 
+### Ai tạo tài khoản nào (2026-10-01)
+
+| Caller | Tạo được | Không tạo được |
+|---|---|---|
+| `SYS_ADMIN` | `TENANT_ADMIN` (từ trang Tenants) + mọi user | — |
+| `TENANT_ADMIN` | **customer user** (trang Users: bắt buộc chọn Owner) | `TENANT_ADMIN` → **403** `Only a system administrator may create a tenant administrator account.` |
+| Customer user (có role `USER:CREATE`) | customer user của customer mình | `TENANT_ADMIN`, user của customer khác → **403** |
+
+Trang **Users** của tenant admin vì thế tạo thẳng customer user (dialog có ô **Owner** = customer sở hữu user và
+`POST /api/user` phải gửi kèm `customerId`); tài khoản quản trị tenant do system admin cấp ở trang Tenants.
+`UserDataValidator` sẵn có vẫn cấm đổi `authority` của một user đã tồn tại, nên không có đường nâng quyền qua
+`POST /api/user`.
+
+### Quyền theo role của customer user
+
+| Resource | Role cấp | Hành vi |
+|---|---|---|
+| `DEVICE`, `ASSET`, `ENTITY_VIEW` | `CREATE` | tạo được; backend gán `customerId` của người tạo + `rbacOwnerId` trước khi kiểm quyền |
+| `DASHBOARD` | `CREATE` | tạo được; dashboard **tự động được gán cho customer của người tạo** (nếu không, dashboard thuộc tenant và user không thấy) |
+| `DASHBOARD` | `READ/WRITE/DELETE` | chỉ áp dụng cho dashboard **đã được gán cho customer** của user (đúng cách ly của nền tảng) |
+| `USER`, `CUSTOMER` | `CREATE/READ/…` | theo phạm vi customer (xem §1) |
+| cờ `Only entities created by the user` | | chỉ áp dụng cho DEVICE/ASSET/ENTITY_VIEW/USER/CUSTOMER (các entity có `additionalInfo` để lưu owner); dashboard bị bỏ qua cờ này thay vì ẩn hết danh sách |
+
 Bản CE chỉ cho `TENANT_ADMIN` tạo device/asset/entity view, và cả WEB UI lẫn backend đều chặn customer user
 **không phụ thuộc role** — vì vậy role có `DEVICE: CREATE` vẫn không thấy nút "Add" và gọi API cũng bị `403`.
 Fork này mở đúng theo hợp đồng của PE:
 
 | Tầng | Trước | Sau |
 |---|---|---|
-| WEB UI (devices/assets/entity views) | `addEnabled = scopes !== 'customer_user'` (ẩn cứng) | nút Add hiện khi role cấp `CREATE`; devices mở đúng wizard, ẩn ô chọn customer vì customer do backend gán |
+| WEB UI (devices/assets/entity views/dashboards) | `addEnabled = scopes !== 'customer_user'` (ẩn cứng) | nút Add hiện khi role cấp `CREATE`; devices mở đúng wizard, ẩn ô chọn customer vì customer do backend gán |
 | `TbRbacAccessControlService` (check theo entity) | nhánh customer user chỉ mở khi `ownCustomerOnly` **và** entity đã có customerId → không bao giờ tạo được (entity mới chưa có customer) | nhánh customer user cho phép khi role cấp operation **và** entity thuộc customer của người gọi (entity mới được controller gán customer trước khi check) |
 | `DeviceController` / `AssetController` / `EntityViewController` | không gán customer → customer user tạo ra entity "của tenant" | `applyCustomerScope` gán `customerId` của người tạo trước khi `checkPermission`; `rbacOwnerId` được ghi cả ở đường `saveDeviceWithCredentials` (wizard) |
+| `DashboardController` | `saveDashboard` chỉ cho `TENANT_ADMIN` | cho cả `CUSTOMER_USER`: sau khi tạo, dashboard được **gán cho customer của người tạo** |
 | `ownOnly` của role | không kiểm ở nhánh customer user | áp dụng như nhánh quản trị: entity không do user tạo bị từ chối |
 
 Kiểm chứng:
 
 ```bash
-/tmp/emu-venv/bin/python scripts/test-create-permissions-local.py   # 21/21 PASS
+/tmp/emu-venv/bin/python scripts/test-create-permissions-local.py   # 28/28 PASS
 ```
 
 Script tạo customer + role `DEVICE:[CREATE,READ,WRITE,DELETE]` (`ownOnly.DEVICE = true`) → customer user tạo device
 (**200**, `customerId` = customer của người tạo, `additionalInfo.rbacOwnerId` = id người tạo) → device hiện trong
 `GET /api/customer/{id}/deviceInfos`; customer user **không** có role → `403`; hai nhóm hệ thống trả `system: true`
-và không đổi được qua API membership; nhóm thường vẫn lưu membership bình thường.
+và không đổi được qua API membership; nhóm thường vẫn lưu membership bình thường. Bổ sung `DASHBOARD:CREATE`
+(tạo dashboard → tự gán cho customer của người tạo → sửa lại được) và quy tắc tài khoản quản trị: tenant admin tạo
+`TENANT_ADMIN` → **403**, `SYS_ADMIN` tạo → **200**.
 
 ### Phía WEB UI (3 guard bổ sung)
 
