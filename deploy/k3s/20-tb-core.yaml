@@ -47,7 +47,7 @@ spec:
       containers:
         - name: tb-core
           # tb-node image: same jar as tb-rule-engine, role selected by TB_SERVICE_TYPE
-          image: ghcr.io/vtapro/tb-node:v4.4.0.10
+          image: ghcr.io/vtapro/tb-node:v4.4.0.11
           imagePullPolicy: Always
           envFrom:
             - configMapRef:
