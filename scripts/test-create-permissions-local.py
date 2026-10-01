@@ -36,7 +36,7 @@ check("login tenant admin", r.status_code == 200, r.status_code)
 session.headers["X-Authorization"] = "Bearer " + r.json()["token"]
 
 suffix = int(time.time())
-created = {"customer": None, "users": [], "devices": [], "groups": [], "roles": []}
+created = {"customer": None, "users": [], "devices": [], "dashboards": [], "groups": [], "roles": []}
 original_role_settings = session.get(BASE + "/api/tenant/role").json()
 original_role_ids = [role["id"] for role in original_role_settings.get("roles", [])]
 
@@ -44,6 +44,8 @@ original_role_ids = [role["id"] for role in original_role_settings.get("roles", 
 def cleanup():
     for device_id in created["devices"]:
         session.delete(BASE + "/api/device/" + device_id)
+    for dashboard_id in created["dashboards"]:
+        session.delete(BASE + "/api/dashboard/" + dashboard_id)
     for user_id in created["users"]:
         session.delete(BASE + "/api/user/" + user_id)
     if created["customer"]:
@@ -156,6 +158,7 @@ try:
     dashboard = r.json() if r.status_code == 200 else {}
     if r.status_code == 200:
         dashboard_id = dashboard["id"]["id"]
+        created["dashboards"].append(dashboard_id)
         r = creator.get(BASE + f"/api/customer/{customer_id}/dashboards", params={"pageSize": 50, "page": 0})
         titles = [d["title"] for d in r.json()["data"]] if r.status_code == 200 else []
         check("the dashboard is assigned to the customer of its creator",

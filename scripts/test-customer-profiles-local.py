@@ -39,12 +39,14 @@ created = {"customer": None, "users": [], "devices": [], "assets": [], "entity_v
 
 
 def cleanup():
+    # the entity views reference the devices, so they have to go first (the platform refuses to delete a device
+    # that is referenced by an entity view)
+    for view_id in created["entity_views"]:
+        session.delete(BASE + "/api/entityView/" + view_id)
     for device_id in created["devices"]:
         session.delete(BASE + "/api/device/" + device_id)
     for asset_id in created["assets"]:
         session.delete(BASE + "/api/asset/" + asset_id)
-    for view_id in created["entity_views"]:
-        session.delete(BASE + "/api/entityView/" + view_id)
     for dashboard_id in created["dashboards"]:
         session.delete(BASE + "/api/dashboard/" + dashboard_id)
     for user_id in created["users"]:

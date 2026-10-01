@@ -141,6 +141,11 @@ check("recreate dashboard", r.status_code == 200 and r.json().get("dashboardId")
 # --- delete (device goes away) --------------------------------------------------------------------
 r = session.delete(BASE + f"/api/tenant/emulator/{emulator_id}")
 check("delete emulator", r.status_code == 200, r.status_code)
+
+# the dashboard of the emulator is a normal dashboard of the tenant: the test removes it as well, otherwise the
+# emulator dashboards of every run would pile up in the database
+if dashboard_id:
+    session.delete(BASE + "/api/dashboard/" + dashboard_id)
 r = session.get(BASE + "/api/tenant/emulator")
 check("emulator removed from the list", all(e["id"] != emulator_id for e in r.json()), len(r.json()))
 r = session.get(BASE + f"/api/device/{device_id}")
