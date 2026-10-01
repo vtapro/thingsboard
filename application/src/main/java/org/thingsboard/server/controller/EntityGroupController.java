@@ -13,6 +13,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.StringUtils;
+import org.thingsboard.server.common.data.EntityType;
+import org.thingsboard.server.common.data.User;
+import org.thingsboard.server.common.data.id.EntityId;
+import org.thingsboard.server.common.data.id.EntityIdFactory;
+import org.thingsboard.server.common.data.id.UserId;
+import org.thingsboard.server.common.data.rbac.EntityGroupMembers;
+import org.thingsboard.server.common.data.rbac.EntityGroupMembersRequest;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroupSettings;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroup;
 import org.thingsboard.server.common.data.id.TenantId;
@@ -26,6 +33,8 @@ import org.thingsboard.server.service.security.permission.Resource;
 import static org.thingsboard.server.controller.ControllerConstants.TENANT_AUTHORITY_PARAGRAPH;
 
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 @RequiredArgsConstructor
 @RestController
@@ -96,6 +105,101 @@ public class EntityGroupController extends BaseController {
                     + "and can not be deleted");
         }
         return entityGroupService.deleteEntityGroup(getCurrentUser().getTenantId(), groupId);
+    }
+
+    @ApiOperation(value = "Get the entity groups of one entity (getEntityGroupMembers)",
+            notes = "Returns the groups of the entity type of the entity and tells whether the entity is a member of "
+                    + "each of them. Used by the \"Manage owner and groups\" dialog. " + TENANT_AUTHORITY_PARAGRAPH)
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @GetMapping(value = "/api/tenant/entityGroup/members/{entityType}/{entityId}")
+    public EntityGroupMembers getEntityGroupMembers(
+            @Parameter(description = "Entity type of the entity, e.g. DEVICE or USER")
+            @PathVariable("entityType") String entityType,
+            @Parameter(description = "Id of the entity")
+            @PathVariable("entityId") String entityId) throws ThingsboardException {
+        accessControlService.checkPermission(getCurrentUser(), Resource.ADMIN_SETTINGS, Operation.READ);
+        EntityId id = checkEntity(entityType, entityId);
+        syncDefaultUserGroups(id);
+        return entityGroupMembers(id);
+    }
+
+    @ApiOperation(value = "Set the entity groups of one entity (saveEntityGroupMembers)",
+            notes = "Adds the entity to the listed groups of its entity type and removes it from the other ones, "
+                    + "without touching the membership of the other entities. Groups change what a user with a role "
+                    + "scoped to those groups may read or change, therefore the caller also needs the WRITE "
+                    + "permission on the entity itself. " + TENANT_AUTHORITY_PARAGRAPH)
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PostMapping(value = "/api/tenant/entityGroup/members/{entityType}/{entityId}")
+    public EntityGroupMembers saveEntityGroupMembers(
+            @Parameter(description = "Entity type of the entity, e.g. DEVICE or USER")
+            @PathVariable("entityType") String entityType,
+            @Parameter(description = "Id of the entity")
+            @PathVariable("entityId") String entityId,
+            @RequestBody EntityGroupMembersRequest request) throws ThingsboardException {
+        accessControlService.checkPermission(getCurrentUser(), Resource.ADMIN_SETTINGS, Operation.WRITE);
+        EntityId id = checkEntity(entityType, entityId);
+        Set<String> requested = request != null && request.getGroupIds() != null
+                ? Set.copyOf(request.getGroupIds()) : Set.of();
+        String target = id.getId().toString();
+        RbacEntityGroupSettings settings = entityGroupService.getEntityGroupSettings(getCurrentUser().getTenantId());
+        for (RbacEntityGroup group : settings.getGroups()) {
+            if (!entityType.equals(group.getEntityType()) || group.isAllGroup()) {
+                // the "All" group of the type contains every entity of the tenant, its membership is implicit
+                continue;
+            }
+            if (group.getEntityIds() == null) {
+                group.setEntityIds(new java.util.ArrayList<>());
+            }
+            if (requested.contains(group.getId())) {
+                if (!group.getEntityIds().contains(target)) {
+                    group.getEntityIds().add(target);
+                }
+            } else {
+                group.getEntityIds().remove(target);
+            }
+        }
+        entityGroupService.saveEntityGroupSettings(getCurrentUser().getTenantId(), settings);
+        return entityGroupMembers(id);
+    }
+
+    /**
+     * Validates the entity type of the group and that the caller may write the entity itself (RBAC scope).
+     */
+    private EntityId checkEntity(String entityType, String entityId) throws ThingsboardException {
+        validateEntityType(entityType);
+        if (StringUtils.isBlank(entityId)) {
+            throw new IncorrectParameterException("Entity id is required");
+        }
+        EntityId id = EntityIdFactory.getByTypeAndUuid(entityType, UUID.fromString(entityId));
+        checkEntityId(id, Operation.WRITE);
+        return id;
+    }
+
+    /**
+     * The default user groups follow the authority of the user, so the dialog always shows the groups a tenant
+     * administrator or a customer user belongs to, even when the user existed before the groups were created.
+     */
+    private void syncDefaultUserGroups(EntityId entityId) throws ThingsboardException {
+        if (EntityType.USER == entityId.getEntityType()) {
+            User user = checkUserId(new UserId(entityId.getId()), Operation.READ);
+            entityGroupService.syncUserGroups(getCurrentUser().getTenantId(), user);
+        }
+    }
+
+    private EntityGroupMembers entityGroupMembers(EntityId entityId) throws ThingsboardException {
+        RbacEntityGroupSettings settings = entityGroupService.getEntityGroupSettings(getCurrentUser().getTenantId());
+        String target = entityId.getId().toString();
+        List<EntityGroupMembers.Member> members = new java.util.ArrayList<>();
+        for (RbacEntityGroup group : settings.getGroups()) {
+            if (!group.getEntityType().equals(entityId.getEntityType().name())) {
+                continue;
+            }
+            boolean member = group.isAllGroup()
+                    || (group.getEntityIds() != null && group.getEntityIds().contains(target));
+            members.add(new EntityGroupMembers.Member(group.getId(), group.getName(), group.getDescription(),
+                    group.isPublicGroup(), group.isAllGroup(), member));
+        }
+        return new EntityGroupMembers(entityId, members);
     }
 
     /** True when the group is the "All" group of its entity type (created by the backend, read only). */

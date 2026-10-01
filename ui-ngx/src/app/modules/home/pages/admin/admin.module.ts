@@ -36,6 +36,8 @@ import { UserGroupDialogComponent } from '@home/pages/admin/user-group-dialog.co
 import { CustomerHierarchyDialogComponent } from '@home/pages/admin/customer-hierarchy-dialog.component';
 import { AutomationComponent } from '@home/pages/admin/automation.component';
 import { AutomationRuleDialogComponent } from '@home/pages/admin/automation-rule-dialog.component';
+import { EmulatorComponent } from '@home/pages/admin/emulator.component';
+import { EmulatorCreateDialogComponent } from '@home/pages/admin/emulator-create-dialog.component';
 
 @NgModule({
   declarations:
@@ -67,6 +69,8 @@ import { AutomationRuleDialogComponent } from '@home/pages/admin/automation-rule
       UserGroupDialogComponent,
       CustomerHierarchyDialogComponent,
       AutomationComponent,
+      EmulatorComponent,
+      EmulatorCreateDialogComponent,
       AutomationRuleDialogComponent
     ],
   imports: [

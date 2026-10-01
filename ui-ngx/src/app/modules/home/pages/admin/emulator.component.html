@@ -1,0 +1,278 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<mat-card appearance="outlined" class="tb-emulator-card">
+  <div class="tb-emulator-header">
+    <div class="tb-emulator-header-title">
+      {{ (selectedTab === 0 ? 'emulator.catalog' : 'emulator.emulators') | translate }}
+    </div>
+    <div class="tb-emulator-hint">
+      {{ (selectedTab === 0 ? 'emulator.catalog-hint' : 'emulator.emulators-hint') | translate }}
+    </div>
+  </div>
+  <mat-tab-group [mat-stretch-tabs]="false" [selectedIndex]="selectedTab"
+                 (selectedTabChange)="selectedTab = $event.index"
+                 animationDuration="0ms" dynamicHeight>
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon>grid_view</mat-icon>
+        <span class="tb-emulator-tab-label">{{ 'emulator.catalog' | translate }}</span>
+      </ng-template>
+      <div class="tb-emulator-content">
+        <div class="tb-emulator-filters">
+          <button mat-stroked-button [class.tb-active-filter]="!categoryFilter && !verifiedOnly"
+                  (click)="categoryFilter = ''; verifiedOnly = false; applyCatalogFilters()">
+            <span>{{ 'emulator.all' | translate }}</span> ({{ catalog.profiles.length }})
+          </button>
+          <button mat-stroked-button [class.tb-active-filter]="verifiedOnly"
+                  (click)="verifiedOnly = !verifiedOnly; applyCatalogFilters()">
+            <mat-icon>verified</mat-icon>
+            <span>{{ 'emulator.verified' | translate }}</span> ({{ verifiedCount }})
+          </button>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-select [(value)]="categoryFilter" (selectionChange)="applyCatalogFilters()"
+                        [placeholder]="'emulator.all-categories' | translate">
+              <mat-option value="">{{ 'emulator.all-categories' | translate }}</mat-option>
+              @for (category of catalog.categories; track category) {
+                <mat-option [value]="category">{{ category }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-select [(value)]="typeFilter" (selectionChange)="applyCatalogFilters()"
+                        [placeholder]="'emulator.all-types' | translate">
+              <mat-option value="">{{ 'emulator.all-types' | translate }}</mat-option>
+              @for (type of catalog.types; track type) {
+                <mat-option [value]="type">{{ type }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tb-emulator-search">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput [(ngModel)]="catalogSearch" (ngModelChange)="applyCatalogFilters()"
+                   [placeholder]="'emulator.search-profiles' | translate">
+          </mat-form-field>
+        </div>
+        <div class="tb-emulator-grid">
+          @for (profile of profiles; track profile.id) {
+            <mat-card appearance="outlined" class="tb-emulator-profile">
+              <div class="tb-emulator-profile-head">
+                <div class="tb-emulator-avatar" [style.background]="profile.color">
+                  <mat-icon>{{ profile.icon }}</mat-icon>
+                </div>
+                <div class="tb-emulator-profile-name">
+                  <div class="tb-emulator-profile-title">{{ profile.name }}</div>
+                  <div class="tb-emulator-profile-sub">
+                    {{ profile.deviceProfile }}{{ profile.model ? ' • ' + profile.model : '' }}
+                  </div>
+                </div>
+                <div class="tb-emulator-profile-chips">
+                  <span class="tb-chip tb-chip-category">{{ profile.category }}</span>
+                  <span class="tb-chip">{{ profile.type }}</span>
+                </div>
+              </div>
+              <div class="tb-emulator-profile-description">{{ profile.description }}</div>
+              <div class="tb-emulator-chips">
+                @for (signal of profile.signals; track signal.key) {
+                  <span class="tb-chip tb-chip-signal">{{ signal.key }}</span>
+                }
+              </div>
+              <div class="tb-emulator-chips">
+                @for (scenario of profile.scenarios; track scenario) {
+                  <span class="tb-chip tb-chip-scenario">{{ scenario }}</span>
+                }
+              </div>
+              @if (emulatorCount(profile.id)) {
+                <div class="tb-emulator-profile-state">
+                  <span class="tb-chip tb-chip-count">
+                    {{ emulatorCount(profile.id) }} {{ 'emulator.card-emulators' | translate }}
+                  </span>
+                  @if (stoppedCount(profile.id)) {
+                    <span class="tb-chip">
+                      {{ stoppedCount(profile.id) }} {{ 'emulator.card-stopped' | translate }}
+                    </span>
+                  }
+                </div>
+              }
+              <div class="tb-emulator-profile-footer">
+                <span class="tb-emulator-meta">
+                  <mat-icon>schedule</mat-icon>{{ intervalLabel(profile.intervalSeconds) }}
+                </span>
+                <span class="tb-emulator-meta">
+                  <mat-icon>sensors</mat-icon>{{ profile.signals.length }}
+                </span>
+                <span class="tb-emulator-meta">
+                  <mat-icon>bolt</mat-icon>{{ profile.scenarios.length }}
+                </span>
+                <span class="flex-1"></span>
+                <button mat-stroked-button color="primary" (click)="createEmulator(profile)">
+                  <mat-icon>add</mat-icon>
+                  <span>{{ 'emulator.create' | translate }}</span>
+                </button>
+              </div>
+            </mat-card>
+          }
+        </div>
+        @if (!profiles.length) {
+          <div class="tb-emulator-empty">
+            <mat-icon>search_off</mat-icon>
+            <div>{{ 'emulator.no-profiles' | translate }}</div>
+          </div>
+        }
+      </div>
+    </mat-tab>
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon>devices_other</mat-icon>
+        <span class="tb-emulator-tab-label">{{ 'emulator.emulators' | translate }}</span>
+      </ng-template>
+      <div class="tb-emulator-content">
+        <div class="tb-emulator-filters">
+          <button mat-stroked-button [class.tb-active-filter]="!statusFilter" (click)="statusFilter = ''">
+            <span>{{ 'emulator.all' | translate }}</span> ({{ emulators.length }})
+          </button>
+          <button mat-stroked-button [class.tb-active-filter]="statusFilter === emulatorStatus.RUNNING"
+                  (click)="statusFilter = emulatorStatus.RUNNING">
+            <span>{{ 'emulator.status-running' | translate }}</span> ({{ countByStatus(emulatorStatus.RUNNING) }})
+          </button>
+          <button mat-stroked-button [class.tb-active-filter]="statusFilter === emulatorStatus.STOPPED"
+                  (click)="statusFilter = emulatorStatus.STOPPED">
+            <span>{{ 'emulator.status-stopped' | translate }}</span> ({{ countByStatus(emulatorStatus.STOPPED) }})
+          </button>
+          <button mat-stroked-button [class.tb-active-filter]="statusFilter === emulatorStatus.PAUSED"
+                  (click)="statusFilter = emulatorStatus.PAUSED">
+            <span>{{ 'emulator.status-paused' | translate }}</span> ({{ countByStatus(emulatorStatus.PAUSED) }})
+          </button>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-select [(value)]="profileFilter" [placeholder]="'emulator.all-profiles' | translate">
+              <mat-option value="">{{ 'emulator.all-profiles' | translate }}</mat-option>
+              @for (profile of catalog.profiles; track profile.id) {
+                <mat-option [value]="profile.id">{{ profile.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tb-emulator-search">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput [(ngModel)]="emulatorSearch" [placeholder]="'emulator.search-emulators' | translate">
+          </mat-form-field>
+          <span class="flex-1"></span>
+          <button mat-stroked-button (click)="clearUnlinked($event)"
+                  [matTooltip]="'emulator.clear-unlinked-hint' | translate">
+            <mat-icon>link_off</mat-icon>
+            <span>{{ 'emulator.clear-unlinked' | translate }}</span>
+          </button>
+          <button mat-icon-button (click)="loadEmulators()" [matTooltip]="'action.refresh' | translate">
+            <mat-icon>refresh</mat-icon>
+          </button>
+        </div>
+        @if (isLoading) {
+          <mat-progress-bar color="accent" mode="indeterminate"></mat-progress-bar>
+        }
+        @if (!filteredEmulators.length && !isLoading) {
+          <div class="tb-emulator-empty">
+            <mat-icon>devices_other</mat-icon>
+            <div>{{ 'emulator.no-emulators' | translate }}</div>
+          </div>
+        }
+        @if (filteredEmulators.length) {
+          <table class="tb-emulator-table">
+            <thead>
+            <tr>
+              <th>{{ 'emulator.status' | translate }}</th>
+              <th>{{ 'emulator.emulator' | translate }}</th>
+              <th>{{ 'emulator.device' | translate }}</th>
+              <th>{{ 'emulator.actions' | translate }}</th>
+              <th>{{ 'emulator.scenario' | translate }}</th>
+              <th>{{ 'emulator.interval' | translate }}</th>
+              <th>{{ 'emulator.last-activity' | translate }}</th>
+              <th>{{ 'emulator.dashboard' | translate }}</th>
+            </tr>
+            </thead>
+            <tbody>
+            @for (emulator of pagedEmulators; track emulator.id) {
+              <tr>
+                <td>
+                  <span class="tb-emulator-status"
+                        [class.tb-status-running]="emulator.status === emulatorStatus.RUNNING"
+                        [class.tb-status-stopped]="emulator.status === emulatorStatus.STOPPED"
+                        [class.tb-status-paused]="emulator.status === emulatorStatus.PAUSED">
+                    {{ statusLabel(emulator) }}
+                  </span>
+                </td>
+                <td>
+                  <div class="tb-emulator-name">{{ emulator.name }}</div>
+                  <div class="tb-emulator-sub">{{ emulator.profileName }}</div>
+                </td>
+                <td>
+                  <a (click)="openDevice(emulator, $event)">{{ emulator.deviceName }}</a>
+                </td>
+                <td class="tb-emulator-actions">
+                  <button mat-icon-button color="primary" [matTooltip]="'emulator.start' | translate"
+                          [disabled]="emulator.status === emulatorStatus.RUNNING || loadingEmulatorId === emulator.id"
+                          (click)="setStatus(emulator, emulatorStatus.RUNNING, $event)">
+                    <mat-icon>play_arrow</mat-icon>
+                  </button>
+                  <button mat-icon-button [matTooltip]="'emulator.pause' | translate"
+                          [disabled]="emulator.status === emulatorStatus.PAUSED || loadingEmulatorId === emulator.id"
+                          (click)="setStatus(emulator, emulatorStatus.PAUSED, $event)">
+                    <mat-icon>pause</mat-icon>
+                  </button>
+                  <button mat-icon-button [matTooltip]="'emulator.stop' | translate"
+                          [disabled]="emulator.status === emulatorStatus.STOPPED || loadingEmulatorId === emulator.id"
+                          (click)="setStatus(emulator, emulatorStatus.STOPPED, $event)">
+                    <mat-icon>stop</mat-icon>
+                  </button>
+                  <button mat-icon-button color="warn" [matTooltip]="'emulator.delete' | translate"
+                          (click)="removeEmulator(emulator, $event)">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+                <td>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tb-emulator-inline-select">
+                    <mat-select [value]="emulator.scenario" (selectionChange)="changeScenario(emulator, $event.value)">
+                      @for (scenario of scenarioList(emulator); track scenario) {
+                        <mat-option [value]="scenario">{{ scenario }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </td>
+                <td>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tb-emulator-inline-select">
+                    <mat-select [value]="emulator.intervalSeconds"
+                                (selectionChange)="changeInterval(emulator, $event.value)">
+                      @for (interval of intervals; track interval) {
+                        <mat-option [value]="interval">{{ intervalLabel(interval) }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </td>
+                <td>{{ lastActivity(emulator) }}</td>
+                <td class="tb-emulator-dashboard">
+                  <button mat-stroked-button color="primary" (click)="openDashboard(emulator, $event)">
+                    <mat-icon>dashboard</mat-icon>
+                    <span>{{ 'emulator.open' | translate }}</span>
+                  </button>
+                  <button mat-icon-button [matTooltip]="'emulator.generate-history' | translate"
+                          [disabled]="loadingEmulatorId === emulator.id"
+                          (click)="generateHistory(emulator, $event)">
+                    <mat-icon>history</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            }
+            </tbody>
+          </table>
+          <mat-paginator [length]="filteredEmulators.length"
+                         [pageIndex]="pageIndex"
+                         [pageSize]="pageSize"
+                         [pageSizeOptions]="pageSizeOptions"
+                         (page)="onPageChange($event)"
+                         showFirstLastButtons></mat-paginator>
+        }
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</mat-card>

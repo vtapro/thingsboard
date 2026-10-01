@@ -6,9 +6,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.AdminSettings;
+import org.thingsboard.server.common.data.User;
 import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroup;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroupSettings;
+import org.thingsboard.server.common.data.security.Authority;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -22,6 +25,14 @@ public class DefaultEntityGroupService implements EntityGroupService {
 
     public static final String ENTITY_GROUPS_SETTINGS_KEY = "entityGroups";
     public static final String ALL_GROUP_NAME = "All";
+    /**
+     * Default user groups of PE: they follow the authority of the user, so a role may grant permissions to the
+     * administrators of the tenant or to its users without listing the users one by one.
+     */
+    public static final String TENANT_ADMINS_GROUP_NAME = "Tenant Administrators";
+    public static final String TENANT_USERS_GROUP_NAME = "Tenant Users";
+    private static final List<String> DEFAULT_USER_GROUP_NAMES =
+            List.of(TENANT_ADMINS_GROUP_NAME, TENANT_USERS_GROUP_NAME);
     /**
      * Entity types that always have an "All" group: the classic PE ones plus the members of this fork
      * (customers and users), so the Groups tab of the Users / Customers pages always shows "All" too.
@@ -73,7 +84,91 @@ public class DefaultEntityGroupService implements EntityGroupService {
                 settings.getGroups().add(group);
             }
         }
+        for (String name : DEFAULT_USER_GROUP_NAMES) {
+            boolean exists = settings.getGroups().stream()
+                    .anyMatch(group -> "USER".equals(group.getEntityType()) && name.equals(group.getName()));
+            if (!exists) {
+                RbacEntityGroup group = new RbacEntityGroup();
+                group.setId(defaultUserGroupId(tenantId, name));
+                group.setName(name);
+                group.setEntityType("USER");
+                group.setDescription(TENANT_ADMINS_GROUP_NAME.equals(name)
+                        ? "Tenant administrators of the tenant (kept in sync by the platform)"
+                        : "Users of the tenant (kept in sync by the platform)");
+                group.setCreatedTime(System.currentTimeMillis());
+                settings.getGroups().add(group);
+            }
+        }
         return settings;
+    }
+
+    /** Stable id of a default user group, so every read returns the same id (see {@link #allGroupId}). */
+    public static String defaultUserGroupId(TenantId tenantId, String name) {
+        return UUID.nameUUIDFromBytes(("defaultUserGroup:" + tenantId.getId() + ":" + name)
+                .getBytes(StandardCharsets.UTF_8)).toString();
+    }
+
+    @Override
+    public synchronized void syncUserGroups(TenantId tenantId, User user) {
+        if (user == null || user.getId() == null || user.getAuthority() == null) {
+            return;
+        }
+        if (!Authority.TENANT_ADMIN.equals(user.getAuthority()) && !Authority.CUSTOMER_USER.equals(user.getAuthority())) {
+            return;
+        }
+        RbacEntityGroupSettings settings = getEntityGroupSettings(tenantId);
+        String entity = user.getId().getId().toString();
+        boolean changed = updateMembership(settings, entity, user.getAuthority());
+        if (changed) {
+            saveEntityGroupSettings(tenantId, settings);
+        }
+    }
+
+    @Override
+    public synchronized void removeUserFromGroups(TenantId tenantId, UserId userId) {
+        if (userId == null) {
+            return;
+        }
+        RbacEntityGroupSettings settings = getEntityGroupSettings(tenantId);
+        String entity = userId.getId().toString();
+        boolean changed = false;
+        for (RbacEntityGroup group : settings.getGroups()) {
+            if ("USER".equals(group.getEntityType()) && group.getEntityIds() != null
+                    && group.getEntityIds().remove(entity)) {
+                changed = true;
+            }
+        }
+        if (changed) {
+            saveEntityGroupSettings(tenantId, settings);
+        }
+    }
+
+    /**
+     * A tenant administrator belongs to "Tenant Administrators", a customer user to "Tenant Users"; the other
+     * default group is left by the user. Returns true when the membership changed.
+     */
+    private boolean updateMembership(RbacEntityGroupSettings settings, String entity, Authority authority) {
+        boolean changed = false;
+        String expectedGroup = Authority.TENANT_ADMIN.equals(authority)
+                ? TENANT_ADMINS_GROUP_NAME : TENANT_USERS_GROUP_NAME;
+        for (RbacEntityGroup group : settings.getGroups()) {
+            if (!"USER".equals(group.getEntityType()) || !DEFAULT_USER_GROUP_NAMES.contains(group.getName())) {
+                continue;
+            }
+            if (group.getEntityIds() == null) {
+                group.setEntityIds(new ArrayList<>());
+            }
+            boolean expected = expectedGroup.equals(group.getName());
+            boolean member = group.getEntityIds().contains(entity);
+            if (expected && !member) {
+                group.getEntityIds().add(entity);
+                changed = true;
+            } else if (!expected && member) {
+                group.getEntityIds().remove(entity);
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     /** Stable id of the "All" group of an entity type, so the id survives the reads that do not persist it. */

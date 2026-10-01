@@ -16,6 +16,8 @@ SPDX-License-Identifier: Apache-2.0
 | [production-k3s.md](production-k3s.md) | Triển khai production trên k3s: 8 image microservices, PostgreSQL managed ngoài cụm, Cassandra + Kafka + ZooKeeper trong cụm, HAProxy cho `app.greeniq.vn`, checklist |
 | [white-labeling.md](white-labeling.md) | Tính năng white labeling (system + tenant), API, cách cấu hình |
 | [rbac-members.md](rbac-members.md) | Quản lý thành viên theo quyền: role cho USER/CUSTOMER, scope own-only, customer con |
+| [emulators.md](emulators.md) | Emulators: catalog thiết bị ảo theo lĩnh vực (năng lượng, nông nghiệp, nhà máy, chiếu sáng…), sinh telemetry theo scenario và tự tạo dashboard |
+| [widget-export.md](widget-export.md) | Xuất dữ liệu widget ra CSV/XLS/XLSX (nút tải xuống trên header widget, giống ThingsBoard PE) |
 | [capacity-load-test.md](capacity-load-test.md) | Kết quả đo tải thật trên cụm (MQTT 1 msg/s/thiết bị), nút cổ chai và lộ trình mở rộng |
 | [k3s-processing-speed-audit.md](k3s-processing-speed-audit.md) | Audit tốc độ xử lý cụm k3s (2026-09-28): độ trễ PostgreSQL/Cassandra/Kafka, HPA, throttling, khuyến nghị |
 | [implementation-status.md](implementation-status.md) | Trạng thái từng tính năng và môi trường chạy local |

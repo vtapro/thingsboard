@@ -38,6 +38,10 @@ import { TenantId } from '@app/shared/models/id/tenant-id';
 import { UserTabsComponent } from '@home/pages/user/user-tabs.component';
 import { isDefinedAndNotNull } from '@core/utils';
 import { hasRbacPermission } from '@core/services/rbac-permissions';
+import {
+  ManageOwnerAndGroupsDialogComponent,
+  ManageOwnerAndGroupsDialogData
+} from '@home/dialogs/manage-owner-and-groups-dialog.component';
 
 export interface UsersTableRouteData {
   authority: Authority;
@@ -236,6 +240,39 @@ export class UsersTableConfigResolver  {
     );
   }
 
+  /**
+   * "Manage owner and groups": the owner of the user (the customer that owns it) and the user groups it belongs to,
+   * like the dialog of ThingsBoard PE.
+   */
+  manageOwnerAndGroups($event: Event, user: User, config: EntityTableConfig<User>) {
+    if ($event) {
+      $event.stopPropagation();
+    }
+    this.dialog.open<ManageOwnerAndGroupsDialogComponent, ManageOwnerAndGroupsDialogData, boolean>(
+      ManageOwnerAndGroupsDialogComponent, {
+        disableClose: true,
+        panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+        data: {
+          entityType: EntityType.USER,
+          entityId: user.id.id,
+          entityName: user.email,
+          ownerId: user.customerId ? user.customerId.id : null,
+          ownerEditable: user.authority === Authority.CUSTOMER_USER,
+          user
+        }
+      }
+    ).afterClosed().subscribe((changed) => {
+      if (changed) {
+        this.store.dispatch(new ActionNotificationShow(
+          {
+            message: this.translate.instant('owner-and-groups.saved'),
+            type: 'success'
+          }));
+        config.updateData(false, true);
+      }
+    });
+  }
+
   resendActivation($event: Event, user: User) {
     if ($event) {
       $event.stopPropagation();
@@ -285,6 +322,9 @@ export class UsersTableConfigResolver  {
         return true;
       case 'enableAccount':
         this.setUserCredentialsEnabled(action.event, action.entity, true);
+        return true;
+      case 'manageOwnerAndGroups':
+        this.manageOwnerAndGroups(action.event, action.entity, config);
         return true;
     }
     return false;

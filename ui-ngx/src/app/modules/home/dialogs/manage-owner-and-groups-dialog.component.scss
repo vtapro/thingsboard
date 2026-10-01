@@ -1,0 +1,65 @@
+// SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+// SPDX-License-Identifier: Apache-2.0
+
+.tb-manage-owner-content {
+  min-width: 460px;
+  max-width: 620px;
+}
+
+.tb-manage-owner-groups {
+  margin-top: 8px;
+}
+
+.tb-manage-owner-hint {
+  margin: 4px 0 12px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, .54);
+}
+
+.tb-manage-owner-error {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #d12730;
+}
+
+.tb-manage-owner-groups-title {
+  font-size: 12px;
+  color: rgba(0, 0, 0, .54);
+  margin-bottom: 4px;
+}
+
+.tb-manage-owner-groups-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(0, 0, 0, .12);
+  border-radius: 4px;
+  padding: 8px 12px;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.tb-manage-group-name {
+  font-weight: 500;
+}
+
+.tb-manage-group-tag {
+  margin-left: 6px;
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 11px;
+  background: #e8f0f9;
+  color: #305680;
+}
+
+.tb-manage-group-description {
+  margin-left: 6px;
+  color: rgba(0, 0, 0, .54);
+  font-size: 12px;
+}
+
+.tb-manage-owner-groups-empty {
+  padding: 12px;
+  color: rgba(0, 0, 0, .54);
+  border: 1px dashed rgba(0, 0, 0, .12);
+  border-radius: 4px;
+}

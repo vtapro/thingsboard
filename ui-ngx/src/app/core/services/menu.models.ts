@@ -62,6 +62,7 @@ export enum MenuId {
   general = 'general',
   white_labeling = 'white_labeling',
   automation = 'automation',
+  emulator = 'emulator',
   mail_server = 'mail_server',
   home_settings = 'home_settings',
   notification_settings = 'notification_settings',
@@ -420,6 +421,17 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
       type: 'link',
       path: '/automation',
       icon: 'schedule'
+    }
+  ],
+  [
+    MenuId.emulator,
+    {
+      id: MenuId.emulator,
+      name: 'emulator.title',
+      fullName: 'emulator.title',
+      type: 'link',
+      path: '/emulators',
+      icon: 'devices_other'
     }
   ],
   [
@@ -1030,6 +1042,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
       {id: MenuId.roles},
       {id: MenuId.white_labeling},
       {id: MenuId.automation},
+      {id: MenuId.emulator},
       {
         id: MenuId.platform_section,
         pages: [

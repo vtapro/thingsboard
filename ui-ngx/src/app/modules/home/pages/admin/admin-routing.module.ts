@@ -37,6 +37,7 @@ import { aiModelRoutes } from '@home/pages/ai-model/ai-model-routing.module';
 import { WhiteLabelingComponent } from '@home/pages/admin/white-labeling.component';
 import { RolesComponent } from '@home/pages/admin/roles.component';
 import { AutomationComponent } from '@home/pages/admin/automation.component';
+import { EmulatorComponent } from '@home/pages/admin/emulator.component';
 
 export const scadaSymbolResolver: ResolveFn<ScadaSymbolData> =
   (route: ActivatedRouteSnapshot,
@@ -407,6 +408,17 @@ const routes: Routes = [
       title: 'automation.title',
       breadcrumb: {
         menuId: MenuId.automation
+      }
+    }
+  },
+  {
+    path: 'emulators',
+    component: EmulatorComponent,
+    data: {
+      auth: [Authority.TENANT_ADMIN],
+      title: 'emulator.title',
+      breadcrumb: {
+        menuId: MenuId.emulator
       }
     }
   },

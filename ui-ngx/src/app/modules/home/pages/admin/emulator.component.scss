@@ -1,0 +1,259 @@
+// SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+// SPDX-License-Identifier: Apache-2.0
+
+.tb-emulator-card {
+  min-height: calc(100% - 32px);
+  padding: 16px 16px 0;
+}
+
+.tb-emulator-header {
+  padding: 0 0 4px;
+}
+
+.tb-emulator-header-title {
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 32px;
+  color: rgba(0, 0, 0, .87);
+}
+
+.tb-emulator-content {
+  padding: 16px 0;
+}
+
+.tb-emulator-tab-label {
+  margin-left: 8px;
+}
+
+.tb-emulator-hint {
+  color: rgba(0, 0, 0, .54);
+  font-size: 14px;
+}
+
+.tb-emulator-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+
+  .tb-active-filter {
+    border-color: #305680;
+    color: #305680;
+  }
+
+  mat-form-field {
+    min-width: 190px;
+  }
+
+  .tb-emulator-search {
+    flex: 1;
+    min-width: 260px;
+  }
+}
+
+.tb-emulator-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.tb-emulator-profile {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.tb-emulator-profile-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.tb-emulator-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex: 0 0 auto;
+}
+
+.tb-emulator-profile-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.tb-emulator-profile-title {
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.tb-emulator-profile-sub {
+  font-size: 11px;
+  letter-spacing: .5px;
+  color: rgba(0, 0, 0, .54);
+  text-transform: uppercase;
+}
+
+.tb-emulator-profile-chips {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.tb-emulator-profile-description {
+  margin-top: 12px;
+  color: rgba(0, 0, 0, .7);
+  font-size: 13px;
+  min-height: 54px;
+}
+
+.tb-emulator-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tb-chip {
+  border: 1px solid rgba(0, 0, 0, .12);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, .7);
+  background: rgba(0, 0, 0, .02);
+
+  &.tb-chip-category {
+    background: #e8f0f9;
+    border-color: #b7cbe4;
+    color: #305680;
+  }
+
+  &.tb-chip-signal {
+    font-family: monospace;
+  }
+
+  &.tb-chip-scenario {
+    background: #f3f3f3;
+  }
+}
+
+.tb-emulator-profile-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, .08);
+}
+
+.tb-emulator-profile-state {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.tb-chip-count {
+  background: #e8f5e9;
+  border-color: #a5d6a7;
+  color: #1e7d32;
+}
+
+.tb-emulator-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: rgba(0, 0, 0, .54);
+  font-size: 12px;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.tb-emulator-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th, td {
+    text-align: left;
+    padding: 10px 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, .08);
+    vertical-align: middle;
+  }
+
+  th {
+    color: rgba(0, 0, 0, .54);
+    font-weight: 500;
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+}
+
+.tb-emulator-name {
+  font-weight: 500;
+}
+
+.tb-emulator-sub {
+  color: rgba(0, 0, 0, .54);
+  font-size: 12px;
+}
+
+.tb-emulator-status {
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(0, 0, 0, .08);
+
+  &.tb-status-running {
+    background: #e6f4ea;
+    color: #1e7d32;
+  }
+
+  &.tb-status-stopped {
+    background: #fdecea;
+    color: #c62828;
+  }
+
+  &.tb-status-paused {
+    background: #fff8e1;
+    color: #b26a00;
+  }
+}
+
+.tb-emulator-actions {
+  white-space: nowrap;
+}
+
+.tb-emulator-inline-select {
+  width: 150px;
+}
+
+.tb-emulator-dashboard {
+  white-space: nowrap;
+}
+
+.tb-emulator-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px;
+  color: rgba(0, 0, 0, .38);
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+  }
+}

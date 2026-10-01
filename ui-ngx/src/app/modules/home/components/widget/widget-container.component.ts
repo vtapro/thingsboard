@@ -36,6 +36,7 @@ import ITooltipsterInstance = JQueryTooltipster.ITooltipsterInstance;
 import ITooltipsterGeoHelper = JQueryTooltipster.ITooltipsterGeoHelper;
 import { WidgetComponent } from '@home/components/widget/widget.component';
 import { WidgetAction } from '@home/models/widget-component.models';
+import { WidgetExportFormat, WidgetExportService } from '@home/components/widget/widget-export.service';
 
 export enum WidgetComponentActionType {
   MOUSE_DOWN,
@@ -131,8 +132,21 @@ export class WidgetContainerComponent extends PageComponent implements OnInit, O
               private renderer: Renderer2,
               private container: ViewContainerRef,
               private dashboardUtils: DashboardUtilsService,
-              private utils: UtilsService) {
+              private utils: UtilsService,
+              private widgetExportService: WidgetExportService) {
     super(store);
+  }
+
+  /** The widget exports the data of its datasources (like the download menu of PE). */
+  canExportWidgetData(): boolean {
+    return this.widgetExportService.canExport(this.widget?.widgetContext);
+  }
+
+  exportWidgetData(format: WidgetExportFormat, $event?: Event): void {
+    if ($event) {
+      $event.stopPropagation();
+    }
+    this.widgetExportService.exportWidget(this.widget?.widgetContext, format);
   }
 
   ngOnInit(): void {

@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.rule.engine.api.MailService;
+import org.thingsboard.server.common.data.Customer;
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.User;
 import org.thingsboard.server.common.data.UserActivationLink;
@@ -57,6 +58,8 @@ import org.thingsboard.server.common.data.settings.UserSettings;
 import org.thingsboard.server.common.data.settings.UserSettingsType;
 import org.thingsboard.server.config.annotations.ApiOperation;
 import org.thingsboard.server.dao.entity.EntityService;
+import org.thingsboard.server.dao.settings.EntityGroupService;
+import org.thingsboard.server.dao.customer.CustomerService;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.entitiy.user.TbUserService;
 import org.thingsboard.server.service.query.EntityQueryService;
@@ -71,6 +74,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -116,6 +120,8 @@ public class UserController extends BaseController {
     private final TbUserService tbUserService;
     private final EntityQueryService entityQueryService;
     private final EntityService entityService;
+    private final CustomerService customerService;
+    private final EntityGroupService entityGroupService;
 
     @ApiOperation(value = "Get User (getUserById)",
             notes = "Fetch the User object based on the provided User Id. " +
@@ -213,13 +219,61 @@ public class UserController extends BaseController {
             throw new ThingsboardException(YOU_DON_T_HAVE_PERMISSION_TO_PERFORM_THIS_OPERATION,
                     ThingsboardErrorCode.PERMISSION_DENIED);
         }
+        boolean ownerChanged = oldUser != null && !Objects.equals(oldUser.getCustomerId(), user.getCustomerId());
+        if (ownerChanged) {
+            checkOwnerChange(currentUser, oldUser, user);
+        }
         if (oldUser == null) {
             checkEntity(null, user, Resource.USER);
             saveRbacOwner(user);
         } else {
             preserveRbacOwner(user, oldUser);
         }
-        return tbUserService.save(getTenantId(), currentUser.getCustomerId(), user, sendActivationMail, request, currentUser);
+        User savedUser = tbUserService.save(getTenantId(), currentUser.getCustomerId(), user, sendActivationMail, request, currentUser);
+        // the default user groups (Tenant Administrators / Tenant Users) follow the authority of the user
+        entityGroupService.syncUserGroups(getTenantId(), savedUser);
+        if (ownerChanged) {
+            // the owner decides which data the user may see: the tokens issued for the previous customer are obsolete
+            eventPublisher.publishEvent(new UserCredentialsInvalidationEvent(savedUser.getId()));
+        }
+        return savedUser;
+    }
+
+    /**
+     * "Manage owner" of a user: a user belongs to the customer that owns it and that customer decides which data
+     * the user may see, so moving the user to another customer is reserved to the administrators of the tenant and
+     * is applied only to the customer users of the customers the caller is allowed to manage (role scope of the
+     * fork). The user itself is invalidated afterwards, because its permissions change immediately.
+     */
+    private void checkOwnerChange(SecurityUser currentUser, User oldUser, User user) throws ThingsboardException {
+        if (!Authority.TENANT_ADMIN.equals(currentUser.getAuthority())
+                && !Authority.SYS_ADMIN.equals(currentUser.getAuthority())) {
+            throw new ThingsboardException(YOU_DON_T_HAVE_PERMISSION_TO_PERFORM_THIS_OPERATION,
+                    ThingsboardErrorCode.PERMISSION_DENIED);
+        }
+        if (!Authority.CUSTOMER_USER.equals(oldUser.getAuthority())) {
+            throw new ThingsboardException("Only a customer user belongs to a customer, the owner of a tenant administrator can not be changed.",
+                    ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+        }
+        CustomerId newCustomerId = user.getCustomerId();
+        if (newCustomerId == null) {
+            throw new ThingsboardException("A customer user must belong to a customer.",
+                    ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+        }
+        CustomerId oldCustomerId = oldUser.getCustomerId();
+        if (oldCustomerId != null) {
+            Customer oldCustomer = customerService.findCustomerById(currentUser.getTenantId(), oldCustomerId);
+            if (oldCustomer != null) {
+                // the caller must be allowed to manage the customer the user is moved out of as well
+                accessControlService.checkPermission(currentUser, Resource.CUSTOMER, Operation.WRITE, oldCustomerId, oldCustomer);
+            }
+        }
+        Customer customer = customerService.findCustomerById(currentUser.getTenantId(), newCustomerId);
+        if (customer == null) {
+            throw new ThingsboardException("Customer with id [" + newCustomerId + "] is not found",
+                    ThingsboardErrorCode.ITEM_NOT_FOUND);
+        }
+        accessControlService.checkPermission(currentUser, Resource.CUSTOMER, Operation.WRITE, newCustomerId, customer);
     }
 
     @ApiOperation(value = "Send or re-send the activation email",
@@ -288,6 +342,7 @@ public class UserController extends BaseController {
             throw new ThingsboardException("At least one tenant administrator must remain!", ThingsboardErrorCode.BAD_REQUEST_PARAMS);
         }
         tbUserService.delete(getTenantId(), getCurrentUser().getCustomerId(), user, getCurrentUser());
+        entityGroupService.removeUserFromGroups(getTenantId(), userId);
     }
 
     @ApiOperation(value = "Get Users (getUsers)",

@@ -43,6 +43,14 @@
       {{ (entity?.authority === authority.TENANT_ADMIN ? 'user.login-as-tenant-admin' : 'user.login-as-customer-user') | translate }}
     </button>
   }
+  @if (manageOwnerAndGroupsEnabled$ | async) {
+    <button mat-stroked-button color="primary"
+            [disabled]="(isLoading$ | async)"
+            (click)="onEntityAction($event, 'manageOwnerAndGroups')"
+            [class.!hidden]="isEdit || !entity?.id">
+      {{ 'owner-and-groups.title' | translate }}
+    </button>
+  }
   <button mat-stroked-button color="primary"
           [disabled]="(isLoading$ | async)"
           (click)="onEntityAction($event, 'delete')"

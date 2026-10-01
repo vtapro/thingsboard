@@ -57,7 +57,18 @@ public class UserDataValidator extends DataValidator<User> {
             throw new DataValidationException("Can't update user authority!");
         }
         if (!old.getCustomerId().equals(user.getCustomerId())) {
-            throw new DataValidationException("Can't update user customer id!");
+            // "Manage owner and groups": the owner of a user is the customer that owns it, so only a customer user
+            // may be moved, and only to a customer of the same tenant. The caller (a tenant administrator, with the
+            // role scope of the fork) is checked by UserController#checkOwnerChange.
+            if (!Authority.CUSTOMER_USER.equals(user.getAuthority())) {
+                throw new DataValidationException("Only a customer user may be assigned to another customer!");
+            }
+            if (user.getCustomerId() == null || ModelConstants.NULL_UUID.equals(user.getCustomerId().getId())) {
+                throw new DataValidationException("User customer id should be specified!");
+            }
+            if (customerDao.findById(tenantId, user.getCustomerId().getId()) == null) {
+                throw new DataValidationException("Customer with id [" + user.getCustomerId() + "] is not found!");
+            }
         }
         return old;
     }

@@ -46,7 +46,7 @@ spec:
               app.kubernetes.io/name: tb-mqtt-transport
       containers:
         - name: tb-mqtt-transport
-          image: ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.5
+          image: ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.6
           imagePullPolicy: Always
           envFrom:
             - configMapRef:

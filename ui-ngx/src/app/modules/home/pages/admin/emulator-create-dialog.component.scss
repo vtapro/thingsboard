@@ -1,0 +1,74 @@
+// SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+// SPDX-License-Identifier: Apache-2.0
+
+.tb-emulator-create {
+  min-width: 520px;
+  max-width: 640px;
+}
+
+.tb-emulator-create-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.tb-emulator-avatar {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+
+  mat-icon {
+    color: #fff;
+  }
+}
+
+.tb-emulator-profile-title {
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.tb-emulator-profile-sub {
+  font-size: 11px;
+  letter-spacing: .5px;
+  color: rgba(0, 0, 0, .54);
+  text-transform: uppercase;
+}
+
+.tb-emulator-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+
+.tb-chip {
+  border: 1px solid rgba(0, 0, 0, .12);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, .7);
+  background: rgba(0, 0, 0, .02);
+}
+
+.tb-chip-signal {
+  font-family: monospace;
+}
+
+.tb-emulator-create-form {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+}
+
+.tb-emulator-create-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, .54);
+}

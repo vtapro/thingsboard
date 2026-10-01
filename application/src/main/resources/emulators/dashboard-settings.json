@@ -1,0 +1,44 @@
+{
+  "timewindow": {
+    "displayValue": "",
+    "selectedTab": 0,
+    "hideAggregation": false,
+    "hideAggInterval": false,
+    "realtime": {
+      "interval": 1000,
+      "timewindowMs": 600000
+    },
+    "history": {
+      "historyType": 0,
+      "interval": 1000,
+      "timewindowMs": 600000,
+      "fixedTimewindow": {
+        "startTimeMs": 1587473857304,
+        "endTimeMs": 1587560257304
+      }
+    },
+    "aggregation": {
+      "type": "AVG",
+      "limit": 500
+    }
+  },
+  "settings": {
+    "stateControllerId": "default",
+    "showTitle": true,
+    "showDashboardsSelect": true,
+    "showEntitiesSelect": true,
+    "showDashboardTimewindow": true
+  },
+  "gridSettings": {
+    "backgroundColor": "#eeeeee",
+    "color": "rgba(0,0,0,0.870588)",
+    "columns": 24,
+    "backgroundSizeMode": "100%",
+    "autoFillHeight": true,
+    "mobileAutoFillHeight": false,
+    "mobileRowHeight": 70,
+    "margin": 10,
+    "outerMargin": true,
+    "layoutType": "default"
+  }
+}

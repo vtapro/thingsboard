@@ -34,6 +34,12 @@ export class UserComponent extends EntityComponent<User> implements OnInit {
     map((auth) => auth.userTokenAccessEnabled && auth.userDetails?.authority === Authority.TENANT_ADMIN)
   );
 
+  /** "Manage owner and groups" is the tenant administrator action of ThingsBoard PE. */
+  manageOwnerAndGroupsEnabled$ = this.store.pipe(
+    select(selectAuth),
+    map((auth) => auth.userDetails?.authority === Authority.TENANT_ADMIN)
+  );
+
   private authUserAuthority: Authority;
 
   constructor(protected store: Store<AppState>,
@@ -66,6 +72,14 @@ export class UserComponent extends EntityComponent<User> implements OnInit {
    * is shown (ThingsBoard PE greys it out instead of hiding it) but stays disabled for the other administrators.
    */
   canLoginAsUser(): boolean {
+    return this.entity?.authority === Authority.CUSTOMER_USER;
+  }
+
+  /**
+   * The owner of a user is the customer that owns it: only customer users have an owner, so the field of the
+   * "Manage owner and groups" dialog is shown only for them.
+   */
+  canChangeOwner(): boolean {
     return this.entity?.authority === Authority.CUSTOMER_USER;
   }
 

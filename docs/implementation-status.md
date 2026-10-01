@@ -23,6 +23,9 @@ Cách cài đặt/chạy chi tiết: [local-dev-macos.md](local-dev-macos.md).
 | 14 | Đo tải / năng lực hệ thống | ✅ | — | bộ công cụ ở `deploy/loadtest/`, kết quả ở [capacity-load-test.md](capacity-load-test.md): an toàn ≤ 500 thiết bị × 1 msg/s, trần ~1.000 msg/s; 2.000 msg/s bắt đầu mất dữ liệu |
 | 15 | Automation (hẹn giờ điều khiển thiết bị) | ✅ | ✅ | rule hẹn giờ theo ngày/tuần/cron → gửi server-side RPC (bật/tắt máy bơm, tưới cây…); lưu trong `admin_settings` key `automation` (không thêm bảng); API `/api/tenant/automation`; trang **Automation** ở menu trái; test local 15/15 PASS (`scripts/test-automation-local.py`) |
 | 16 | Quản lý thành viên theo quyền (USER/CUSTOMER RBAC) | ✅ | ✅ | user có quyền `USER`/`CUSTOMER` tự thêm/xoá thành viên và customer con; scope `ownOnly` + `ownCustomerOnly`; menu Users/Customers hiện theo quyền; tài khoản `TENANT_ADMIN` chỉ system admin mới disable/enable và `Login as` chỉ áp cho customer user; xem [rbac-members.md](rbac-members.md) |
+| 17 | Emulators: catalog thiết bị ảo + dashboard theo lĩnh vực | ✅ | ✅ | 15 profile/8 lĩnh vực (năng lượng, nông nghiệp, nhà máy, chiếu sáng, nước, vận tải, toà nhà, đô thị); tạo emulator = device thật + sinh telemetry theo scenario + tự tạo dashboard của lĩnh vực; xem [emulators.md](emulators.md) |
+| 18 | Manage owner and groups (theo chuẩn PE) | ✅ | ✅ | Dialog trong panel chi tiết user: đổi owner (customer sở hữu user, chỉ `CUSTOMER_USER`) + gán user vào các user group; API `entityGroup/members/{entityType}/{id}`; guard quyền + invalidate token khi đổi owner; xem [rbac-members.md](rbac-members.md) §8 |
+| 19 | Xuất dữ liệu widget (CSV/XLS/XLSX) | — | ✅ | Menu tải xuống trên header mỗi widget (giống PE): Time series (1 dòng/timestamp, cột `<entity> · <key> (unit)`) + Latest values; XLSX nhiều sheet bằng JSZip, không thêm dependency; xem [widget-export.md](widget-export.md) |
 
 ## 2. Môi trường local hiện tại (native, không Docker)
 

@@ -101,6 +101,29 @@
       }
       <button mat-icon-button
               type="button"
+              [class.!hidden]="isEdit || !canExportWidgetData()"
+              (click)="$event.stopPropagation()"
+              [matMenuTriggerFor]="widgetExportMenu"
+              matTooltip="{{ 'widget.export-data' | translate }}"
+              matTooltipPosition="above">
+        <tb-icon>download</tb-icon>
+      </button>
+      <mat-menu #widgetExportMenu="matMenu" xPosition="before">
+        <button mat-menu-item type="button" (click)="exportWidgetData('csv', $event)">
+          <tb-icon matMenuItemIcon>description</tb-icon>
+          <span>{{ 'widget.export-to-csv' | translate }}</span>
+        </button>
+        <button mat-menu-item type="button" (click)="exportWidgetData('xls', $event)">
+          <tb-icon matMenuItemIcon>table_view</tb-icon>
+          <span>{{ 'widget.export-to-xls' | translate }}</span>
+        </button>
+        <button mat-menu-item type="button" (click)="exportWidgetData('xlsx', $event)">
+          <tb-icon matMenuItemIcon>grid_on</tb-icon>
+          <span>{{ 'widget.export-to-xlsx' | translate }}</span>
+        </button>
+      </mat-menu>
+      <button mat-icon-button
+              type="button"
               [class.!hidden]="isEdit || !widget.enableFullscreen"
               (click)="$event.stopPropagation(); widget.isFullscreen = !widget.isFullscreen; updateEditWidgetActionsTooltipState()"
               matTooltip="{{(widget.isFullscreen ? 'fullscreen.exit' : 'fullscreen.expand') | translate}}"

@@ -1,0 +1,63 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<form [formGroup]="formGroup" (ngSubmit)="save()">
+  <mat-toolbar color="primary" class="tb-dialog-header">
+    <h2>{{ 'owner-and-groups.title' | translate }}</h2>
+    <span class="flex-1"></span>
+    <button mat-icon-button type="button" (click)="cancel()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </mat-toolbar>
+  @if (loading) {
+    <mat-progress-bar color="accent" mode="indeterminate"></mat-progress-bar>
+  }
+  <mat-dialog-content class="tb-manage-owner-content">
+    @if (data.ownerEditable) {
+      <tb-entity-autocomplete formControlName="customerId"
+                              [labelText]="'owner-and-groups.owner' | translate"
+                              [placeholder]="'owner-and-groups.owner-placeholder' | translate"
+                              [appearance]="'outline'"
+                              [required]="true"
+                              [subscriptSizing]="'dynamic'"
+                              [entityType]="entityType.CUSTOMER">
+      </tb-entity-autocomplete>
+      <div class="tb-manage-owner-hint">{{ 'owner-and-groups.owner-hint' | translate }}</div>
+      @if (formGroup.get('customerId').hasError('saveFailed')) {
+        <div class="tb-manage-owner-error">{{ 'owner-and-groups.save-failed' | translate }}</div>
+      }
+    }
+    <div class="tb-manage-owner-groups">
+      <div class="tb-manage-owner-groups-title">{{ 'owner-and-groups.groups' | translate }}</div>
+      <div class="tb-manage-owner-groups-list" *ngIf="groups.length; else noGroups">
+        @for (group of groups; track group.id) {
+          <mat-checkbox [checked]="isMember(group)"
+                        [disabled]="group.allGroup"
+                        (change)="toggleGroup(group, $event.checked)">
+            <span class="tb-manage-group-name">{{ group.name }}</span>
+            @if (group.publicGroup) {
+              <span class="tb-manage-group-tag" [matTooltip]="'owner-and-groups.public-group' | translate">
+                {{ 'owner-and-groups.public' | translate }}
+              </span>
+            }
+            @if (group.description) {
+              <span class="tb-manage-group-description">{{ group.description }}</span>
+            }
+          </mat-checkbox>
+        }
+      </div>
+      <ng-template #noGroups>
+        <div class="tb-manage-owner-groups-empty">{{ 'owner-and-groups.no-groups' | translate }}</div>
+      </ng-template>
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">{{ 'action.cancel' | translate }}</button>
+    <button mat-raised-button color="primary" type="submit" [disabled]="loading || saving">
+      {{ 'action.update' | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

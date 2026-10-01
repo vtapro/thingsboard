@@ -1,0 +1,69 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<form [formGroup]="emulatorForm" (ngSubmit)="create()">
+  <mat-toolbar color="primary" class="tb-dialog-header">
+    <h2>{{ 'emulator.create-title' | translate }}</h2>
+    <span class="flex-1"></span>
+    <button mat-icon-button type="button" (click)="cancel()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </mat-toolbar>
+  <mat-dialog-content class="mat-typography tb-emulator-create">
+    <div class="tb-emulator-create-profile">
+      <div class="tb-emulator-avatar" [style.background]="data.profile.color">
+        <mat-icon>{{ data.profile.icon }}</mat-icon>
+      </div>
+      <div>
+        <div class="tb-emulator-profile-title">{{ data.profile.name }}</div>
+        <div class="tb-emulator-profile-sub">{{ data.profile.category }} • {{ data.profile.type }}</div>
+      </div>
+    </div>
+    <div class="tb-emulator-chips">
+      @for (signal of data.profile.signals; track signal.key) {
+        <span class="tb-chip tb-chip-signal">{{ signal.key }}</span>
+      }
+    </div>
+    <div class="tb-emulator-create-form">
+      <mat-form-field appearance="outline" class="mat-block">
+        <mat-label>{{ 'emulator.name' | translate }}</mat-label>
+        <input matInput formControlName="name" required>
+        <mat-hint>{{ 'emulator.name-hint' | translate }}</mat-hint>
+        @if (emulatorForm.get('name').hasError('pattern')) {
+          <mat-error>{{ 'emulator.name-invalid' | translate }}</mat-error>
+        }
+        @if (emulatorForm.get('name').hasError('duplicate')) {
+          <mat-error>{{ 'emulator.name-exists' | translate }}</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="mat-block">
+        <mat-label>{{ 'emulator.scenario' | translate }}</mat-label>
+        <mat-select formControlName="scenario">
+          @for (scenario of data.profile.scenarios; track scenario) {
+            <mat-option [value]="scenario">{{ scenario }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="mat-block">
+        <mat-label>{{ 'emulator.interval' | translate }}</mat-label>
+        <mat-select formControlName="intervalSeconds">
+          @for (interval of intervals; track interval.value) {
+            <mat-option [value]="interval.value">{{ interval.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-checkbox formControlName="createDashboard">
+        <span>{{ 'emulator.create-dashboard-option' | translate }}</span>
+      </mat-checkbox>
+      <div class="tb-emulator-create-hint">{{ 'emulator.create-hint' | translate }}</div>
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">{{ 'action.cancel' | translate }}</button>
+    <button mat-raised-button color="primary" type="submit"
+            [disabled]="emulatorForm.invalid || isSaving">{{ 'action.create' | translate }}</button>
+  </mat-dialog-actions>
+</form>
