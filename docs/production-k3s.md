@@ -29,15 +29,17 @@ production của ThingsBoard. Khác biệt với môi trường dev (xem [local-
 > qua) vì thành viên suy ra từ authority; (3) **quyền RBAC không được nạp khi tải lại trang** (chỉ nạp sau khi
 > login) nên UI hiện/ẩn nút theo quyền nền tảng — nay nạp ở mọi lần boot. Phụ: danh sách "own entities" không còn
 > trễ 60 giây sau khi tạo device. Chi tiết [rbac-members.md](rbac-members.md) §8–§9.
-> Cụm production chạy 8 image `ghcr.io/vtapro/tb-*:v4.4.0.8`.
 > Schema không đổi so với `v4.4.0.5` nên **bỏ qua job `tb-install`** khi roll bản này.
 > 
-> Đã roll cụm production (2026-10-01): 9/9 deployment ThingsBoard (`tb-core`, `tb-rule-engine`, `tb-web-ui`,
-> `tb-js-executor`, `tb-mqtt-transport`, `tb-http-transport`, `tb-coap-transport`, `tb-lwm2m-transport`,
-> `tb-snmp-transport`) chạy `v4.4.0.8`, tất cả pod Running; `https://app.greeniq.vn` trả về bundle UI mới và
-> `/api/noauth/whiteLabeling` = 200. Roll bằng `kubectl -n thingsboard set image` nên không ghi đè các giá trị
-> drift khác trong cụm. (Release trước `v4.4.0.7` — 2026-10-01: nút xuất dữ liệu widget chỉ hiện trong dashboard
-> + ghim IPv4 cho GHCR trên các node.)
+> Đã roll cụm production (2026-10-01): 3/3 deployment **thực sự đổi code** — `tb-core` và `tb-rule-engine`
+> (`ghcr.io/vtapro/tb-node:v4.4.0.8`), `tb-web-ui` (`ghcr.io/vtapro/tb-web-ui:v4.4.0.8`) — pod Running 1/1;
+> `https://app.greeniq.vn` = 200, `/api/noauth/whiteLabeling` = 200, bundle `main-*.js` mới (gọi
+> `loadUserRoles()` ngay khi boot) và locale có khoá `owner-and-groups.system-group`. Các transport /
+> `tb-js-executor` **cố ý giữ `v4.4.0.7`** vì bản `v4.4.0.8` không đổi code của chúng (image `.8` giống hệt `.7`),
+> tránh restart thừa trên node đang gần trần CPU-request. Roll bằng `kubectl -n thingsboard set image` nên không
+> ghi đè các giá trị drift khác trong cụm; chiến lược rollingUpdate `maxSurge=0/maxUnavailable=1` được patch tạm
+> khi roll rồi trả lại `25%/25%`. (Release trước `v4.4.0.7` — 2026-10-01: nút xuất dữ liệu widget chỉ hiện trong
+> dashboard + ghim IPv4 cho GHCR trên các node.)
 
 > **Sự cố GHCR đã khắc phục (2026-10-01):** các node k3s **không có route IPv6 ra internet**, nhưng containerd
 > lại ưu tiên bản ghi AAAA của `ghcr.io` / `pkg-containers.githubusercontent.com` → pull lỗi
