@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright The ThingsBoard Authors
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -7,7 +7,7 @@
 # "Manage owner and groups"):
 #   - GET  /api/tenant/user/{userId}/roles  -> moi role cua tenant + role nao dang gan truc tiep / qua nhom
 #   - POST /api/tenant/user/{userId}/roles  -> dat dung danh sach role gan truc tiep
-#   - quyen hieu luc cua user doi ngay (union cac role), khong dung tới user khac
+#   - quyen hieu luc cua user doi ngay (union cac role), khong dung toi user khac
 #   - chi TENANT_ADMIN goi duoc API nay (customer user -> 403)
 #
 # Chay:

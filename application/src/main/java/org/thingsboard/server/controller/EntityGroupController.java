@@ -151,24 +151,26 @@ public class EntityGroupController extends BaseController {
         Set<String> requested = request != null && request.getGroupIds() != null
                 ? Set.copyOf(request.getGroupIds()) : Set.of();
         String target = id.getId().toString();
-        RbacEntityGroupSettings settings = entityGroupService.getEntityGroupSettings(getCurrentUser().getTenantId());
-        for (RbacEntityGroup group : settings.getGroups()) {
-            if (!entityType.equals(group.getEntityType()) || group.isAllGroup()) {
-                // the "All" group of the type contains every entity of the tenant, its membership is implicit
-                continue;
-            }
-            if (group.getEntityIds() == null) {
-                group.setEntityIds(new java.util.ArrayList<>());
-            }
-            if (requested.contains(group.getId())) {
-                if (!group.getEntityIds().contains(target)) {
-                    group.getEntityIds().add(target);
+        // read-modify-write inside the tenant lock: two administrators that edit the members of two entities at the
+        // same time do not overwrite each other
+        entityGroupService.updateEntityGroupSettings(getCurrentUser().getTenantId(), settings -> {
+            for (RbacEntityGroup group : settings.getGroups()) {
+                if (!entityType.equals(group.getEntityType()) || group.isAllGroup()) {
+                    // the "All" group of the type contains every entity of the tenant, its membership is implicit
+                    continue;
                 }
-            } else {
-                group.getEntityIds().remove(target);
+                if (group.getEntityIds() == null) {
+                    group.setEntityIds(new java.util.ArrayList<>());
+                }
+                if (requested.contains(group.getId())) {
+                    if (!group.getEntityIds().contains(target)) {
+                        group.getEntityIds().add(target);
+                    }
+                } else {
+                    group.getEntityIds().remove(target);
+                }
             }
-        }
-        entityGroupService.saveEntityGroupSettings(getCurrentUser().getTenantId(), settings);
+        });
         // the membership selects the roles of the user (and of the members of a user group), so the effective
         // permissions must be recomputed right away
         accessControlService.onPermissionsChanged();

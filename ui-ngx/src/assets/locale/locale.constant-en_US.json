@@ -42,7 +42,9 @@
         "customer-profile-hint": "Customer user profiles: a user in 'Customer Administrators' is the administrator of its customer — it may create and manage devices, assets, entity views and dashboards, and manage the users of that customer (role 'Customer Administrator'); a user in 'Customer Users' may only read the data of its customer (role 'Customer User'). Move the user to the other group to switch the profile; the permissions of the user change immediately.",
         "no-groups": "There is no entity group of this type yet. Create one in the Groups tab of the entity page.",
         "saved": "Owner and groups updated",
-        "save-failed": "Failed to update the owner"
+        "save-failed": "Failed to update the owner",
+        "save-roles-failed": "The roles were not saved. The dialog shows the state stored by the platform.",
+        "save-groups-failed": "The groups were not saved. The dialog shows the state stored by the platform."
     },
     "emulator": {
         "title": "Emulators",

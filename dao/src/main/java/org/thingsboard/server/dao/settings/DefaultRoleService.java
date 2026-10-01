@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Service
 @RequiredArgsConstructor
@@ -45,16 +46,33 @@ public class DefaultRoleService implements RoleService {
 
     @Override
     public RbacRoleSettings getRoleSettings(TenantId tenantId) {
+        return ensureDefaultRoles(tenantId, readRoleSettings(tenantId));
+    }
+
+    private RbacRoleSettings readRoleSettings(TenantId tenantId) {
         AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, ROLES_SETTINGS_KEY);
         if (adminSettings == null || adminSettings.getJsonValue() == null) {
-            return ensureDefaultRoles(tenantId, new RbacRoleSettings());
+            return new RbacRoleSettings();
         }
         try {
-            return ensureDefaultRoles(tenantId, JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER
-                    .convertValue(adminSettings.getJsonValue(), RbacRoleSettings.class));
+            return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER
+                    .convertValue(adminSettings.getJsonValue(), RbacRoleSettings.class);
         } catch (Exception e) {
             throw new RuntimeException("Failed to load roles settings!", e);
         }
+    }
+
+    /** Writes the settings of the tenant; the caller already holds the tenant lock. */
+    private RbacRoleSettings writeRoleSettings(TenantId tenantId, RbacRoleSettings settings) {
+        AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, ROLES_SETTINGS_KEY);
+        if (adminSettings == null) {
+            adminSettings = new AdminSettings();
+            adminSettings.setTenantId(tenantId);
+            adminSettings.setKey(ROLES_SETTINGS_KEY);
+        }
+        adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
+        AdminSettings saved = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
+        return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), RbacRoleSettings.class);
     }
 
     /**
@@ -134,15 +152,17 @@ public class DefaultRoleService implements RoleService {
             // the roles of the two profiles of a customer user always exist and keep their name: the platform owns
             // them (their permissions stay editable)
             settings = ensureDefaultRoles(tenantId, settings != null ? settings : new RbacRoleSettings());
-            AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, ROLES_SETTINGS_KEY);
-            if (adminSettings == null) {
-                adminSettings = new AdminSettings();
-                adminSettings.setTenantId(tenantId);
-                adminSettings.setKey(ROLES_SETTINGS_KEY);
-            }
-            adminSettings.setJsonValue(JacksonUtil.valueToTree(settings));
-            AdminSettings saved = adminSettingsService.saveAdminSettings(tenantId, adminSettings);
-            return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(saved.getJsonValue(), RbacRoleSettings.class);
+            return writeRoleSettings(tenantId, settings);
+        }
+    }
+
+    @Override
+    public RbacRoleSettings updateRoleSettings(TenantId tenantId, Consumer<RbacRoleSettings> update) {
+        synchronized (locks.lockFor(tenantId)) {
+            // read-modify-write inside the tenant lock, so concurrent changes are not lost
+            RbacRoleSettings settings = ensureDefaultRoles(tenantId, readRoleSettings(tenantId));
+            update.accept(settings);
+            return writeRoleSettings(tenantId, settings);
         }
     }
 

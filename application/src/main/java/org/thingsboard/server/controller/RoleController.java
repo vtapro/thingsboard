@@ -120,20 +120,22 @@ public class RoleController extends BaseController {
         }
         Set<String> requested = request != null && request.getRoleIds() != null
                 ? Set.copyOf(request.getRoleIds()) : Set.of();
-        RbacRoleSettings settings = roleService.getRoleSettings(getCurrentUser().getTenantId());
-        for (RbacRole role : settings.getRoles()) {
-            if (role.getUserIds() == null) {
-                role.setUserIds(new ArrayList<>());
-            }
-            if (requested.contains(role.getId())) {
-                if (!role.getUserIds().contains(userId.toString())) {
-                    role.getUserIds().add(userId.toString());
+        // read-modify-write inside the tenant lock: two administrators that change the roles of two users at the same
+        // time do not overwrite each other
+        roleService.updateRoleSettings(getCurrentUser().getTenantId(), settings -> {
+            for (RbacRole role : settings.getRoles()) {
+                if (role.getUserIds() == null) {
+                    role.setUserIds(new ArrayList<>());
                 }
-            } else {
-                role.getUserIds().remove(userId.toString());
+                if (requested.contains(role.getId())) {
+                    if (!role.getUserIds().contains(userId.toString())) {
+                        role.getUserIds().add(userId.toString());
+                    }
+                } else {
+                    role.getUserIds().remove(userId.toString());
+                }
             }
-        }
-        roleService.saveRoleSettings(getCurrentUser().getTenantId(), settings);
+        });
         // the effective permissions of the user change immediately
         accessControlService.onPermissionsChanged();
         UserRoleAssignments assignments = userRoleAssignments(userId.toString());

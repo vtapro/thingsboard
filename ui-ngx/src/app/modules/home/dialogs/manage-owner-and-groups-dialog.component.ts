@@ -10,6 +10,7 @@ import { AppState } from '@core/core.state';
 import { EntityGroupMember, EntityGroupService } from '@core/http/entity-group.service';
 import { defaultHttpOptionsFromConfig } from '@core/http/http-utils';
 import { DialogService } from '@core/services/dialog.service';
+import { ActionNotificationShow } from '@core/notification/notification.actions';
 import { UserService } from '@core/http/user.service';
 import { EntityType } from '@shared/models/entity-type.models';
 import { User } from '@shared/models/user.model';
@@ -330,19 +331,28 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
     this.http.post(`/api/tenant/user/${this.data.entityId}/roles`, {roleIds},
       defaultHttpOptionsFromConfig({})).subscribe({
       next: () => this.saveGroups(groupIds),
-      error: () => {
-        this.saving = false;
-      }
+      error: () => this.saveFailed('owner-and-groups.save-roles-failed')
     });
   }
 
   private saveGroups(groupIds: string[]): void {
     this.entityGroupService.setMembers(this.data.entityType, this.data.entityId, groupIds).subscribe({
       next: () => this.dialogRef.close(true),
-      error: () => {
-        this.saving = false;
-      }
+      error: () => this.saveFailed('owner-and-groups.save-groups-failed')
     });
+  }
+
+  /**
+   * A step of the dialog failed after an earlier step was already applied: tell the administrator which step failed
+   * and reload the state of the dialog, so what is shown is what the platform really stored.
+   */
+  private saveFailed(messageKey: string): void {
+    this.saving = false;
+    this.store.dispatch(new ActionNotificationShow({
+      message: this.translate.instant(messageKey),
+      type: 'error'
+    }));
+    this.loadEffectiveRoles();
   }
 
 }

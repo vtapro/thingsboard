@@ -8,11 +8,19 @@ import org.thingsboard.server.common.data.User;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroup;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroupSettings;
 
+import java.util.function.Consumer;
+
 public interface EntityGroupService {
 
     RbacEntityGroupSettings getEntityGroupSettings(TenantId tenantId);
 
     RbacEntityGroupSettings saveEntityGroupSettings(TenantId tenantId, RbacEntityGroupSettings settings);
+
+    /**
+     * Applies a change to the entity group settings of the tenant atomically (read, update and write while the
+     * tenant lock is held), so concurrent changes do not overwrite each other.
+     */
+    RbacEntityGroupSettings updateEntityGroupSettings(TenantId tenantId, Consumer<RbacEntityGroupSettings> update);
 
     /**
      * Creates or updates a single group. The other groups of the tenant are not touched.

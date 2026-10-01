@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Service
 @RequiredArgsConstructor
@@ -141,12 +142,8 @@ public class DefaultEntityGroupService implements EntityGroupService {
         if (!Authority.TENANT_ADMIN.equals(user.getAuthority()) && !Authority.CUSTOMER_USER.equals(user.getAuthority())) {
             return;
         }
-        RbacEntityGroupSettings settings = getEntityGroupSettings(tenantId);
         String entity = user.getId().getId().toString();
-        boolean changed = updateMembership(settings, entity, user.getAuthority());
-        if (changed) {
-            saveEntityGroupSettings(tenantId, settings);
-        }
+        updateEntityGroupSettings(tenantId, settings -> updateMembership(settings, entity, user.getAuthority()));
     }
 
     @Override
@@ -154,18 +151,14 @@ public class DefaultEntityGroupService implements EntityGroupService {
         if (userId == null) {
             return;
         }
-        RbacEntityGroupSettings settings = getEntityGroupSettings(tenantId);
         String entity = userId.getId().toString();
-        boolean changed = false;
-        for (RbacEntityGroup group : settings.getGroups()) {
-            if ("USER".equals(group.getEntityType()) && group.getEntityIds() != null
-                    && group.getEntityIds().remove(entity)) {
-                changed = true;
+        updateEntityGroupSettings(tenantId, settings -> {
+            for (RbacEntityGroup group : settings.getGroups()) {
+                if ("USER".equals(group.getEntityType()) && group.getEntityIds() != null) {
+                    group.getEntityIds().remove(entity);
+                }
             }
-        }
-        if (changed) {
-            saveEntityGroupSettings(tenantId, settings);
-        }
+        });
     }
 
     /**
@@ -234,22 +227,33 @@ public class DefaultEntityGroupService implements EntityGroupService {
     @Override
     public RbacEntityGroupSettings saveEntityGroup(TenantId tenantId, RbacEntityGroup group) {
         synchronized (locks.lockFor(tenantId)) {
-            RbacEntityGroupSettings settings = getEntityGroupSettings(tenantId);
-            List<RbacEntityGroup> groups = new ArrayList<>(settings.getGroups() != null ? settings.getGroups() : List.of());
-            groups.removeIf(existing -> Objects.equals(existing.getId(), group.getId()));
-            groups.add(group);
-            settings.setGroups(groups);
-            return saveEntityGroupSettings(tenantId, settings);
+            return updateEntityGroupSettings(tenantId, settings -> {
+                List<RbacEntityGroup> groups = new ArrayList<>(settings.getGroups() != null ? settings.getGroups() : List.of());
+                groups.removeIf(existing -> Objects.equals(existing.getId(), group.getId()));
+                groups.add(group);
+                settings.setGroups(groups);
+            });
         }
     }
 
     @Override
     public RbacEntityGroupSettings deleteEntityGroup(TenantId tenantId, String groupId) {
         synchronized (locks.lockFor(tenantId)) {
+            return updateEntityGroupSettings(tenantId, settings -> {
+                List<RbacEntityGroup> groups = new ArrayList<>(settings.getGroups() != null ? settings.getGroups() : List.of());
+                groups.removeIf(existing -> Objects.equals(existing.getId(), groupId));
+                settings.setGroups(groups);
+            });
+        }
+    }
+
+    @Override
+    public RbacEntityGroupSettings updateEntityGroupSettings(TenantId tenantId, Consumer<RbacEntityGroupSettings> update) {
+        synchronized (locks.lockFor(tenantId)) {
+            // read-modify-write inside the tenant lock, so two administrators that edit the groups (or the members of
+            // two different entities) at the same time do not overwrite each other
             RbacEntityGroupSettings settings = getEntityGroupSettings(tenantId);
-            List<RbacEntityGroup> groups = new ArrayList<>(settings.getGroups() != null ? settings.getGroups() : List.of());
-            groups.removeIf(existing -> Objects.equals(existing.getId(), groupId));
-            settings.setGroups(groups);
+            update.accept(settings);
             return saveEntityGroupSettings(tenantId, settings);
         }
     }
