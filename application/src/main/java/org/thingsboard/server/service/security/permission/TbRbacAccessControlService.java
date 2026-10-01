@@ -674,6 +674,12 @@ public class TbRbacAccessControlService implements AccessControlService {
             return true;
         }
         if (entity instanceof Customer target) {
+            if (operation == Operation.DELETE && user.getCustomerId() != null
+                    && user.getCustomerId().equals(target.getId())) {
+                // a customer user never deletes the customer it belongs to: it would delete its own scope
+                // (and the account of the caller) with it
+                return false;
+            }
             return isCustomerInUserScope(user, target.getId(), role);
         }
         return false;

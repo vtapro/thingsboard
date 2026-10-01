@@ -141,7 +141,10 @@ export class CustomersTableConfigResolver  {
     this.config.detailsReadonly = (customer) => customer && customer.additionalInfo && customer.additionalInfo.isPublic;
     const platformDeleteEnabled = this.config.deleteEnabled;
     this.config.deleteEnabled = (customer) => platformDeleteEnabled(customer)
-      && hasRbacPermission('CUSTOMER', 'DELETE');
+      && hasRbacPermission('CUSTOMER', 'DELETE')
+      // a customer user never deletes the customer it belongs to (the backend refuses it as well)
+      && !(authState.authUser?.authority === Authority.CUSTOMER_USER
+           && customer?.id?.id === authState.authUser.customerId);
     if (authState.authUser?.authority === Authority.CUSTOMER_USER) {
       // a customer user sees the customers of its scope only; the links to the entities of a customer are tenant admin
       // features (there is a dedicated Users page for the members)

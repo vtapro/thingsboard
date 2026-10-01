@@ -39,8 +39,14 @@ export const setRbacPermissions = (permissions: { [resource: string]: string[] }
 
 export const getRbacPermissions = (): { [resource: string]: string[] } | null => rbacPermissions;
 
-/** READ_ATTRIBUTES -> READ, WRITE_TELEMETRY -> WRITE. */
-const baseOperation = (operation: string): string => operation.startsWith('READ') ? 'READ' : 'WRITE';
+/**
+ * Operation that a "classic" role (one that only lists CREATE/READ/WRITE/DELETE) has to contain to grant the
+ * requested one. It mirrors TbRbacAccessControlService#grantedOperation: everything that reads maps to READ, the
+ * auxiliary write operations (attributes, telemetry, rpc, claim, assign) map to WRITE, while DELETE is never derived
+ * — the role has to list it explicitly.
+ */
+const baseOperation = (operation: string): string =>
+  operation === 'DELETE' ? 'DELETE' : (operation.startsWith('READ') ? 'READ' : 'WRITE');
 
 /**
  * True when the custom roles of the user allow the operation on the resource. When the user has no custom role,

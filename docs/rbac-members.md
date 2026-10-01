@@ -204,6 +204,17 @@ Mỗi tenant được cấp sẵn **2 role** và **2 nhóm USER** cùng tên, n�
 - Hai nhóm này **sửa được** trong dialog (khác nhóm hệ thống `All` bị khoá).
 - Nhóm user cùng tên (dùng để gán role) được sinh tự động và **lấy thành viên từ nhóm entity** — dialog là nơi
   duy nhất quản lý thành viên; role của profile được gán sẵn cho nhóm đó.
+
+Hai quy tắc đã sửa sau khi kiểm tra UI (2026-10-01):
+
+- **Delete không bao giờ được suy ra từ Write.** Trước đây helper của UI coi role có `WRITE` là có luôn `DELETE`
+  nên nút xoá **bật** trong khi backend từ chối (`Your role does not grant "Delete" on CUSTOMER.`). Nay UI và
+  backend dùng cùng quy tắc: role phải liệt kê `DELETE` (hoặc `ALL`) thì nút mới bật; các operation phụ
+  (`READ_ATTRIBUTES`, `WRITE_TELEMETRY`, `RPC_CALL`, …) vẫn suy ra từ `READ`/`WRITE` như trước.
+- **Customer user không bao giờ xoá được customer mà nó thuộc về** (kể cả khi role có `CUSTOMER: DELETE`): backend
+  chặn và UI không bật nút xoá cho dòng customer đó, tránh việc user tự xoá phạm vi (và tài khoản) của mình.
+  Profile `Customer Administrator` **không** cấp `CUSTOMER: DELETE` — muốn cho xoá customer con thì tick `Delete`
+  ở resource `CUSTOMER` trong role (hoặc nhờ bổ sung vào profile).
 - Muốn tinh chỉnh profile: sửa role `Customer Administrator` / `Customer User` ở trang **Roles** (role là mặc định
   nhưng vẫn sửa được); muốn cấp thêm quyền cho một nhóm người: tạo role mới và gán cho nhóm thường.
 - Khi đổi role/nhóm, backend **xoá cache quyền** (`AccessControlService.onPermissionsChanged`) nên hiệu lực ngay,
@@ -214,6 +225,7 @@ Mỗi tenant được cấp sẵn **2 role** và **2 nhóm USER** cùng tên, n�
 | `DEVICE`, `ASSET`, `ENTITY_VIEW` | `CREATE` | tạo được; backend gán `customerId` của người tạo + `rbacOwnerId` trước khi kiểm quyền |
 | `DASHBOARD` | `CREATE` | tạo được; dashboard **tự động được gán cho customer của người tạo** (nếu không, dashboard thuộc tenant và user không thấy) |
 | `DASHBOARD` | `READ/WRITE/DELETE` | chỉ áp dụng cho dashboard **đã được gán cho customer** của user (đúng cách ly của nền tảng) |
+| `DELETE` (mọi resource) | | role phải liệt kê **Delete** tường minh — hệ thống không suy ra Delete từ Write (UI và backend dùng cùng quy tắc) |
 | `USER`, `CUSTOMER` | `CREATE/READ/…` | theo phạm vi customer (xem §1) |
 | cờ `Only entities created by the user` | | chỉ áp dụng cho DEVICE/ASSET/ENTITY_VIEW/USER/CUSTOMER (các entity có `additionalInfo` để lưu owner); dashboard bị bỏ qua cờ này thay vì ẩn hết danh sách |
 
