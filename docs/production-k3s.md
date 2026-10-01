@@ -45,6 +45,12 @@ production của ThingsBoard. Khác biệt với môi trường dev (xem [local-
 > và tự chạy lại sau khi node reboot. Kiểm chứng: DaemonSet `imagePullPolicy: Always` pull
 > `ghcr.io/vtapro/tb-web-ui:v4.4.0.7` thành công trên 100% node.
 
+> **HPA cho giai đoạn ít tải (2026-10-01):** đặt `minReplicas: 1` cho **mọi** service
+> (`deploy/k3s/40-hpa.yaml`) để cụm không giữ pod thừa khi ít người dùng/telemetry. Lưu ý cụm production hiện chạy
+> `maxReplicas` thấp hơn manifest (core/rule-engine/js-executor/mqtt = 4, http = 3, web-ui = 4 — do manifest cũ
+> đã áp trước đây) nên HPA thực tế dừng theo sức chứa của cụm; khi thêm node thì apply lại `40-hpa.yaml` để nâng
+> trần theo tài liệu SCALING.md.
+
 Code ThingsBoard **không bị sửa để bỏ Kafka/Cassandra**. Việc "không dùng Kafka/Cassandra" chỉ
 áp dụng cho script và tài liệu dev; toàn bộ nhánh Kafka/Cassandra/microservices của ThingsBoard
 CE vẫn nguyên vẹn (xem mục 8 để có bằng chứng kiểm tra).

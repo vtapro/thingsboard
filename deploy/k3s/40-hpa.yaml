@@ -32,7 +32,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: tb-core
-  minReplicas: 2
+  minReplicas: 1
   maxReplicas: 16
   metrics:
     - type: Resource
@@ -59,7 +59,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: tb-rule-engine
-  minReplicas: 2
+  minReplicas: 1
   # Trần = TB_QUEUE_RULE_ENGINE_PARTITIONS / 2. Read the partition count from the Tenant profile queue
   # (Main/HighPriority/SequentialByOriginator) before raising this value.
   maxReplicas: 16
@@ -138,7 +138,7 @@ spec:
     kind: Deployment
     name: tb-mqtt-transport
   # 2 replica thường trực: lúc bắt đầu bão kết nối transport cần sẵn sàng, không chờ HPA.
-  minReplicas: 2
+  minReplicas: 1
   # MQTT transport là producer (không bị giới hạn bởi partition); trần thật là số connection + CPU/RAM của node.
   maxReplicas: 16
   metrics:
