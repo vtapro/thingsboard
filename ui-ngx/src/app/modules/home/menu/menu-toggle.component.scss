@@ -52,6 +52,9 @@
       .mat-icon {
         visibility: visible;
       }
+
+      /* the sub-items are indented under their section, like the menu of ThingsBoard PE */
+      padding-left: 28px;
     }
   }
 }
