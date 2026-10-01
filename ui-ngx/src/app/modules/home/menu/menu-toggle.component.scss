@@ -48,8 +48,9 @@
     transition-property: height;
 
     a.mat-mdc-button {
+      /* the icon of a page is shown (like ThingsBoard PE): it helps to scan the sub-items of a section */
       .mat-icon {
-        visibility: hidden;
+        visibility: visible;
       }
     }
   }

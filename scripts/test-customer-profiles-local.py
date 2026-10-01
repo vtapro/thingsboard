@@ -112,9 +112,18 @@ try:
           membership["Customer Users"]["member"] is True
           and membership["Customer Administrators"]["member"] is False,
           {k: v["member"] for k, v in membership.items()})
-    check("the two customer profile groups are editable in the dialog",
-          membership["Customer Users"]["system"] is False
-          and membership["Customer Administrators"]["system"] is False)
+    check("the two customer profile groups are managed by the platform",
+          membership["Customer Users"]["system"] is True
+          and membership["Customer Administrators"]["system"] is True,
+          {k: v.get("system") for k, v in membership.items()})
+
+    # the platform groups can not be renamed nor deleted (the profiles and the mirrored user groups depend on them)
+    r = session.delete(BASE + "/api/tenant/entityGroup/" + membership["Customer Users"]["id"])
+    check("the profile group can not be deleted", r.status_code == 400, r.status_code)
+    renamed = {"id": membership["Customer Users"]["id"], "name": "Renamed by the test", "entityType": "USER",
+               "entityIds": [], "publicGroup": False}
+    r = session.post(BASE + "/api/tenant/entityGroup/group", json=renamed)
+    check("the profile group can not be renamed", r.status_code == 400, r.status_code)
 
     user = user_session(user_id)
     r = user.get(BASE + "/api/user/roles")

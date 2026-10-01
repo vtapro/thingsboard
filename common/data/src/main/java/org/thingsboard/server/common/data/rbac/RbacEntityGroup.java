@@ -38,6 +38,13 @@ public class RbacEntityGroup implements Serializable {
      */
     private boolean allGroup;
 
+    /**
+     * Group of the platform: the "All" group of an entity type and the two profiles of a customer user
+     * ("Customer Administrators" / "Customer Users"). It can not be renamed nor deleted; its members are managed in
+     * the "Manage owner and groups" dialog.
+     */
+    private boolean system;
+
     @Schema(description = "Ids of the entities that belong to the group")
     private List<String> entityIds = new ArrayList<>();
 

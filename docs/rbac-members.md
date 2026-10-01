@@ -211,6 +211,17 @@ Luồng chuẩn cho "khách mua thiết bị về cắm" (không cần lộ acce
 | Quyền | `Customer User` có `CLAIM_DEVICES` mặc định; role tự tạo phải tick `Claim devices` ở resource DEVICE. Nếu role là "chi tiết" thì cần tick kèm `READ_ATTRIBUTES`/`READ_TELEMETRY` để dashboard vẫn hiển thị |
 | Nâng cấp profile | role hệ thống có `defaultVersion`; tenant cũ được **merge** quyền mặc định mới **một lần**, sau đó mọi tinh chỉnh của admin được giữ nguyên |
 
+### Nhóm hệ thống và đồng bộ với "User groups" (2026-10-01)
+
+- Trong tab **GROUPS** của trang Users: `All`, `Customer Users`, `Customer Administrators` là **nhóm hệ thống**
+  (API trả `system: true`): chỉ có thể thêm/bớt thành viên, **không đổi tên, không xoá** (backend trả `400`).
+  Nhóm thường do admin tạo vẫn sửa/xoá bình thường.
+- Mọi nhóm USER đều có **user group cùng tên** trong **Security → Roles → User groups**, nên chỉ cần tạo nhóm một
+  lần là có thể gán role cho nhóm đó; thành viên đồng bộ **hai chiều**:
+  - sửa thành viên trong dialog "Manage owner and groups" (hoặc tab GROUPS) → user group cập nhật theo;
+  - sửa thành viên trong Roles → User groups → nhóm entity cập nhật theo;
+  - xoá nhóm ở Roles → User groups cũng xoá nhóm entity tương ứng (và ngược lại).
+
 ### Role hệ thống (2 profile)
 
 Hai role `Customer Administrator` / `Customer User` được trả về với cờ `"system": true`:

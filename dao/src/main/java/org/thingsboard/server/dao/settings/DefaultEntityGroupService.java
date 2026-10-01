@@ -94,6 +94,7 @@ public class DefaultEntityGroupService implements EntityGroupService {
                 group.setName(ALL_GROUP_NAME);
                 group.setEntityType(entityType);
                 group.setAllGroup(true);
+                group.setSystem(true);
                 group.setDescription("All " + entityType.toLowerCase().replace('_', ' ') + "s of the tenant");
                 group.setCreatedTime(System.currentTimeMillis());
                 settings.getGroups().add(group);
@@ -102,6 +103,13 @@ public class DefaultEntityGroupService implements EntityGroupService {
         // the groups that followed the authority of the user are not part of the model of PE any more
         settings.getGroups().removeIf(group -> "USER".equals(group.getEntityType())
                 && LEGACY_AUTHORITY_GROUP_NAMES.contains(group.getName()));
+        // an existing record of a platform group is marked as such (the flag is stored by the next save)
+        settings.getGroups().forEach(group -> {
+            if (group.isAllGroup() || ("USER".equals(group.getEntityType())
+                    && CUSTOMER_PROFILE_GROUP_NAMES.contains(group.getName()))) {
+                group.setSystem(true);
+            }
+        });
         // the two profiles of the customer users of PE
         for (String name : CUSTOMER_PROFILE_GROUP_NAMES) {
             boolean exists = settings.getGroups().stream()
@@ -125,6 +133,8 @@ public class DefaultEntityGroupService implements EntityGroupService {
         group.setEntityType("USER");
         group.setDescription(description);
         group.setCreatedTime(System.currentTimeMillis());
+        // the profiles of a customer user are groups of the platform: they can not be renamed nor deleted
+        group.setSystem(true);
         return group;
     }
 

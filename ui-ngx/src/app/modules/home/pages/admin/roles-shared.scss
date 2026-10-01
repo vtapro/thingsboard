@@ -45,6 +45,16 @@
 .tb-roles-table {
   width: 100%;
   background: transparent;
+
+  /* compact rows: the permissions are shown as small chips, so the row only needs the height of its content */
+  .mat-mdc-row {
+    height: auto;
+  }
+
+  .mat-mdc-cell,
+  .mat-mdc-header-cell {
+    padding: 6px 8px;
+  }
 }
 
 .tb-roles-cell-strong {
@@ -64,17 +74,18 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 4px 0;
+  padding: 2px 0;
 }
 
 .tb-roles-chip {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  line-height: 16px;
-  /* the chip never gets cut off: the text wraps inside the rounded badge */
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 14px;
+  white-space: nowrap;
+  /* the compact chip shows the first operations only, the full list is in the tooltip */
   max-width: 100%;
   white-space: normal;
   overflow-wrap: anywhere;

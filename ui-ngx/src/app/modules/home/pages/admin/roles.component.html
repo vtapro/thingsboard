@@ -55,6 +55,7 @@
                         <div class="tb-roles-role-chip-cell tb-roles-chips">
                           @for (chip of permissionChips(role); track chip.label) {
                             <span class="tb-roles-chip"
+                                  [matTooltip]="chip.tooltip"
                                   [class.tb-roles-chip-scoped]="chip.scoped">{{ chip.label }}</span>
                           }
                         </div>

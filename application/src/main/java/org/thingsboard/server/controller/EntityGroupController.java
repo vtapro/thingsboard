@@ -87,9 +87,9 @@ public class EntityGroupController extends BaseController {
             throw new IncorrectParameterException("Entity group name is required");
         }
         validateEntityType(entityGroup.getEntityType());
-        if (isAllGroup(getCurrentUser().getTenantId(), entityGroup.getId())) {
-            throw new IncorrectParameterException("The All group of an entity type contains every entity of the tenant "
-                    + "and can not be modified");
+        if (isSystemGroup(getCurrentUser().getTenantId(), entityGroup.getId())) {
+            throw new IncorrectParameterException("This group belongs to the platform (the \"All\" group or one of the "
+                    + "two profiles of a customer user) and can not be renamed.");
         }
         RbacEntityGroupSettings saved = entityGroupService.saveEntityGroup(getCurrentUser().getTenantId(), entityGroup);
         accessControlService.onPermissionsChanged();
@@ -108,9 +108,10 @@ public class EntityGroupController extends BaseController {
         if (StringUtils.isBlank(groupId)) {
             throw new IncorrectParameterException("Entity group id is required");
         }
-        if (isAllGroup(getCurrentUser().getTenantId(), groupId)) {
-            throw new IncorrectParameterException("The All group of an entity type contains every entity of the tenant "
-                    + "and can not be deleted");
+        if (isSystemGroup(getCurrentUser().getTenantId(), groupId)) {
+            throw new IncorrectParameterException("This group belongs to the platform (the \"All\" group or one of the "
+                    + "two profiles of a customer user) and can not be deleted. Its members are managed in the "
+                    + "\"Manage owner and groups\" dialog of a user.");
         }
         RbacEntityGroupSettings saved = entityGroupService.deleteEntityGroup(getCurrentUser().getTenantId(), groupId);
         accessControlService.onPermissionsChanged();
@@ -225,9 +226,16 @@ public class EntityGroupController extends BaseController {
             boolean member = group.isAllGroup()
                     || (group.getEntityIds() != null && group.getEntityIds().contains(target));
             members.add(new EntityGroupMembers.Member(group.getId(), group.getName(), group.getDescription(),
-                    group.isPublicGroup(), group.isAllGroup(), group.isAllGroup(), member));
+                    group.isPublicGroup(), group.isAllGroup(), group.isSystem(), member));
         }
         return new EntityGroupMembers(entityId, members);
+    }
+
+    /** True when the group belongs to the platform (the "All" group or a profile of a customer user). */
+    private boolean isSystemGroup(TenantId tenantId, String groupId) {
+        RbacEntityGroupSettings settings = entityGroupService.getEntityGroupSettings(tenantId);
+        return settings.getGroups() != null && settings.getGroups().stream()
+                .anyMatch(group -> groupId.equals(group.getId()) && group.isSystem());
     }
 
     /** True when the group is the "All" group of its entity type (created by the backend, read only). */

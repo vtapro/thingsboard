@@ -29,6 +29,9 @@ interface EntityGroup {
   description?: string;
   publicGroup?: boolean;
   createdTime?: number;
+  allGroup?: boolean;
+  /** Group of the platform (All + the two profiles of a customer user): no rename, no delete. */
+  system?: boolean;
 }
 
 @Component({

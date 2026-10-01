@@ -33,9 +33,20 @@ interface RbacRole {
 }
 
 interface PermissionChip {
+  /** Compact label, e.g. `DEVICE · create, read +8`. */
   label: string;
+  /** Full list of the granted operations, shown on hover. */
+  tooltip: string;
   scoped: boolean;
 }
+
+/** Number of operations shown in the compact chip before the `+N` counter. */
+const CHIP_OPERATIONS = 2;
+
+const compactOperations = (operations: string[]): string => operations
+  .slice(0, CHIP_OPERATIONS)
+  .map(operation => operation.toLowerCase())
+  .join(', ') + (operations.length > CHIP_OPERATIONS ? ` +${operations.length - CHIP_OPERATIONS}` : '');
 
 interface TenantUserInfo {
   id: { id: string };
@@ -303,7 +314,8 @@ export class RolesComponent extends PageComponent implements OnInit {
       const operations = role.permissions[resource] || [];
       if (operations.length) {
         chips.push({
-          label: `${resource} · ${operations.join(', ')}${this.ownScopeSuffix(role, resource)}`,
+          label: `${resource} · ${compactOperations(operations)}${this.ownScopeSuffix(role, resource)}`,
+          tooltip: `${resource}: ${operations.join(', ')}`,
           scoped: false
         });
       }
@@ -317,13 +329,16 @@ export class RolesComponent extends PageComponent implements OnInit {
       const groupIds = new Set<string>();
       operations.forEach(operation => (byOperation[operation] || []).forEach(id => groupIds.add(id)));
       chips.push({
-        label: `${resource} · ${operations.join(', ')} · ${this.translate.instant('admin.roles-groups-count',
+        label: `${resource} · ${compactOperations(operations)} · ${this.translate.instant('admin.roles-groups-count',
           {count: groupIds.size})}${this.ownScopeSuffix(role, resource)}`,
+        tooltip: `${resource}: ${operations.join(', ')} · ${this.translate.instant('admin.roles-groups-count',
+          {count: groupIds.size})}`,
         scoped: true
       });
     }
     if (role.ownCustomerOnly) {
-      chips.push({label: this.translate.instant('admin.roles-own-customer-only'), scoped: true});
+      const label = this.translate.instant('admin.roles-own-customer-only');
+      chips.push({label, tooltip: label, scoped: true});
     }
     return chips;
   }
@@ -585,7 +600,22 @@ export class RolesComponent extends PageComponent implements OnInit {
       true
     ).subscribe(result => {
       if (result) {
-        this.persistUserGroups(this.userGroups.filter(g => g.id !== group.id));
+        // the group is mirrored into an entity group of the user type (the "Manage owner and groups" dialog edits its
+        // members), so delete that group as well, otherwise it would show up again on the next read
+        const entityGroup = this.groups.find(g => g.entityType === 'USER' && g.name === group.name);
+        if (entityGroup) {
+          this.http.delete<{groups: RbacEntityGroup[]}>(`/api/tenant/entityGroup/${entityGroup.id}`,
+            defaultHttpOptionsFromConfig({ignoreErrors: true})).subscribe({
+            next: settings => {
+              this.groups = settings?.groups || this.groups.filter(g => g.id !== entityGroup.id);
+              this.clampGroupPage();
+              this.persistUserGroups(this.userGroups.filter(g => g.id !== group.id));
+            },
+            error: (error: HttpErrorResponse) => this.notifySaveFailed('entity-group.save-failed', error)
+          });
+        } else {
+          this.persistUserGroups(this.userGroups.filter(g => g.id !== group.id));
+        }
       }
     });
   }

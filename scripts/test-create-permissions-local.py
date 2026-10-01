@@ -199,10 +199,10 @@ try:
     # --- only the "All" group is a system group ---------------------------------------------------
     r = session.get(BASE + f"/api/tenant/entityGroup/members/USER/{creator_id}")
     members = {m["name"]: m for m in r.json()["groups"]}
-    check("the 'All' group is reported as a system group",
+    check("the platform groups are reported as system groups",
           members["All"]["system"] is True
-          and members["Customer Users"]["system"] is False
-          and members["Customer Administrators"]["system"] is False,
+          and members["Customer Users"]["system"] is True
+          and members["Customer Administrators"]["system"] is True,
           {k: v.get("system") for k, v in members.items()})
     check("the groups that followed the authority of the user are gone",
           "Tenant Users" not in members and "Tenant Administrators" not in members, sorted(members))
