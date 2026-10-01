@@ -3,7 +3,10 @@
 package org.thingsboard.server.controller;
 
 import io.swagger.v3.oas.annotations.Parameter;
+import org.springframework.web.bind.annotation.PathVariable;
 import lombok.RequiredArgsConstructor;
+import org.thingsboard.server.common.data.User;
+import org.thingsboard.server.common.data.id.UserId;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,8 +15,12 @@ import org.springframework.web.bind.annotation.RestController;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.rbac.RbacRole;
 import org.thingsboard.server.common.data.rbac.RbacRoleSettings;
+import org.thingsboard.server.common.data.rbac.RbacUserGroup;
+import org.thingsboard.server.common.data.rbac.UserRoleAssignments;
+import org.thingsboard.server.common.data.rbac.UserRoleAssignmentsRequest;
 import org.thingsboard.server.config.annotations.ApiOperation;
 import org.thingsboard.server.dao.settings.RoleService;
+import org.thingsboard.server.dao.settings.UserGroupService;
 import org.thingsboard.server.dao.exception.IncorrectParameterException;
 import org.thingsboard.server.service.security.permission.TbRbacAccessControlService;
 import org.thingsboard.server.queue.util.TbCoreComponent;
@@ -23,6 +30,12 @@ import org.thingsboard.server.service.security.permission.Resource;
 import static org.thingsboard.server.controller.ControllerConstants.TENANT_AUTHORITY_PARAGRAPH;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 @RequiredArgsConstructor
 @RestController
@@ -30,6 +43,7 @@ import java.util.List;
 public class RoleController extends BaseController {
 
     private final RoleService roleService;
+    private final UserGroupService userGroupService;
 
     @ApiOperation(value = "Get roles of the current tenant (getRoles)",
             notes = "Returns custom roles configured for the current tenant. " + TENANT_AUTHORITY_PARAGRAPH)
@@ -59,6 +73,85 @@ public class RoleController extends BaseController {
      * Permissions can be scoped to entity groups only for the entities that may belong to a group (devices, assets
      * and entity views). Everything else has to be granted globally, otherwise the scope would always be empty.
      */
+    @ApiOperation(value = "Get the roles of one user (getUserRolesAssignments)",
+            notes = "Returns every role of the tenant with the way it applies to the user: assigned directly to the "
+                    + "user, or through one of its user groups. Used by the \"Roles\" section of the user dialog. "
+                    + TENANT_AUTHORITY_PARAGRAPH)
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @GetMapping(value = "/api/tenant/user/{userId}/roles")
+    public UserRoleAssignments getUserRolesAssignments(
+            @Parameter(description = "Id of the user") @PathVariable("userId") String strUserId)
+            throws ThingsboardException {
+        accessControlService.checkPermission(getCurrentUser(), Resource.ADMIN_SETTINGS, Operation.READ);
+        UUID userId = toUUID(strUserId);
+        checkUserId(new UserId(userId), Operation.READ);
+        return userRoleAssignments(userId.toString());
+    }
+
+    @ApiOperation(value = "Set the roles assigned directly to one user (saveUserRolesAssignments)",
+            notes = "The user is assigned directly to exactly the listed roles of the tenant. The assignments of the "
+                    + "other users and the roles the user gets from its user groups are not changed. "
+                    + TENANT_AUTHORITY_PARAGRAPH)
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PostMapping(value = "/api/tenant/user/{userId}/roles")
+    public UserRoleAssignments saveUserRolesAssignments(
+            @Parameter(description = "Id of the user") @PathVariable("userId") String strUserId,
+            @RequestBody UserRoleAssignmentsRequest request) throws ThingsboardException {
+        accessControlService.checkPermission(getCurrentUser(), Resource.ADMIN_SETTINGS, Operation.WRITE);
+        UUID userId = toUUID(strUserId);
+        User user = checkUserId(new UserId(userId), Operation.WRITE);
+        if (user.getAuthority() == org.thingsboard.server.common.data.security.Authority.SYS_ADMIN) {
+            throw new ThingsboardException("The roles of a system administrator can not be configured.",
+                    org.thingsboard.server.common.data.exception.ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+        }
+        Set<String> requested = request != null && request.getRoleIds() != null
+                ? Set.copyOf(request.getRoleIds()) : Set.of();
+        RbacRoleSettings settings = roleService.getRoleSettings(getCurrentUser().getTenantId());
+        for (RbacRole role : settings.getRoles()) {
+            if (role.getUserIds() == null) {
+                role.setUserIds(new ArrayList<>());
+            }
+            if (requested.contains(role.getId())) {
+                if (!role.getUserIds().contains(userId.toString())) {
+                    role.getUserIds().add(userId.toString());
+                }
+            } else {
+                role.getUserIds().remove(userId.toString());
+            }
+        }
+        roleService.saveRoleSettings(getCurrentUser().getTenantId(), settings);
+        // the effective permissions of the user change immediately
+        accessControlService.onPermissionsChanged();
+        return userRoleAssignments(userId.toString());
+    }
+
+    /** Every role of the tenant with the way it applies to the user (direct assignment or user groups). */
+    private UserRoleAssignments userRoleAssignments(String userId) throws ThingsboardException {
+        RbacRoleSettings settings = roleService.getRoleSettings(getCurrentUser().getTenantId());
+        Set<String> direct = new HashSet<>();
+        for (RbacRole role : settings.getRoles()) {
+            if (role.getUserIds() != null && role.getUserIds().contains(userId)) {
+                direct.add(role.getId());
+            }
+        }
+        Map<String, List<String>> fromGroups = new HashMap<>();
+        for (RbacUserGroup group : userGroupService.getUserGroupSettings(getCurrentUser().getTenantId()).getGroups()) {
+            if (group.getUserIds() != null && group.getUserIds().contains(userId) && group.getRoleIds() != null) {
+                for (String roleId : group.getRoleIds()) {
+                    fromGroups.computeIfAbsent(roleId, id -> new ArrayList<>()).add(group.getName());
+                }
+            }
+        }
+        List<UserRoleAssignments.Role> roles = new ArrayList<>();
+        for (RbacRole role : settings.getRoles()) {
+            List<String> groups = fromGroups.getOrDefault(role.getId(), List.of());
+            boolean isDirect = direct.contains(role.getId());
+            roles.add(new UserRoleAssignments.Role(role.getId(), role.getName(), isDirect,
+                    isDirect || !groups.isEmpty(), groups));
+        }
+        return new UserRoleAssignments(userId, roles);
+    }
+
     private void validateScopedPermissions(RbacRoleSettings settings) {
         if (settings == null || settings.getRoles() == null) {
             return;

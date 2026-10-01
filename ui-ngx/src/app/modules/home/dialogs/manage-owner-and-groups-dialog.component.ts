@@ -36,15 +36,44 @@ export interface ManageOwnerAndGroupsDialogData {
 
 const CUSTOMER_PROFILE_ROLE_NAMES = ['Customer Administrator', 'Customer User'];
 
+interface RolePermissionSummary {
+  resource: string;
+  operations: string;
+}
+
+/** One role of the tenant, as offered by the "Roles" section of the dialog. */
 interface EffectiveRole {
+  id: string;
   name: string;
   /** One of the two profiles of a customer user. */
   profile: boolean;
-  /** Assigned to the user itself (the other roles come from a user group). */
+  /** Assigned to the user itself (the roles that only come from a user group can not be unticked here). */
   direct: boolean;
+  /** The role applies to the user (directly or through one of its user groups). */
+  assigned: boolean;
   /** Names of the user groups that carry the role. */
   groups: string[];
+  /** Granted permissions, e.g. `DEVICE create, read`. */
+  summary: string;
 }
+
+/** `DEVICE create, read` — the granted operations of one role, used by the "Roles" section of the dialog. */
+const summarisePermissions = (permissions?: { [resource: string]: string[] },
+                             scopedPermissions?: { [resource: string]: { [operation: string]: string[] } }): string => {
+  const lines: string[] = [];
+  Object.entries(permissions || {}).forEach(([resource, operations]) => {
+    if (operations && operations.length) {
+      lines.push(`${resource} ${operations.map(op => op.toLowerCase()).join(', ')}`);
+    }
+  });
+  Object.entries(scopedPermissions || {}).forEach(([resource, byOperation]) => {
+    const operations = Object.keys(byOperation || {});
+    if (operations.length) {
+      lines.push(`${resource} ${operations.map(op => op.toLowerCase()).join(', ')} (scoped)`);
+    }
+  });
+  return lines.join(' · ');
+};
 
 @Component({
   selector: 'tb-manage-owner-and-groups-dialog',
@@ -66,6 +95,9 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
    * groups). An empty list means the platform permissions of its authority apply.
    */
   effectiveRoles: EffectiveRole[] = [];
+  /** Roles ticked in the "Roles" section: they are assigned directly to the user. */
+  roleSelection = new Set<string>();
+  private initialRoleSelection = new Set<string>();
   rolesLoaded = false;
 
   constructor(protected store: Store<AppState>,
@@ -99,6 +131,11 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
     this.loadEffectiveRoles();
   }
 
+  /**
+   * Loads the roles of the tenant (with the permissions of each one) and the way they apply to the user: assigned
+   * directly to the user or through one of its user groups. The tenant administrator ticks the direct assignment in
+   * the "Roles" section of the dialog.
+   */
   private loadEffectiveRoles(): void {
     if (this.data.entityType !== EntityType.USER || !this.data.entityId) {
       this.rolesLoaded = true;
@@ -106,39 +143,30 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
     }
     const userId = this.data.entityId;
     const options = defaultHttpOptionsFromConfig({ignoreLoading: true, ignoreErrors: true});
-    this.http.get<{ roles: Array<{ id: string; name: string; userIds?: string[] }> }>(
+    this.http.get<{ roles: Array<{ id: string; name: string;
+                                   permissions?: { [resource: string]: string[] };
+                                   scopedPermissions?: { [resource: string]: { [operation: string]: string[] } } }> }>(
       '/api/tenant/role', options).subscribe({
       next: (settings) => {
         const roles = settings?.roles || [];
-        this.http.get<{ groups: Array<{ name?: string; userIds?: string[]; roleIds?: string[] }> }>(
-          '/api/tenant/userGroup', options).subscribe({
-          next: (userGroups) => {
-            const roleSources = new Map<string, { names: string[]; direct: boolean }>();
-            roles.forEach(role => {
-              if (role.userIds && role.userIds.includes(userId)) {
-                roleSources.set(role.id, {names: [], direct: true});
-              }
-            });
-            (userGroups?.groups || []).forEach(group => {
-              if (group.userIds && group.userIds.includes(userId)) {
-                (group.roleIds || []).forEach(roleId => {
-                  const source = roleSources.get(roleId) || {names: [], direct: false};
-                  if (group.name && !source.names.includes(group.name)) {
-                    source.names.push(group.name);
-                  }
-                  roleSources.set(roleId, source);
-                });
-              }
-            });
-            this.effectiveRoles = roles.filter(role => roleSources.has(role.id)).map(role => {
-              const source = roleSources.get(role.id);
+        this.http.get<{ roles: Array<{ id: string; name: string; direct: boolean; assigned: boolean; groups?: string[] }> }>(
+          `/api/tenant/user/${userId}/roles`, options).subscribe({
+          next: (assignments) => {
+            const byId = new Map((assignments?.roles || []).map(role => [role.id, role]));
+            this.effectiveRoles = roles.map(role => {
+              const assignment = byId.get(role.id);
               return {
+                id: role.id,
                 name: role.name,
                 profile: CUSTOMER_PROFILE_ROLE_NAMES.includes(role.name),
-                direct: source.direct,
-                groups: source.names
+                direct: !!assignment?.direct,
+                assigned: !!assignment?.assigned,
+                groups: assignment?.groups || [],
+                summary: summarisePermissions(role.permissions, role.scopedPermissions)
               };
             });
+            this.roleSelection = new Set(this.effectiveRoles.filter(role => role.direct).map(role => role.id));
+            this.initialRoleSelection = new Set(this.roleSelection);
             this.rolesLoaded = true;
           },
           error: () => {
@@ -150,6 +178,30 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
         this.rolesLoaded = true;
       }
     });
+  }
+
+  /** The roles that only apply through a user group: they follow the group membership of the dialog. */
+  get groupRoles(): EffectiveRole[] {
+    return this.effectiveRoles.filter(role => !role.direct && role.assigned);
+  }
+
+  get roleAssignmentChanged(): boolean {
+    if (this.roleSelection.size !== this.initialRoleSelection.size) {
+      return true;
+    }
+    return Array.from(this.roleSelection).some(id => !this.initialRoleSelection.has(id));
+  }
+
+  toggleRole(role: EffectiveRole, checked: boolean): void {
+    if (checked) {
+      this.roleSelection.add(role.id);
+    } else {
+      this.roleSelection.delete(role.id);
+    }
+  }
+
+  isRoleSelected(role: EffectiveRole): boolean {
+    return this.roleSelection.has(role.id);
   }
 
   /** A tenant administrator belongs to the tenant, so it has no owner customer (the field is not applicable). */
@@ -206,24 +258,13 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
         return;
       }
       this.saving = true;
-      const options = defaultHttpOptionsFromConfig({});
-      this.http.get<{ roles: Array<{ id: string; name: string; userIds?: string[] }> }>(
-        '/api/tenant/role', options).subscribe({
-        next: (settings) => {
-          (settings?.roles || []).forEach(role => {
-            if (!CUSTOMER_PROFILE_ROLE_NAMES.includes(role.name) && role.userIds) {
-              role.userIds = role.userIds.filter(id => id !== this.data.entityId);
-            }
-          });
-          this.http.post('/api/tenant/role', {roles: settings?.roles || []}, options).subscribe({
-            next: () => {
-              this.saving = false;
-              this.loadEffectiveRoles();
-            },
-            error: () => {
-              this.saving = false;
-            }
-          });
+      // keep only the profile roles the user has directly: the assignment of every other role is dropped
+      const roleIds = this.effectiveRoles.filter(role => role.direct && role.profile).map(role => role.id);
+      this.http.post(`/api/tenant/user/${this.data.entityId}/roles`, {roleIds},
+        defaultHttpOptionsFromConfig({})).subscribe({
+        next: () => {
+          this.saving = false;
+          this.loadEffectiveRoles();
         },
         error: () => {
           this.saving = false;
@@ -268,15 +309,31 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
       const customerId = this.formGroup.get('customerId').value;
       user.customerId = isDefinedAndNotNull(customerId) ? new CustomerId(customerId) : null;
       this.userService.saveUser(user).subscribe({
-        next: () => this.saveGroups(groupIds),
+        next: () => this.saveRoles(groupIds),
         error: () => {
           this.saving = false;
           this.formGroup.get('customerId').setErrors({saveFailed: true});
         }
       });
     } else {
-      this.saveGroups(groupIds);
+      this.saveRoles(groupIds);
     }
+  }
+
+  /** Persists the direct role assignment of the user (only when the ticks of the "Roles" section changed). */
+  private saveRoles(groupIds: string[]): void {
+    if (this.data.entityType !== EntityType.USER || !this.roleAssignmentChanged) {
+      this.saveGroups(groupIds);
+      return;
+    }
+    const roleIds = Array.from(this.roleSelection);
+    this.http.post(`/api/tenant/user/${this.data.entityId}/roles`, {roleIds},
+      defaultHttpOptionsFromConfig({})).subscribe({
+      next: () => this.saveGroups(groupIds),
+      error: () => {
+        this.saving = false;
+      }
+    });
   }
 
   private saveGroups(groupIds: string[]): void {

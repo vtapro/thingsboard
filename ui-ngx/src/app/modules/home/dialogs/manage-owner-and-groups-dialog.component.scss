@@ -127,3 +127,30 @@
 .tb-manage-owner-warning-action {
   margin-top: 8px;
 }
+
+.tb-manage-owner-roles-section {
+  margin-top: 16px;
+}
+
+.tb-manage-owner-roles-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(0, 0, 0, .12);
+  border-radius: 4px;
+  padding: 8px 12px;
+  max-height: 260px;
+  overflow: auto;
+
+  mat-checkbox {
+    display: block;
+    margin: 4px 0;
+  }
+}
+
+.tb-manage-role-summary {
+  display: block;
+  margin-left: 4px;
+  color: rgba(0, 0, 0, .54);
+  font-size: 11px;
+  line-height: 1.4;
+}

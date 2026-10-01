@@ -62,6 +62,35 @@
     @if (data.ownerEditable === false) {
       <div class="tb-manage-owner-hint">{{ 'owner-and-groups.no-owner-hint' | translate }}</div>
     }
+    @if (data.entityType === entityType.USER) {
+      <div class="tb-manage-owner-roles-section">
+        <div class="tb-manage-owner-groups-title">{{ 'owner-and-groups.roles' | translate }}</div>
+        @if (!rolesLoaded) {
+          <mat-progress-bar color="accent" mode="indeterminate"></mat-progress-bar>
+        } @else if (effectiveRoles.length) {
+          <div class="tb-manage-owner-roles-list">
+            @for (role of effectiveRoles; track role.id) {
+              <mat-checkbox [checked]="isRoleSelected(role)"
+                            (change)="toggleRole(role, $event.checked)">
+                <span class="tb-manage-group-name">{{ role.name }}</span>
+                @if (!role.direct && role.groups.length) {
+                  <span class="tb-manage-group-tag" [matTooltip]="'owner-and-groups.role-from-group-hint' | translate">
+                    <tb-icon>group</tb-icon>
+                    {{ role.groups.join(', ') }}
+                  </span>
+                }
+                @if (role.summary) {
+                  <span class="tb-manage-role-summary">{{ role.summary }}</span>
+                }
+              </mat-checkbox>
+            }
+          </div>
+          <div class="tb-manage-owner-hint">{{ 'owner-and-groups.roles-hint' | translate }}</div>
+        } @else {
+          <div class="tb-manage-owner-groups-empty">{{ 'owner-and-groups.no-roles-hint' | translate }}</div>
+        }
+      </div>
+    }
     <div class="tb-manage-owner-roles">
       <span class="tb-manage-owner-roles-label">{{ 'owner-and-groups.effective-roles' | translate }}</span>
       @if (!rolesLoaded) {

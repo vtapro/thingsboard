@@ -175,6 +175,24 @@ khác không đổi) → chuyển user sang customer B (**200**, đọc lại th
 
 ## 9. Quyền tạo entity của customer user (audit 2026-10-01)
 
+### Gán role tuỳ biến trực tiếp cho user (2026-10-01)
+
+Trang **Roles** cho phép tạo role tuỳ ý (tên, từng resource/operation, scope theo entity group, cờ `ownOnly`,
+`ownCustomerOnly`, gán user/nhóm user). Bổ sung thêm chiều ngược lại — gán role **từ phía user** trong dialog
+**Manage owner and groups**:
+
+| Thành phần | Nội dung |
+|---|---|
+| API | `GET /api/tenant/user/{userId}/roles` → mọi role của tenant + `direct` (gán trực tiếp), `assigned` (đang hiệu lực), `groups` (nhóm user nào cấp role đó); `POST /api/tenant/user/{userId}/roles` `{"roleIds":[…]}` → đặt đúng danh sách role gán **trực tiếp** cho user |
+| Quyền | chỉ `TENANT_ADMIN` **và** role phải có `ADMIN_SETTINGS: READ/WRITE` (customer user → 403); user phải thuộc tenant của người gọi |
+| Database | **không đổi schema**: role nằm trong `admin_settings` (key `roles`) dạng JSON, `userIds` là danh sách gán trực tiếp — API chỉ ghi lại document đó |
+| UI | mục **Roles** trong dialog: mỗi role một checkbox kèm tóm tắt quyền (`DEVICE read, write · DASHBOARD create, read`); role đến từ nhóm user hiện nhãn tên nhóm và chỉ đổi được bằng cách đổi nhóm |
+| Hiệu lực | `accessControlService.onPermissionsChanged()` được gọi sau khi lưu → quyền của user đổi **ngay**, không chờ cache |
+
+Quyền hiệu lực của user = **hợp** của: role gán trực tiếp (ticked trong dialog) + role của các nhóm user
+(`Customer Administrators` / `Customer Users` / nhóm thường). Dialog cảnh báo khi user là `Customer Users` mà còn
+role khác cấp thêm quyền, và có nút **Remove the extra roles** để bỏ gán trực tiếp các role ngoài profile.
+
 ### Ai tạo tài khoản nào (2026-10-01)
 
 | Caller | Tạo được | Không tạo được |
@@ -258,7 +276,13 @@ Hai profile customer user có script riêng:
 
 ```bash
 /tmp/emu-venv/bin/python scripts/test-customer-profiles-local.py   # 21/21 PASS
+/tmp/emu-venv/bin/python scripts/test-user-roles-local.py          # 18/18 PASS
 ```
+
+`test-user-roles-local.py` kiểm tra: tạo role tuỳ biến → `GET /api/tenant/user/{id}/roles` thấy role chưa gán và
+role profile đến từ nhóm `Customer Users`; `POST` gán trực tiếp → quyền hiệu lực ngay (tạo được dashboard),
+document `roles` trong DB có `userIds` đúng, user khác không bị ảnh hưởng; bỏ gán → 403 ngay; customer user gọi API
+này → 403.
 
 Script kiểm tra: tenant có sẵn role `Customer Administrator` / `Customer User` và 2 nhóm cùng tên (có `roleIds`);
 user mới vào `Customer Users` → `GET /api/user/roles` = `[Customer User]`, tạo device **403**; chuyển sang
