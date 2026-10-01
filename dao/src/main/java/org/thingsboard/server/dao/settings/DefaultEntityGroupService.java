@@ -31,8 +31,19 @@ public class DefaultEntityGroupService implements EntityGroupService {
      */
     public static final String TENANT_ADMINS_GROUP_NAME = "Tenant Administrators";
     public static final String TENANT_USERS_GROUP_NAME = "Tenant Users";
-    private static final List<String> DEFAULT_USER_GROUP_NAMES =
+    public static final List<String> DEFAULT_USER_GROUP_NAMES =
             List.of(TENANT_ADMINS_GROUP_NAME, TENANT_USERS_GROUP_NAME);
+
+    /**
+     * True when the membership of the group is derived from the platform instead of being maintained by the tenant
+     * administrator: the two default user groups follow the authority of the user, so the "Manage owner and groups"
+     * dialog shows them but never changes them.
+     */
+    public static boolean isAuthorityManagedUserGroup(RbacEntityGroup group) {
+        return group != null && "USER".equals(group.getEntityType())
+                && DEFAULT_USER_GROUP_NAMES.contains(group.getName());
+    }
+
     /**
      * Entity types that always have an "All" group: the classic PE ones plus the members of this fork
      * (customers and users), so the Groups tab of the Users / Customers pages always shows "All" too.

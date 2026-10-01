@@ -42,6 +42,7 @@ import { EntityViewComponent } from '@modules/home/pages/entity-view/entity-view
 import { EntityViewTableHeaderComponent } from '@modules/home/pages/entity-view/entity-view-table-header.component';
 import { EntityViewId } from '@shared/models/id/entity-view-id';
 import { EntityViewTabsComponent } from '@home/pages/entity-view/entity-view-tabs.component';
+import { hasExplicitRbacPermission } from '@core/services/rbac-permissions';
 import { EdgeService } from '@core/http/edge.service';
 import {
   AddEntitiesToEdgeDialogComponent,
@@ -138,8 +139,9 @@ export class EntityViewsTableConfigResolver  {
         this.config.cellActionDescriptors = this.configureCellActions(this.config.componentsData.entityViewScope);
         this.config.groupActionDescriptors = this.configureGroupActions(this.config.componentsData.entityViewScope);
         this.config.addActionDescriptors = this.configureAddActions(this.config.componentsData.entityViewScope);
-        this.config.addEnabled = !(this.config.componentsData.entityViewScope === 'customer_user' ||
-          this.config.componentsData.entityViewScope === 'edge_customer_user');
+        // A customer user may create entity views when its role grants ENTITY_VIEW:CREATE; the backend keeps the
+        // new entity view inside the customer of its creator.
+        this.config.addEnabled = this.config.componentsData.entityViewScope !== 'edge_customer_user';
         this.config.entitiesDeleteEnabled = this.config.componentsData.entityViewScope === 'tenant';
         this.config.deleteEnabled = () => this.config.componentsData.entityViewScope === 'tenant';
         return this.config;
@@ -283,6 +285,16 @@ export class EntityViewsTableConfigResolver  {
           icon: 'add',
           isEnabled: () => true,
           onAction: ($event) => this.addEntityViewsToCustomer($event)
+        }
+      );
+    }
+    if (entityViewScope === 'customer_user') {
+      actions.push(
+        {
+          name: this.translate.instant('entity-view.add-entity-view-text'),
+          icon: 'insert_drive_file',
+          isEnabled: () => hasExplicitRbacPermission('ENTITY_VIEW', 'CREATE'),
+          onAction: ($event) => this.config.getTable().addEntity($event)
         }
       );
     }

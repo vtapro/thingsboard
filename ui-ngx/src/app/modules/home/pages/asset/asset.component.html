@@ -96,7 +96,7 @@
         [showDetailsPageLink]="true"
         (assetProfileUpdated)="onAssetProfileUpdated()">
       </tb-asset-profile-autocomplete>
-      @if (isAdd) {
+      @if (isAdd && assetScope !== 'customer_user') {
         <tb-entity-autocomplete
           useFullEntityId
           formControlName="customerId"

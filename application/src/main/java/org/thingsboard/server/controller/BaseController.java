@@ -38,6 +38,7 @@ import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.DeviceInfo;
 import org.thingsboard.server.common.data.DeviceProfile;
 import org.thingsboard.server.common.data.EntityType;
+import org.thingsboard.server.common.data.HasCustomerId;
 import org.thingsboard.server.common.data.EntityView;
 import org.thingsboard.server.common.data.EntityViewInfo;
 import org.thingsboard.server.common.data.HasName;
@@ -203,6 +204,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
@@ -662,6 +664,24 @@ public abstract class BaseController {
         if (user.getEmail() != null) {
             entity.setAdditionalInfoField("rbacOwnerEmail", TextNode.valueOf(user.getEmail()));
         }
+    }
+
+    /**
+     * Assigns the customer of the caller to a new entity of a customer user, like ThingsBoard PE: a customer user
+     * always creates the entities inside its own customer, so the client can not plant them in another customer.
+     * The call is a no-op for the administrators and for updates (an existing entity may be re-assigned explicitly
+     * by a tenant administrator).
+     */
+    protected <T extends HasCustomerId> void applyCustomerScope(T entity, Consumer<CustomerId> customerIdSetter)
+            throws ThingsboardException {
+        if (entity == null || (entity instanceof HasId<?> hasId && hasId.getId() != null)) {
+            return;
+        }
+        SecurityUser user = getCurrentUser();
+        if (user == null || user.getAuthority() != Authority.CUSTOMER_USER) {
+            return;
+        }
+        customerIdSetter.accept(user.getCustomerId());
     }
 
     /**

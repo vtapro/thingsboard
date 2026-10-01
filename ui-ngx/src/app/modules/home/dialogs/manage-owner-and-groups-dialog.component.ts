@@ -76,8 +76,12 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
     return group.allGroup || this.groupSelection.has(group.id);
   }
 
+  isEditable(group: EntityGroupMember): boolean {
+    return !group.system;
+  }
+
   toggleGroup(group: EntityGroupMember, checked: boolean): void {
-    if (group.allGroup) {
+    if (!this.isEditable(group)) {
       return;
     }
     if (checked) {

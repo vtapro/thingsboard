@@ -16,7 +16,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { DatePipe } from '@angular/common';
 import { WhiteLabelingService } from '@core/http/white-labeling.service';
 import { EntityType, entityTypeResources, entityTypeTranslations } from '@shared/models/entity-type.models';
-import { AddEntityDialogData, EntityAction } from '@home/models/entity/entity-component.models';
+import { EntityAction } from '@home/models/entity/entity-component.models';
 import {
   Device,
   DeviceCredentials,
@@ -36,7 +36,7 @@ import { CustomerService } from '@core/http/customer.service';
 import { Customer } from '@app/shared/models/customer.model';
 import { NULL_UUID } from '@shared/models/id/has-uuid';
 import { BroadcastService } from '@core/services/broadcast.service';
-import { hasRbacPermission } from '@core/services/rbac-permissions';
+import { hasExplicitRbacPermission, hasRbacPermission } from '@core/services/rbac-permissions';
 import { DeviceTableHeaderComponent } from '@modules/home/pages/device/device-table-header.component';
 import { MatDialog } from '@angular/material/dialog';
 import {
@@ -55,8 +55,10 @@ import {
 } from '../../dialogs/add-entities-to-customer-dialog.component';
 import { DeviceTabsComponent } from '@home/pages/device/device-tabs.component';
 import { HomeDialogsService } from '@home/dialogs/home-dialogs.service';
-import { DeviceWizardDialogComponent } from '@home/components/wizard/device-wizard-dialog.component';
-import { BaseData, HasId } from '@shared/models/base-data';
+import {
+  DeviceWizardDialogComponent,
+  DeviceWizardDialogData
+} from '@home/components/wizard/device-wizard-dialog.component';
 import { deepClone, isDefined, isDefinedAndNotNull } from '@core/utils';
 import { EdgeService } from '@core/http/edge.service';
 import {
@@ -173,8 +175,10 @@ export class DevicesTableConfigResolver  {
         this.config.cellActionDescriptors = this.configureCellActions(this.config.componentsData.deviceScope);
         this.config.groupActionDescriptors = this.configureGroupActions(this.config.componentsData.deviceScope);
         this.config.addActionDescriptors = this.configureAddActions(this.config.componentsData.deviceScope);
-        this.config.addEnabled = !(this.config.componentsData.deviceScope === 'customer_user' ||
-          this.config.componentsData.deviceScope === 'edge_customer_user');
+        // A customer user may create devices when its role grants DEVICE:CREATE (the descriptor below is the only
+        // one for that scope, so it decides whether the button shows). The platform denies the operation when the
+        // role does not grant it and the backend keeps the new device inside the customer of its creator.
+        this.config.addEnabled = this.config.componentsData.deviceScope !== 'edge_customer_user';
         this.config.entitiesDeleteEnabled = this.config.componentsData.deviceScope === 'tenant';
         this.config.deleteEnabled = () => this.config.componentsData.deviceScope === 'tenant';
         return this.config;
@@ -403,19 +407,19 @@ export class DevicesTableConfigResolver  {
         {
           name: this.translate.instant('device.add-device-text'),
           icon: 'insert_drive_file',
-          isEnabled: () => true,
+          isEnabled: () => hasRbacPermission('DEVICE', 'CREATE'),
           onAction: ($event) => this.deviceWizard($event)
         },
         {
           name: this.translate.instant('device.import'),
           icon: 'file_upload',
-          isEnabled: () => true,
+          isEnabled: () => hasRbacPermission('DEVICE', 'CREATE'),
           onAction: ($event) => this.importDevices($event)
         },
         {
           name: this.translate.instant('iot-hub.add-from-iot-hub'),
           icon: 'hub',
-          isEnabled: () => true,
+          isEnabled: () => hasRbacPermission('DEVICE', 'CREATE'),
           onAction: (_$event) => this.addDeviceFromIotHub()
         },
       );
@@ -428,6 +432,18 @@ export class DevicesTableConfigResolver  {
           icon: 'add',
           isEnabled: () => true,
           onAction: ($event) => this.addDevicesToCustomer($event)
+        }
+      );
+    }
+    if (deviceScope === 'customer_user') {
+      // A customer user with a role that grants DEVICE:CREATE creates the device inside its own customer, so the
+      // wizard is offered exactly like for a tenant administrator (the wizard hides the customer selector).
+      actions.push(
+        {
+          name: this.translate.instant('device.add-device-text'),
+          icon: 'insert_drive_file',
+          isEnabled: () => hasExplicitRbacPermission('DEVICE', 'CREATE'),
+          onAction: ($event) => this.deviceWizard($event)
         }
       );
     }
@@ -470,17 +486,22 @@ export class DevicesTableConfigResolver  {
   }
 
   deviceWizard($event: Event) {
-    this.dialog.open<DeviceWizardDialogComponent, AddEntityDialogData<BaseData<HasId>>,
+    this.dialog.open<DeviceWizardDialogComponent, DeviceWizardDialogData,
       Device>(DeviceWizardDialogComponent, {
       disableClose: true,
-      panelClass: ['tb-dialog', 'tb-fullscreen-dialog']
+      panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+      data: {
+        hideCustomerField: this.config.componentsData.deviceScope === 'customer_user'
+      }
     }).afterClosed().subscribe(
       (res) => {
         if (res) {
           this.store.pipe(select(selectUserSettingsProperty( 'notDisplayConnectivityAfterAddDevice'))).pipe(
             take(1)
           ).subscribe((settings: boolean) => {
-            if(!settings) {
+            // The connectivity dialog reads the device credentials, so it is skipped when the role does not grant
+            // them (a customer user with DEVICE:CREATE only); the device was already created.
+            if (!settings && hasRbacPermission('DEVICE', 'READ_CREDENTIALS')) {
               this.checkConnectivity(null, res.id, true);
             } else {
               this.config.updateData();

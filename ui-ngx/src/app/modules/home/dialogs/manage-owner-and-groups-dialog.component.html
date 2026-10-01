@@ -35,9 +35,15 @@
       <div class="tb-manage-owner-groups-list" *ngIf="groups.length; else noGroups">
         @for (group of groups; track group.id) {
           <mat-checkbox [checked]="isMember(group)"
-                        [disabled]="group.allGroup"
+                        [disabled]="!isEditable(group)"
                         (change)="toggleGroup(group, $event.checked)">
             <span class="tb-manage-group-name">{{ group.name }}</span>
+            @if (group.system) {
+              <span class="tb-manage-group-tag" [matTooltip]="'owner-and-groups.system-group' | translate">
+                <tb-icon>lock</tb-icon>
+                {{ 'owner-and-groups.auto' | translate }}
+              </span>
+            }
             @if (group.publicGroup) {
               <span class="tb-manage-group-tag" [matTooltip]="'owner-and-groups.public-group' | translate">
                 {{ 'owner-and-groups.public' | translate }}

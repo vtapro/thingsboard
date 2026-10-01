@@ -37,7 +37,7 @@ import { TenantService } from '@app/core/http/tenant.service';
 import { TenantId } from '@app/shared/models/id/tenant-id';
 import { UserTabsComponent } from '@home/pages/user/user-tabs.component';
 import { isDefinedAndNotNull } from '@core/utils';
-import { hasRbacPermission } from '@core/services/rbac-permissions';
+import { hasExplicitRbacPermission, hasRbacPermission } from '@core/services/rbac-permissions';
 import {
   ManageOwnerAndGroupsDialogComponent,
   ManageOwnerAndGroupsDialogData
@@ -120,7 +120,8 @@ export class UsersTableConfigResolver  {
           this.customerId = this.authUser.customerId?.id;
           // GET /api/users is available to a customer user and returns the users of its customer, filtered by the role
           this.config.entitiesFetchFunction = pageLink => this.userService.getUsers(pageLink);
-          this.config.addEnabled = hasRbacPermission('USER', 'CREATE');
+          // the platform denies creating a user to a customer user, so the role has to grant it explicitly
+          this.config.addEnabled = hasExplicitRbacPermission('USER', 'CREATE');
         } else {
           // tenant administrator: every user of the tenant; adding here creates a tenant level user
           // (authority TENANT_ADMIN, no customer). Role limited members are created under a customer.

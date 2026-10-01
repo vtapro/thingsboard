@@ -65,3 +65,17 @@ export const hasRbacPermission = (resource: string, operation: string): boolean 
   }
   return operations.includes(baseOperation(operation));
 };
+
+/**
+ * True when a custom role of the user grants the operation. Unlike {@link hasRbacPermission} there is no fallback to
+ * the platform permissions, so the caller can check an operation that the platform denies to the authority of the
+ * user — for example {@code DEVICE:CREATE} of a customer user: without a role the platform denies it, so the WEB UI
+ * must not show the button either.
+ */
+export const hasExplicitRbacPermission = (resource: string, operation: string): boolean => {
+  const permissions = getRbacPermissions();
+  if (!permissions || !permissions[resource]) {
+    return false;
+  }
+  return hasRbacPermission(resource, operation);
+};

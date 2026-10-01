@@ -24,6 +24,7 @@ import org.thingsboard.server.common.data.rbac.RbacEntityGroupSettings;
 import org.thingsboard.server.common.data.rbac.RbacEntityGroup;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.config.annotations.ApiOperation;
+import org.thingsboard.server.dao.settings.DefaultEntityGroupService;
 import org.thingsboard.server.dao.settings.EntityGroupService;
 import org.thingsboard.server.dao.exception.IncorrectParameterException;
 import org.thingsboard.server.queue.util.TbCoreComponent;
@@ -147,6 +148,10 @@ public class EntityGroupController extends BaseController {
                 // the "All" group of the type contains every entity of the tenant, its membership is implicit
                 continue;
             }
+            if (DefaultEntityGroupService.isAuthorityManagedUserGroup(group)) {
+                // the default user groups follow the authority of the user, so the dialog can not change them
+                continue;
+            }
             if (group.getEntityIds() == null) {
                 group.setEntityIds(new java.util.ArrayList<>());
             }
@@ -197,7 +202,8 @@ public class EntityGroupController extends BaseController {
             boolean member = group.isAllGroup()
                     || (group.getEntityIds() != null && group.getEntityIds().contains(target));
             members.add(new EntityGroupMembers.Member(group.getId(), group.getName(), group.getDescription(),
-                    group.isPublicGroup(), group.isAllGroup(), member));
+                    group.isPublicGroup(), group.isAllGroup(),
+                    group.isAllGroup() || DefaultEntityGroupService.isAuthorityManagedUserGroup(group), member));
         }
         return new EntityGroupMembers(entityId, members);
     }

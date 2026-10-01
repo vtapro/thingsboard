@@ -129,6 +129,8 @@ public class EntityViewController extends BaseController {
             @Parameter(description = UNIQUIFY_STRATEGY_DESC)
             @RequestParam(name = "uniquifyStrategy", defaultValue = "RANDOM") UniquifyStrategy uniquifyStrategy) throws Exception {
         entityView.setTenantId(getCurrentUser().getTenantId());
+        // a customer user always creates the entity view inside its own customer (same as ThingsBoard PE)
+        applyCustomerScope(entityView, entityView::setCustomerId);
         EntityView existingEntityView = null;
         if (entityView.getId() == null) {
             accessControlService
@@ -140,7 +142,13 @@ public class EntityViewController extends BaseController {
             // the owner is set once, on creation, and must not be rewritten by the client
             stripRbacOwner(entityView);
         }
-        return tbEntityViewService.save(entityView, existingEntityView, new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
+        EntityView savedEntityView = tbEntityViewService.save(entityView, existingEntityView,
+                new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
+        if (existingEntityView == null) {
+            // the "own entities" cache of the tenant is stale as soon as an entity was created
+            accessControlService.onEntityCreated(getCurrentUser());
+        }
+        return savedEntityView;
     }
 
     @ApiOperation(value = "Delete entity view (deleteEntityView)",

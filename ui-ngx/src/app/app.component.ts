@@ -13,7 +13,7 @@ import { LocalStorageService } from '@core/local-storage/local-storage.service';
 import { DomSanitizer } from '@angular/platform-browser';
 import { MatIconRegistry } from '@angular/material/icon';
 import { getCurrentAuthState, selectUserReady } from '@core/auth/auth.selectors';
-import { filter, skip, tap } from 'rxjs/operators';
+import { distinctUntilChanged, filter, map, skip, tap } from 'rxjs/operators';
 import { AuthService } from '@core/auth/auth.service';
 import { svgIcons, svgIconsUrl } from '@shared/models/icon.models';
 import { ActionSettingsChangeLanguage } from '@core/settings/settings.actions';
@@ -121,12 +121,23 @@ export class AppComponent {
       if (data.isAuthenticated) {
         this.whiteLabelingService.loadAuthenticatedWhiteLabelingSettings();
         this.customMenuService.loadCustomMenu();
+      }
+      this.authService.gotoDefaultPlace(data.isAuthenticated);
+    });
+    // The permissions of the custom roles must be loaded on every boot (a simple page reload with a valid token
+    // included), not only after an explicit login: the subscription above skips the first "user loaded" emission of
+    // the boot, so the menu, the entity tables and the widgets would otherwise keep the platform permissions.
+    this.store.select(selectUserReady).pipe(
+      filter((data) => data.isUserLoaded),
+      map((data) => data.isAuthenticated),
+      distinctUntilChanged()
+    ).subscribe((authenticated) => {
+      if (authenticated) {
         this.rbacService.loadUserRoles();
       } else {
         // the permissions of the previous user must not be reused by the next one
         setRbacPermissions(null);
       }
-      this.authService.gotoDefaultPlace(data.isAuthenticated);
     });
     this.authService.reloadUser();
   }

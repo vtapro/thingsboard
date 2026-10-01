@@ -43,6 +43,7 @@ import { AssetTableHeaderComponent } from '@modules/home/pages/asset/asset-table
 import { AssetId } from '@app/shared/models/id/asset-id';
 import { AssetTabsComponent } from '@home/pages/asset/asset-tabs.component';
 import { HomeDialogsService } from '@home/dialogs/home-dialogs.service';
+import { hasExplicitRbacPermission, hasRbacPermission } from '@core/services/rbac-permissions';
 import { DeviceInfo } from '@shared/models/device.models';
 import { EdgeService } from '@core/http/edge.service';
 import {
@@ -139,7 +140,9 @@ export class AssetsTableConfigResolver  {
         this.config.cellActionDescriptors = this.configureCellActions(this.config.componentsData.assetScope);
         this.config.groupActionDescriptors = this.configureGroupActions(this.config.componentsData.assetScope);
         this.config.addActionDescriptors = this.configureAddActions(this.config.componentsData.assetScope);
-        this.config.addEnabled = !(this.config.componentsData.assetScope === 'customer_user' || this.config.componentsData.assetScope === 'edge_customer_user');
+        // A customer user may create assets when its role grants ASSET:CREATE; the backend keeps the new asset
+        // inside the customer of its creator.
+        this.config.addEnabled = this.config.componentsData.assetScope !== 'edge_customer_user';
         this.config.entitiesDeleteEnabled = this.config.componentsData.assetScope === 'tenant';
         this.config.deleteEnabled = () => this.config.componentsData.assetScope === 'tenant';
         return this.config;
@@ -284,13 +287,13 @@ export class AssetsTableConfigResolver  {
         {
           name: this.translate.instant('asset.add-asset-text'),
           icon: 'insert_drive_file',
-          isEnabled: () => true,
+          isEnabled: () => hasRbacPermission('ASSET', 'CREATE'),
           onAction: ($event) => this.config.getTable().addEntity($event)
         },
         {
           name: this.translate.instant('asset.import'),
           icon: 'file_upload',
-          isEnabled: () => true,
+          isEnabled: () => hasRbacPermission('ASSET', 'CREATE'),
           onAction: ($event) => this.importAssets($event)
         }
       );
@@ -302,6 +305,16 @@ export class AssetsTableConfigResolver  {
           icon: 'add',
           isEnabled: () => true,
           onAction: ($event) => this.addAssetsToCustomer($event)
+        }
+      );
+    }
+    if (assetScope === 'customer_user') {
+      actions.push(
+        {
+          name: this.translate.instant('asset.add-asset-text'),
+          icon: 'insert_drive_file',
+          isEnabled: () => hasExplicitRbacPermission('ASSET', 'CREATE'),
+          onAction: ($event) => this.config.getTable().addEntity($event)
         }
       );
     }

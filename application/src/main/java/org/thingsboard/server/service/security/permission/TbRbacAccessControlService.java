@@ -438,6 +438,14 @@ public class TbRbacAccessControlService implements AccessControlService {
         ownerIndexCache.keySet().removeIf(key -> key.startsWith(prefix));
     }
 
+    @Override
+    public void onEntityCreated(SecurityUser user) {
+        if (user != null && user.getTenantId() != null) {
+            // the owner index of the tenant is stale as soon as one of its entities was created
+            invalidateOwnerIndex(user.getTenantId());
+        }
+    }
+
     private record OwnerIndex(long createdTs, Map<UUID, String> owners) {
     }
 
@@ -552,10 +560,31 @@ public class TbRbacAccessControlService implements AccessControlService {
         if (defaultAccessControlService.hasPermission(user, resource, operation, entityId, entity)) {
             return true;
         }
-        if (!role.isOwnCustomerOnly() || !hasOperationGrant(user.getTenantId(), role, resource, effective, entityId)) {
+        if (isOwnOnlyResource(role, resource) && entityId != null && !isEntityOwner(user, entity)) {
+            // "Only entities created by the user": the customer user only reaches the entities it created itself
             return false;
         }
-        return userBelongsToCustomerSubtree(user, entity);
+        if (!hasOperationGrant(user.getTenantId(), role, resource, effective, entityId)) {
+            return false;
+        }
+        // A customer user keeps the platform isolation, the role may only widen it inside the customer scope of the
+        // user: the entity has to belong to the own customer of the user or, when the role enables the customer
+        // hierarchy, to one of the sub-customers configured by the tenant administrator. A new entity is created
+        // inside the customer of the caller (the controller assigns it before this check).
+        return belongsToOwnCustomer(user, entity)
+                || (role.isOwnCustomerOnly() && userBelongsToCustomerSubtree(user, entity));
+    }
+
+    /**
+     * True when the entity belongs to the own customer of the user. A new entity carries the customer assigned by
+     * the controller, so the same check also covers the creation of an entity by a customer user.
+     */
+    private boolean belongsToOwnCustomer(SecurityUser user, Object entity) {
+        if (!isCustomerUser(user) || !(entity instanceof HasCustomerId hasCustomerId)) {
+            return false;
+        }
+        CustomerId customerId = hasCustomerId.getCustomerId();
+        return customerId != null && customerId.getId() != null && customerId.equals(user.getCustomerId());
     }
 
     /**

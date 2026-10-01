@@ -193,6 +193,8 @@ public class DeviceController extends BaseController {
                              @Parameter(description = UNIQUIFY_STRATEGY_DESC)
                              @RequestParam(name = "uniquifyStrategy", defaultValue = "RANDOM") UniquifyStrategy uniquifyStrategy) throws Exception {
         device.setTenantId(getCurrentUser().getTenantId());
+        // a customer user always creates the device inside its own customer (same as ThingsBoard PE)
+        applyCustomerScope(device, device::setCustomerId);
         if (device.getId() != null) {
             checkDeviceId(device.getId(), Operation.WRITE);
         } else {
@@ -205,8 +207,14 @@ public class DeviceController extends BaseController {
             // the owner is set once, on creation, and must not be rewritten by the client
             stripRbacOwner(device);
         }
-        return tbDeviceService.save(device, accessToken,
+        boolean created = device.getId() == null;
+        Device savedDevice = tbDeviceService.save(device, accessToken,
                 new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
+        if (created) {
+            // the "own devices" cache of the tenant is stale as soon as a device was created
+            accessControlService.onEntityCreated(getCurrentUser());
+        }
+        return savedDevice;
     }
 
     @ApiOperation(value = "Create Device (saveDevice) with credentials ",
@@ -241,8 +249,21 @@ public class DeviceController extends BaseController {
         Device device = deviceAndCredentials.getDevice();
         DeviceCredentials credentials = deviceAndCredentials.getCredentials();
         device.setTenantId(getCurrentUser().getTenantId());
+        // a customer user always creates the device inside its own customer (same as ThingsBoard PE)
+        applyCustomerScope(device, device::setCustomerId);
         checkEntity(device.getId(), device, Resource.DEVICE);
-        return tbDeviceService.saveDeviceWithCredentials(device, credentials, new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
+        if (device.getId() == null) {
+            saveRbacOwner(device);
+        } else {
+            stripRbacOwner(device);
+        }
+        boolean createdWithCredentials = device.getId() == null;
+        Device savedDevice = tbDeviceService.saveDeviceWithCredentials(device, credentials,
+                new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
+        if (createdWithCredentials) {
+            accessControlService.onEntityCreated(getCurrentUser());
+        }
+        return savedDevice;
     }
 
     @ApiOperation(value = "Delete device (deleteDevice)",

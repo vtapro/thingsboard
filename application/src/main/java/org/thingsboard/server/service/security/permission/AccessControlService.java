@@ -51,4 +51,12 @@ public interface AccessControlService {
         return null;
     }
 
+    /**
+     * Called after an entity that may be scoped to its creator was created. An implementation that caches the owner
+     * of the entities (see the "only the entities created by the user" flag of a role) drops the stale cache here,
+     * otherwise the list pages would not show the entity the user has just created.
+     */
+    default void onEntityCreated(SecurityUser user) {
+    }
+
 }

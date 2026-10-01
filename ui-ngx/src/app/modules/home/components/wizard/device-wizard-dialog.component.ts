@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
-import { Component, ViewChild } from '@angular/core';
-import { MatDialogRef } from '@angular/material/dialog';
+import { Component, Inject, Optional, ViewChild } from '@angular/core';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -19,6 +19,14 @@ import { MediaBreakpoints } from '@shared/models/constants';
 import { deepTrim } from '@core/utils';
 import { CustomerId } from '@shared/models/id/customer-id';
 import { HttpErrorResponse } from '@angular/common/http';
+
+export interface DeviceWizardDialogData {
+  /**
+   * A customer user always creates the device inside its own customer (assigned by the backend), so the customer
+   * selector of the wizard is hidden and the device is stored under the customer of the creator.
+   */
+  hideCustomerField?: boolean;
+}
 
 @Component({
     selector: 'tb-device-wizard',
@@ -51,6 +59,7 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
   constructor(protected store: Store<AppState>,
               protected router: Router,
               public dialogRef: MatDialogRef<DeviceWizardDialogComponent, Device>,
+              @Optional() @Inject(MAT_DIALOG_DATA) public data: DeviceWizardDialogData,
               private deviceService: DeviceService,
               private breakpointObserver: BreakpointObserver,
               private fb: FormBuilder) {

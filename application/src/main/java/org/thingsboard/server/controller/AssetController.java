@@ -142,6 +142,8 @@ public class AssetController extends BaseController {
                            @Parameter(description = UNIQUIFY_STRATEGY_DESC)
                            @RequestParam(name = "uniquifyStrategy", defaultValue = "RANDOM") UniquifyStrategy uniquifyStrategy) throws Exception {
         asset.setTenantId(getTenantId());
+        // a customer user always creates the asset inside its own customer (same as ThingsBoard PE)
+        applyCustomerScope(asset, asset::setCustomerId);
         checkEntity(asset.getId(), asset, Resource.ASSET);
         if (asset.getId() == null) {
             // remember which user created the asset (used by the RBAC "own entities" scope)
@@ -150,7 +152,14 @@ public class AssetController extends BaseController {
             // the owner is set once, on creation, and must not be rewritten by the client
             stripRbacOwner(asset);
         }
-        return tbAssetService.save(asset, new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
+        boolean created = asset.getId() == null;
+        Asset savedAsset = tbAssetService.save(asset,
+                new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
+        if (created) {
+            // the "own entities" cache of the tenant is stale as soon as an entity was created
+            accessControlService.onEntityCreated(getCurrentUser());
+        }
+        return savedAsset;
     }
 
     @ApiOperation(value = "Delete asset (deleteAsset)",

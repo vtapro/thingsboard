@@ -22,7 +22,7 @@ import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { HomeDialogsService } from '@home/dialogs/home-dialogs.service';
 import { Authority } from '@shared/models/authority.enum';
-import { hasRbacPermission } from '@core/services/rbac-permissions';
+import { hasExplicitRbacPermission, hasRbacPermission } from '@core/services/rbac-permissions';
 
 @Injectable()
 export class CustomersTableConfigResolver  {
@@ -146,7 +146,8 @@ export class CustomersTableConfigResolver  {
       // a customer user sees the customers of its scope only; the links to the entities of a customer are tenant admin
       // features (there is a dedicated Users page for the members)
       this.config.cellActionDescriptors.splice(0);
-      this.config.addEnabled = hasRbacPermission('CUSTOMER', 'CREATE');
+      // the platform denies creating a customer to a customer user, so the role has to grant it explicitly
+      this.config.addEnabled = hasExplicitRbacPermission('CUSTOMER', 'CREATE');
     }
   }
 

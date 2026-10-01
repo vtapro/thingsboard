@@ -49,6 +49,14 @@
   font-size: 11px;
   background: #e8f0f9;
   color: #305680;
+  white-space: nowrap;
+
+  tb-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    vertical-align: -3px;
+  }
 }
 
 .tb-manage-group-description {

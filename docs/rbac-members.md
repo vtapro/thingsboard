@@ -126,17 +126,22 @@ PE, gộp 2 việc:
 
 Mỗi tenant được tạo sẵn 3 nhóm cho user, đúng như bộ chọn nhóm của PE:
 
-| Nhóm | Ai thuộc nhóm | Ghi chú |
+| Nhóm | Ai thuộc nhóm | Sửa được trong dialog? |
 |---|---|---|
-| `All` | mọi user của tenant | nhóm hệ thống, không sửa/xoá được |
-| `Tenant Administrators` | user authority `TENANT_ADMIN` | id sinh từ tenant + tên nhóm nên ổn định; thành viên do nền tảng đồng bộ |
-| `Tenant Users` | user authority `CUSTOMER_USER` | như trên |
+| `All` | mọi user của tenant | không — nhóm hệ thống |
+| `Tenant Administrators` | user authority `TENANT_ADMIN` | không — thành viên suy ra từ authority |
+| `Tenant Users` | user authority `CUSTOMER_USER` | không — thành viên suy ra từ authority |
 
 Quy tắc đồng bộ: khi tạo/sửa user (`POST /api/user`), nền tảng tự thêm user vào nhóm theo authority của họ và bỏ
 khỏi nhóm còn lại; khi mở dialog (hoặc gọi API membership) hệ thống đồng bộ lại user đang xem, nên cả những user
 tạo trước khi có 2 nhóm này cũng hiện đúng; khi xoá user thì user được bỏ khỏi mọi nhóm user.
 
-Các nhóm này là nhóm thường (có thể gán role/scope theo chúng), không phải nhóm hệ thống bị khoá như `All`.
+Hai nhóm theo authority là **nhóm hệ thống**: API membership trả `"system": true` và
+`POST /api/tenant/entityGroup/members/...` **bỏ qua** chúng, nên dialog chỉ hiển thị trạng thái (checkbox bị khoá,
+kèm nhãn `Auto`) thay vì cho sửa rồi âm thầm bị đồng bộ lại. Lý do: nếu cho sửa thì role scope theo nhóm
+"Tenant Users" sẽ không còn nghĩa "mọi customer user của tenant", hoặc thay đổi sẽ bị lần đồng bộ kế tiếp ghi đè
+(đúng lỗi "tick 2 nhóm này không lưu được" đã gặp). Muốn gán quyền cho một tập user tuỳ ý thì tạo **nhóm thường**
+(tab Groups của trang Users) rồi thêm user vào nhóm đó — nhóm thường vẫn sửa được bình thường.
 
 ### API
 
@@ -169,3 +174,41 @@ giới hạn role cũng không thể tự đưa entity ngoài phạm vi vào nh�
 Script kiểm tra: tạo user trong customer A → thêm/bỏ user khỏi một user group (và xác nhận thành viên của entity
 khác không đổi) → chuyển user sang customer B (**200**, đọc lại thấy đúng B) → `TENANT_ADMIN` không nhận owner
 (**400**) → customer không tồn tại (**404**) → entity không tồn tại (**404**).
+
+## 9. Quyền tạo entity của customer user (audit 2026-10-01)
+
+Bản CE chỉ cho `TENANT_ADMIN` tạo device/asset/entity view, và cả WEB UI lẫn backend đều chặn customer user
+**không phụ thuộc role** — vì vậy role có `DEVICE: CREATE` vẫn không thấy nút "Add" và gọi API cũng bị `403`.
+Fork này mở đúng theo hợp đồng của PE:
+
+| Tầng | Trước | Sau |
+|---|---|---|
+| WEB UI (devices/assets/entity views) | `addEnabled = scopes !== 'customer_user'` (ẩn cứng) | nút Add hiện khi role cấp `CREATE`; devices mở đúng wizard, ẩn ô chọn customer vì customer do backend gán |
+| `TbRbacAccessControlService` (check theo entity) | nhánh customer user chỉ mở khi `ownCustomerOnly` **và** entity đã có customerId → không bao giờ tạo được (entity mới chưa có customer) | nhánh customer user cho phép khi role cấp operation **và** entity thuộc customer của người gọi (entity mới được controller gán customer trước khi check) |
+| `DeviceController` / `AssetController` / `EntityViewController` | không gán customer → customer user tạo ra entity "của tenant" | `applyCustomerScope` gán `customerId` của người tạo trước khi `checkPermission`; `rbacOwnerId` được ghi cả ở đường `saveDeviceWithCredentials` (wizard) |
+| `ownOnly` của role | không kiểm ở nhánh customer user | áp dụng như nhánh quản trị: entity không do user tạo bị từ chối |
+
+Kiểm chứng:
+
+```bash
+/tmp/emu-venv/bin/python scripts/test-create-permissions-local.py   # 21/21 PASS
+```
+
+Script tạo customer + role `DEVICE:[CREATE,READ,WRITE,DELETE]` (`ownOnly.DEVICE = true`) → customer user tạo device
+(**200**, `customerId` = customer của người tạo, `additionalInfo.rbacOwnerId` = id người tạo) → device hiện trong
+`GET /api/customer/{id}/deviceInfos`; customer user **không** có role → `403`; hai nhóm hệ thống trả `system: true`
+và không đổi được qua API membership; nhóm thường vẫn lưu membership bình thường.
+
+### Phía WEB UI (3 guard bổ sung)
+
+| Guard | Vấn đề | Cách sửa |
+|---|---|---|
+| Nạp quyền khi boot | `AppComponent.setupAuth()` gọi `loadUserRoles()` trong subscription có `skip(1)`, mà lần boot (F5 với token còn hạn) chỉ phát một lần `isUserLoaded = true` → **quyền không bao giờ được nạp**, UI dùng quyền nền tảng (thấy nút không có quyền, menu không ẩn) | thêm subscription riêng cho `loadUserRoles()` / `setRbacPermissions(null)` theo `selectUserReady` |
+| `hasExplicitRbacPermission` | `hasRbacPermission` fallback về "không có role ⇒ giữ quyền nền tảng", nhưng nền tảng **cấm** customer user tạo device/user/customer ⇒ nút vẫn hiện rồi `403` | helper mới yêu cầu role cấp tường minh, dùng cho các nút Add ở scope `customer_user` (devices, assets, entity views, users, customers); scope tenant admin vẫn dùng `hasRbacPermission` |
+| Danh sách "own entities" | `ownerIndexCache` có TTL 60s và không ai xoá → device vừa tạo **không hiện** trong danh sách tới 1 phút | `AccessControlService.onEntityCreated(user)` (mặc định no-op) được gọi sau khi tạo device/asset/entity view, `TbRbacAccessControlService` xoá cache owner của tenant |
+| Wizard device | ô "Assign to customer" hiện cho cả customer user (không cần thiết vì backend tự gán) | `DeviceWizardDialogData.hideCustomerField`, resolver bật khi scope là `customer_user` |
+| Kiểm tra kết nối sau khi thêm | hộp thoại đọc device credentials nên role chỉ có `DEVICE:CREATE` nhận lỗi `Failed to fetch data!` ngay sau khi tạo thành công | chỉ mở hộp thoại khi role có `READ_CREDENTIALS`, còn lại chỉ refresh danh sách |
+
+Kiểm chứng UI (Chrome headless + CDP, `ng serve` local): customer user **không** role → 0 nút Add; có role
+`DEVICE:CREATE` → nút "Add new device" (wizard mở, **không** có ô "Assign to customer"); tenant admin → nút "Add"
+như cũ; tạo device trong wizard → hộp thoại đóng, device hiện ngay trong bảng.

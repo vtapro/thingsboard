@@ -47,6 +47,13 @@ public class EntityGroupMembers {
          */
         private boolean allGroup;
 
+        /**
+         * A group whose membership is derived from the platform itself and therefore can not be changed by the
+         * "Manage owner and groups" dialog: the "All" group of the entity type and the default user groups that
+         * follow the authority of the user ("Tenant Administrators" / "Tenant Users").
+         */
+        private boolean system;
+
         private boolean member;
     }
 

@@ -12,6 +12,11 @@ export interface EntityGroupMember {
   description?: string;
   publicGroup: boolean;
   allGroup: boolean;
+  /**
+   * Membership derived from the platform (the "All" group and the default user groups that follow the authority
+   * of the user): the dialog only shows the state, it can not change it.
+   */
+  system: boolean;
   member: boolean;
 }
 

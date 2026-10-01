@@ -22,6 +22,8 @@
         "groups": "Groups",
         "public": "Public",
         "public-group": "Public group: visible to every customer user of the group",
+        "auto": "Auto",
+        "system-group": "The membership of this group is managed automatically by the platform (it follows the entity type or the authority of the user) and can not be changed here.",
         "no-groups": "There is no entity group of this type yet. Create one in the Groups tab of the entity page.",
         "saved": "Owner and groups updated",
         "save-failed": "Failed to update the owner"

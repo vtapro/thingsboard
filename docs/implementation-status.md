@@ -26,6 +26,7 @@ Cách cài đặt/chạy chi tiết: [local-dev-macos.md](local-dev-macos.md).
 | 17 | Emulators: catalog thiết bị ảo + dashboard theo lĩnh vực | ✅ | ✅ | 15 profile/8 lĩnh vực (năng lượng, nông nghiệp, nhà máy, chiếu sáng, nước, vận tải, toà nhà, đô thị); tạo emulator = device thật + sinh telemetry theo scenario + tự tạo dashboard của lĩnh vực; xem [emulators.md](emulators.md) |
 | 18 | Manage owner and groups (theo chuẩn PE) | ✅ | ✅ | Dialog trong panel chi tiết user: đổi owner (customer sở hữu user, chỉ `CUSTOMER_USER`) + gán user vào các user group; API `entityGroup/members/{entityType}/{id}`; guard quyền + invalidate token khi đổi owner; xem [rbac-members.md](rbac-members.md) §8 |
 | 19 | Xuất dữ liệu widget (CSV/XLS/XLSX) | — | ✅ | Menu tải xuống trên header mỗi widget (giống PE): Time series (1 dòng/timestamp, cột `<entity> · <key> (unit)`) + Latest values; XLSX nhiều sheet bằng JSZip, không thêm dependency; xem [widget-export.md](widget-export.md) |
+| 20 | Customer user tạo device/asset/entity view theo role | ✅ | ✅ | role có `CREATE` thì nút Add hiện (devices dùng wizard, ẩn ô chọn customer); backend gán `customerId` của người tạo + `rbacOwnerId` trước khi kiểm quyền, `ownOnly` được áp ở nhánh customer user; nhóm hệ thống `All`/`Tenant Administrators`/`Tenant Users` trả `system: true` và không sửa được qua dialog — xem [rbac-members.md](rbac-members.md) §8–§9 |
 
 ## 2. Môi trường local hiện tại (native, không Docker)
 
@@ -90,3 +91,25 @@ Bài học đã gặp: `-Dpkg.skip=true` (hoặc `-Dskip.ui.build=true`) làm m�
 `target/classes`; không dùng `mvn clean` vì sẽ xoá `ui-ngx/node_modules` và `*/target/proto`; installer cần
 `install.data_dir` có `sql/`; thiếu `queue.type=in-memory` thì installer lỗi bảng `queue`; queue `in-memory`
 bật RocksDB cho EDQS/calculated fields nên phải trỏ `rocksdb_path` khi `user.home` không phải thư mục ghi được.
+
+Bài học đã gặp (bổ sung 2026-10-01): **Java language server của VS Code (redhat.java/Eclipse JDT) tự biên dịch
+vào `target/classes`** bằng ECJ. Bytecode của ECJ có thể thay thế bytecode javac (thấy rõ ở class có
+`Unresolved compilation problems` hoặc `Duplicate method name`), và nếu `mvn install` chạy sau đó thì jar trong
+`~/.m2` cũng bị nhiễm (lỗi kiểu `cannot access ImageCacheKeyProto / class file not found`). Cách xử lý:
+
+```bash
+# 1. tạm dừng language server (SIGSTOP) để nó không ghi vào target/classes trong lúc build
+kill -STOP "$(pgrep -f eclipse.jdt.ls | head -1)"
+# 2. build lại sạch đúng các module đã sửa rồi mới compile application
+mvn -o -q -pl common/data,dao install -DskipTests -Dskip.ui.build=true -Dlicense.skip=true
+rm -rf application/target/classes
+mvn -o -pl application compile -DskipTests -Dskip.ui.build=true -Dlicense.skip=true
+# 3. cho language server chạy lại
+kill -CONT "$(pgrep -f eclipse.jdt.ls | head -1)"
+./scripts/start-tb.sh --force
+```
+
+Không dùng `mvn -pl application -am ...`: module `common/proto` build từ source cần `tbmsg.proto` (chỉ có trong
+artifact đã publish) nên sẽ chết ở `protoc`, và `-am` không cần thiết vì các module khác đã nằm trong `~/.m2`.
+Backend local phải chạy ngoài sandbox (cần mở socket tới PostgreSQL/Redis) và nên tách session
+(`subprocess.Popen(..., start_new_session=True)`) để không bị dừng khi lệnh kết thúc.
