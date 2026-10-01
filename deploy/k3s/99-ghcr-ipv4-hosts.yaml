@@ -1,0 +1,83 @@
+#
+# SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Ghim IPv4 cho các host của GHCR trên mọi node.
+#
+# Các node k3s của cụm này KHÔNG có route IPv6 ra internet, nhưng containerd (Go resolver) vẫn ưu tiên bản ghi
+# AAAA của `ghcr.io` / `pkg-containers.githubusercontent.com` -> pull image lỗi
+# `read: connection reset by peer` và rollout đứng ở ImagePullBackOff.
+#
+# DaemonSet này ghi thêm bản ghi IPv4 của 2 host đó vào /etc/hosts của node (idempotent: mỗi lần chạy lại tự xoá
+# dòng cũ theo marker `# tb-ghcr-ipv4`), nên containerd luôn đi IPv4. Pod được tạo lại sau mỗi lần node reboot nên
+# cấu hình tự được áp lại. Khi nhà cung cấp VPS sửa được IPv6, chỉ cần xoá DaemonSet này:
+#
+#   kubectl -n thingsboard delete daemonset tb-ghcr-ipv4
+#
+# Kiểm chứng: daemonset tạm với `imagePullPolicy: Always` pull `ghcr.io/vtapro/tb-web-ui:<tag>` phải chạy trên 100% node.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: tb-ghcr-ipv4
+  namespace: thingsboard
+  labels:
+    app.kubernetes.io/name: tb-ghcr-ipv4
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tb-ghcr-ipv4
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tb-ghcr-ipv4
+    spec:
+      hostNetwork: true
+      tolerations:
+        - operator: Exists
+      initContainers:
+        - name: patch-hosts
+          image: busybox:1.36
+          securityContext:
+            privileged: true
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              H=/host-etc/hosts
+              touch "$H"
+              # xoá các dòng do lần chạy trước rồi thêm lại (idempotent)
+              sed '/# tb-ghcr-ipv4$/d' "$H" > /tmp/hosts.new
+              cat >> /tmp/hosts.new <<'EOF'
+              140.82.121.33 ghcr.io # tb-ghcr-ipv4
+              140.82.121.34 ghcr.io # tb-ghcr-ipv4
+              185.199.108.154 pkg-containers.githubusercontent.com # tb-ghcr-ipv4
+              185.199.109.154 pkg-containers.githubusercontent.com # tb-ghcr-ipv4
+              185.199.110.154 pkg-containers.githubusercontent.com # tb-ghcr-ipv4
+              185.199.111.154 pkg-containers.githubusercontent.com # tb-ghcr-ipv4
+              EOF
+              cat /tmp/hosts.new > "$H"
+              echo "$(date -Iseconds) ghcr pinned to IPv4" > /host-etc/tb-ghcr-ipv4.state
+          volumeMounts:
+            - name: host-etc
+              mountPath: /host-etc
+      containers:
+        - name: keepalive
+          image: busybox:1.36
+          command: ["/bin/sh", "-c", "sleep infinity"]
+          resources:
+            requests:
+              cpu: 1m
+              memory: 16Mi
+            limits:
+              cpu: 20m
+              memory: 64Mi
+          volumeMounts:
+            - name: host-etc
+              mountPath: /host-etc
+              readOnly: true
+      volumes:
+        - name: host-etc
+          hostPath:
+            path: /etc
+            type: Directory

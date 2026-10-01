@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: Copyright The Thingsboard Authors
 // SPDX-License-Identifier: Apache-2.0
 import { Injectable } from '@angular/core';
+import { Router } from '@angular/router';
 import JSZip from 'jszip';
 import { WidgetContext } from '@home/models/widget-component.models';
-import { DatasourceData } from '@shared/models/widget.models';
+import { DatasourceData, DatasourceType } from '@shared/models/widget.models';
+import { AliasFilterType } from '@shared/models/alias.models';
 
 export type WidgetExportFormat = 'csv' | 'xls' | 'xlsx';
 
@@ -27,8 +29,36 @@ interface WidgetExportTable {
 })
 export class WidgetExportService {
 
+  constructor(private router: Router) {}
+
   public canExport(ctx: WidgetContext): boolean {
-    return this.hasData(ctx?.data) || this.hasData(ctx?.latestData);
+    return this.isDashboardRoute()
+      && this.hasEntityDatasource(ctx)
+      && (this.hasData(ctx?.data) || this.hasData(ctx?.latestData));
+  }
+
+  /**
+   * The export belongs to the widgets of a dashboard (the pages of the user), not to the home pages
+   * (System administrator / Tenant administrator home), which only show counts and platform metrics.
+   */
+  private isDashboardRoute(): boolean {
+    return (this.router.url || '').startsWith('/dashboards');
+  }
+
+  /**
+   * Only the widgets that read the data of an entity (time series, attributes, latest values) are exportable, like
+   * in ThingsBoard PE. The counters (entity/alarm count), the widgets computed by a JavaScript function and the
+   * "Api usage state" widgets (CPU/RAM/Disk metrics of the platform) carry no entity data to export.
+   */
+  private hasEntityDatasource(ctx: WidgetContext): boolean {
+    const aliases = ctx?.aliasController?.getEntityAliases?.() || {};
+    return !!ctx?.datasources?.some(datasource => {
+      if (datasource?.type !== DatasourceType.entity && datasource?.type !== DatasourceType.device) {
+        return false;
+      }
+      const alias = datasource.entityAliasId ? aliases[datasource.entityAliasId] : null;
+      return !alias || alias.filter?.type !== AliasFilterType.apiUsageState;
+    });
   }
 
   public exportWidget(ctx: WidgetContext, format: WidgetExportFormat): void {
