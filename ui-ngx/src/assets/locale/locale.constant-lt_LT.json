@@ -216,7 +216,7 @@
     "domain-name": "Domeno pavadinimas",
     "domain-name-unique": "Domeno pavadinimas ir protokolas turi būti unikalūs.",
     "domain-name-max-length": "Domeno pavadinimas turi būti trumpesnis nei 256 simboliai",
-    "error-verification-url": "Domeno pavadinime neturi būti simbolių '/' ir ':'. Pavyzdys: thingsboard.io",
+    "error-verification-url": "A domain name shouldn't contain symbols '/' and ':'. Example: example.com",
     "connection-settings": "Ryšio nustatymai",
     "oauth2": {
       "access-token-uri": "Prieigos rakto URI",
@@ -1379,8 +1379,8 @@
     "make-private-dashboard-title": "Ar tikrai norite skydelį '{{dashboardTitle}}' padaryti privačiu?",
     "make-private-dashboard-text": "Po patvirtinimo skydelis taps privačiu ir jo nematys kiti vartotojai.",
     "make-private-dashboard": "Skydelį padaryti privačiu",
-    "socialshare-text": "'{{dashboardTitle}}' sukurta naudojant ThingsBoard",
-    "socialshare-title": "'{{dashboardTitle}}' sukurta naudojant ThingsBoard",
+    "socialshare-text": "'{{dashboardTitle}}'",
+    "socialshare-title": "'{{dashboardTitle}}'",
     "select-dashboard": "Pasirinkti skydelį",
     "no-dashboards-matching": "Skydelio, atitinkančio '{{entity}}', nėra.",
     "dashboard-required": "Skydelis būtinas.",
@@ -3918,9 +3918,9 @@
     "configuration-app": "Konfigūracijos programa",
     "configuration-step": {
       "prepare-environment-title": "Paruošti kūrimo aplinką",
-      "prepare-environment-text": "Flutter ThingsBoard mobiliajai programai reikalingas Flutter SDK. Vadovaukitės instrukcijomis, kad nustatytumėte Flutter SDK.",
+      "prepare-environment-text": "The Flutter mobile application requires the Flutter SDK. Follow instructions to set up Flutter SDK.",
       "get-source-code-title": "Gauti programos išeities kodą",
-      "get-source-code-text": "Galite gauti Flutter ThingsBoard mobiliosios programos išeities kodą, klonuodami jį iš GitHub saugyklos:",
+      "get-source-code-text": "You can get the Flutter mobile application source code by cloning the GitHub repository:",
       "configure-app-settings-title": "Sukonfigūruoti programos nustatymus",
       "configure-app-settings-text": "Atsisiųskite konfigūracijos failą ir įdėkite jį į projekto, kurį klonavote ankstesniame žingsnyje, šakninį katalogą.",
       "download-file": "Atsisiųsti failą",
@@ -5609,7 +5609,7 @@
     "tenant-required": "Valdytojas būtinas",
     "search": "Valdytojų paieška",
     "selected-tenants": "Pasirinkta { count, plural, =1 {1 valdytojas} other {# valdytojai} }",
-    "isolated-tb-rule-engine": "Naudoti atskiras ThingsBoard taisyklių variklio eiles",
+    "isolated-tb-rule-engine": "Use isolated Rule Engine queues",
     "isolated-tb-rule-engine-details": "Kiekvienas nuomininkas turės atskiras taisyklių variklio eiles"
   },
   "tenant-profile": {
@@ -9365,7 +9365,7 @@
     },
     "functions": {
       "title": "Funkcijos",
-      "pe-feature-tooltip": "Galima tik ThingsBoard\nProfessional Edition versijoje",
+      "pe-feature-tooltip": "Only on the Professional Edition",
       "switch-to-pe": "Pereiti į PE versiją",
       "alarms": "Aliarmai",
       "dashboards": "Valdymo skydeliai",

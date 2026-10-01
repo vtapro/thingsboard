@@ -217,7 +217,7 @@
     "domain-name": "Domeinnaam",
     "domain-name-unique": "Domeinnaam en protocol moeten uniek zijn.",
     "domain-name-max-length": "Domeinnaam moet minder dan 256 tekens bevatten",
-    "error-verification-url": "Domeinnaam mag geen '/' of ':' bevatten. Voorbeeld: thingsboard.io",
+    "error-verification-url": "A domain name shouldn't contain symbols '/' and ':'. Example: example.com",
     "connection-settings": "Verbindingsinstellingen",
     "oauth2": {
       "access-token-uri": "Access token URI",
@@ -1871,8 +1871,8 @@
     "make-private-dashboard-title": "Weet u zeker dat u het dashboard '{{dashboardTitle}}' privé wilt maken?",
     "make-private-dashboard-text": "Na bevestiging wordt het dashboard privé en niet langer toegankelijk voor anderen.",
     "make-private-dashboard": "Dashboard privé maken",
-    "socialshare-text": "'{{dashboardTitle}}' aangedreven door ThingsBoard",
-    "socialshare-title": "'{{dashboardTitle}}' aangedreven door ThingsBoard",
+    "socialshare-text": "'{{dashboardTitle}}'",
+    "socialshare-title": "'{{dashboardTitle}}'",
     "select-dashboard": "Selecteer dashboard",
     "no-dashboards-matching": "Geen dashboards gevonden voor '{{entity}}'.",
     "dashboard-required": "Dashboard is verplicht.",
@@ -4471,9 +4471,9 @@
     "configuration-app": "Configuratie-app",
     "configuration-step": {
       "prepare-environment-title": "Ontwikkelomgeving voorbereiden",
-      "prepare-environment-text": "Flutter ThingsBoard Mobiele Applicatie vereist de Flutter SDK. Volg de instructies om de Flutter SDK in te stellen.",
+      "prepare-environment-text": "The Flutter mobile application requires the Flutter SDK. Follow instructions to set up Flutter SDK.",
       "get-source-code-title": "Broncode van de app verkrijgen",
-      "get-source-code-text": "Je kunt de broncode van de Flutter ThingsBoard Mobiele Applicatie verkrijgen door deze te clonen vanuit de GitHub-repository:",
+      "get-source-code-text": "You can get the Flutter mobile application source code by cloning the GitHub repository:",
       "configure-app-settings-title": "App-instellingen configureren",
       "configure-app-settings-text": "Download het configuratiebestand en plaats het in de hoofdmap van het project dat je in de vorige stap hebt gekloond.",
       "download-file": "Bestand downloaden",
@@ -6178,7 +6178,7 @@
     "tenant-required": "Tenant is verplicht",
     "search": "Zoek tenants",
     "selected-tenants": "{ count, plural, =1 {1 tenant} other {# tenants} } geselecteerd",
-    "isolated-tb-rule-engine": "Gebruik geïsoleerde ThingsBoard Rule Engine-wachtrijen",
+    "isolated-tb-rule-engine": "Use isolated Rule Engine queues",
     "isolated-tb-rule-engine-details": "Elke tenant krijgt toegewezen Rule Engine-wachtrijen"
   },
   "tenant-profile": {
@@ -10017,7 +10017,7 @@
     },
     "functions": {
       "title": "Functies",
-      "pe-feature-tooltip": "Alleen beschikbaar in ThingsBoard\nProfessional Edition",
+      "pe-feature-tooltip": "Only on the Professional Edition",
       "switch-to-pe": "Overschakelen naar PE",
       "alarms": "Alarmen",
       "dashboards": "Dashboards",

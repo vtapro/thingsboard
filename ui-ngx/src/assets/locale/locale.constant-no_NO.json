@@ -217,7 +217,7 @@
     "domain-name": "Domenenavn",
     "domain-name-unique": "Domenenavn og protokoll må være unike.",
     "domain-name-max-length": "Domenenavn skal være kortere enn 256 tegn",
-    "error-verification-url": "Et domenenavn skal ikke inneholde symbolene '/' og ':'. Eksempel: thingsboard.io",
+    "error-verification-url": "A domain name shouldn't contain symbols '/' and ':'. Example: example.com",
     "connection-settings": "Tilkoblingsinnstillinger",
     "oauth2": {
       "access-token-uri": "URI for tilgangstoken",
@@ -1871,8 +1871,8 @@
     "make-private-dashboard-title": "Er du sikker på at du vil gjøre dashbordet '{{dashboardTitle}}' privat?",
     "make-private-dashboard-text": "Etter bekreftelse blir dashbordet privat og ikke tilgjengelig for andre.",
     "make-private-dashboard": "Gjør dashbord privat",
-    "socialshare-text": "'{{dashboardTitle}}' levert av ThingsBoard",
-    "socialshare-title": "'{{dashboardTitle}}' levert av ThingsBoard",
+    "socialshare-text": "'{{dashboardTitle}}'",
+    "socialshare-title": "'{{dashboardTitle}}'",
     "select-dashboard": "Velg dashbord",
     "no-dashboards-matching": "Ingen dashbord som samsvarer med '{{entity}}' ble funnet.",
     "dashboard-required": "Dashbord er påkrevd.",
@@ -4471,9 +4471,9 @@
     "configuration-app": "Konfigurasjonsapp",
     "configuration-step": {
       "prepare-environment-title": "Forbered utviklingsmiljø",
-      "prepare-environment-text": "Flutter ThingsBoard Mobile Application krever Flutter SDK. Følg instruksjonene for å sette opp Flutter SDK.",
+      "prepare-environment-text": "The Flutter mobile application requires the Flutter SDK. Follow instructions to set up Flutter SDK.",
       "get-source-code-title": "Hent appens kildekode",
-      "get-source-code-text": "Du kan hente kildekoden til Flutter ThingsBoard Mobile Application ved å klone den fra GitHub-repositoriet:",
+      "get-source-code-text": "You can get the Flutter mobile application source code by cloning the GitHub repository:",
       "configure-app-settings-title": "Konfigurer appinnstillinger",
       "configure-app-settings-text": "Last ned konfigurasjonsfilen og legg den i rotkatalogen til prosjektet du klonet i forrige steg.",
       "download-file": "Last ned fil",
@@ -6178,7 +6178,7 @@
     "tenant-required": "Leietaker er påkrevd",
     "search": "Søk etter leietakere",
     "selected-tenants": "{ count, plural, =1 {1 leietaker} other {# leietakere} } valgt",
-    "isolated-tb-rule-engine": "Bruk isolerte ThingsBoard Rule Engine-køer",
+    "isolated-tb-rule-engine": "Use isolated Rule Engine queues",
     "isolated-tb-rule-engine-details": "Hver leietaker får dedikerte Rule Engine-køer"
   },
   "tenant-profile": {
@@ -10017,7 +10017,7 @@
     },
     "functions": {
       "title": "Funksjoner",
-      "pe-feature-tooltip": "Kun i ThingsBoard\nProfessional Edition",
+      "pe-feature-tooltip": "Only on the Professional Edition",
       "switch-to-pe": "Bytt til PE",
       "alarms": "Alarmer",
       "dashboards": "Dashbord",

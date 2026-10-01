@@ -19,6 +19,7 @@ import { MatExpansionPanel } from '@angular/material/expansion';
 import { NotificationTargetConfigType, NotificationTargetConfigTypeInfoMap } from '@shared/models/notification.models';
 import { EntityType } from '@shared/models/entity-type.models';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { WhiteLabelingService } from '@core/http/white-labeling.service';
 
 @Component({
     selector: 'tb-2fa-settings',
@@ -47,6 +48,7 @@ export class TwoFactorAuthSettingsComponent extends PageComponent implements OnI
 
   constructor(protected store: Store<AppState>,
               private twoFaService: TwoFactorAuthenticationService,
+              private whiteLabelingService: WhiteLabelingService,
               private fb: UntypedFormBuilder,
               private destroyRef: DestroyRef) {
     super(store);
@@ -210,6 +212,15 @@ export class TwoFactorAuthSettingsComponent extends PageComponent implements OnI
     this.twoFaFormGroup.get('enforcedUsersFilter.filterByTenants').patchValue(this.filterByTenants, {onlySelf: true});
   }
 
+  /**
+   * Name shown by the authenticator application next to the account of the user: the title of the white labeling of
+   * the tenant when it is configured, a neutral name otherwise.
+   */
+  private twoFactorIssuerName(): string {
+    const appTitle = this.whiteLabelingService.settings?.appTitle;
+    return appTitle && appTitle.trim().length ? appTitle.trim() : 'IoT Platform';
+  }
+
   private buildProvidersSettingsForm(provider: TwoFactorAuthProviderType) {
     const formControlConfig: {[key: string]: any} = {
       providerType: [provider],
@@ -217,7 +228,10 @@ export class TwoFactorAuthSettingsComponent extends PageComponent implements OnI
     };
     switch (provider) {
       case TwoFactorAuthProviderType.TOTP:
-        formControlConfig.issuerName = [{value: 'ThingsBoard', disabled: true}, [Validators.required, Validators.pattern(/^(?!^\s+$).*$/)]];
+        // the issuer is the name the authenticator application shows near the account: use the brand of the
+        // deployment (white labeling) instead of the name of the upstream project
+        formControlConfig.issuerName = [{value: this.twoFactorIssuerName(), disabled: true},
+          [Validators.required, Validators.pattern(/^(?!^\s+$).*$/)]];
         break;
       case TwoFactorAuthProviderType.SMS:
         formControlConfig.smsVerificationMessageTemplate = [{value: 'Verification code: ${code}', disabled: true}, [

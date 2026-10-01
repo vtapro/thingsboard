@@ -217,7 +217,7 @@
     "domain-name": "域名",
     "domain-name-unique": "域名和协议需要唯一。",
     "domain-name-max-length": "域名应少于 256 个字符",
-    "error-verification-url": "域名不应包含符号“/”和“:”。例如：thingsboard.io",
+    "error-verification-url": "A domain name shouldn't contain symbols '/' and ':'. Example: example.com",
     "connection-settings": "连接设置",
     "oauth2": {
       "access-token-uri": "Access token URI",
@@ -1871,8 +1871,8 @@
     "make-private-dashboard-title": "确定要将仪表板“{{dashboardTitle}}”设为私有吗？",
     "make-private-dashboard-text": "确认后仪表板将设为私有，其他人将无法访问。",
     "make-private-dashboard": "将仪表板设为私有",
-    "socialshare-text": "“{{dashboardTitle}}”由 ThingsBoard 提供支持",
-    "socialshare-title": "“{{dashboardTitle}}”由 ThingsBoard 提供支持",
+    "socialshare-text": "'{{dashboardTitle}}'",
+    "socialshare-title": "'{{dashboardTitle}}'",
     "select-dashboard": "选择仪表板",
     "no-dashboards-matching": "未找到匹配“{{entity}}”的仪表板。",
     "dashboard-required": "仪表板为必填项。",
@@ -4471,9 +4471,9 @@
     "configuration-app": "配置应用",
     "configuration-step": {
       "prepare-environment-title": "准备开发环境",
-      "prepare-environment-text": "Flutter ThingsBoard 移动应用程序需要 Flutter SDK。请按照说明设置 Flutter SDK。",
+      "prepare-environment-text": "The Flutter mobile application requires the Flutter SDK. Follow instructions to set up Flutter SDK.",
       "get-source-code-title": "获取应用源代码",
-      "get-source-code-text": "您可以通过从 GitHub 仓库克隆来获取 Flutter ThingsBoard 移动应用程序的源代码：",
+      "get-source-code-text": "You can get the Flutter mobile application source code by cloning the GitHub repository:",
       "configure-app-settings-title": "配置应用设置",
       "configure-app-settings-text": "下载配置文件并将其放置到上一步克隆的项目根目录中。",
       "download-file": "下载文件",
@@ -6178,7 +6178,7 @@
     "tenant-required": "租户为必填项",
     "search": "搜索租户",
     "selected-tenants": "{ count, plural, =1 {1 个租户} other {# 个租户} }已选择",
-    "isolated-tb-rule-engine": "使用隔离的 ThingsBoard 规则引擎队列",
+    "isolated-tb-rule-engine": "Use isolated Rule Engine queues",
     "isolated-tb-rule-engine-details": "每个租户将拥有专用的规则引擎队列"
   },
   "tenant-profile": {
@@ -10017,7 +10017,7 @@
     },
     "functions": {
       "title": "功能",
-      "pe-feature-tooltip": "仅适用于 ThingsBoard\nProfessional Edition",
+      "pe-feature-tooltip": "Only on the Professional Edition",
       "switch-to-pe": "切换到 PE",
       "alarms": "告警",
       "dashboards": "仪表板",

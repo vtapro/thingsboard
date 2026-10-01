@@ -158,7 +158,7 @@
         "user-lockout-notification-email": "V případě zablokování uživatelského účtu odeslat upozornění na email",
         "domain-name": "Doménové jméno",
         "domain-name-unique": "Doménové jméno a protokol musí být unikátní.",
-        "error-verification-url": "Doménové jméno by nemělo obsahovat symbol '/' ani ':'. Příklad: thingsboard.io",
+        "error-verification-url": "A domain name shouldn't contain symbols '/' and ':'. Example: example.com",
         "oauth2": {
           "access-token-uri": "URI přístupového tokenu",
           "access-token-uri-required": "URI přístupového tokenu je povinné.",
@@ -726,8 +726,8 @@
         "make-private-dashboard-title": "Jste si jisti, že chcete dashboard '{{dashboardTitle}}' zneveřejnit?",
         "make-private-dashboard-text": "Po potvrzení bude dashboard neveřejný a nebude pro ostatní dostupný.",
         "make-private-dashboard": "Učinit dashboard neveřejným",
-        "socialshare-text": "'{{dashboardTitle}}' powered by ThingsBoard",
-        "socialshare-title": "'{{dashboardTitle}}' powered by ThingsBoard",
+        "socialshare-text": "'{{dashboardTitle}}'",
+        "socialshare-title": "'{{dashboardTitle}}'",
         "select-dashboard": "Vybrat dashboard",
         "no-dashboards-matching": "Žádné dashboardy odpovídající '{{entity}}' nebyly nalezeny.",
         "dashboard-required": "Dashboard je povinný.",
@@ -2466,7 +2466,7 @@
         "tenant-required": "Tenant je povinný",
         "search": "Vyhledat tenanty",
         "selected-tenants": "Vybráno { count, plural, =1 {1 tenantů} other {# tenantů} }",
-        "isolated-tb-rule-engine": "Zpracování v izolovaném kontejneru ThingsBoard Rule Engine",
+        "isolated-tb-rule-engine": "Use isolated Rule Engine queues",
         "isolated-tb-rule-engine-details": "Vyžaduje samostatnou mikroslužbu(y) pro každého izolovaného tenanta"
     },
     "tenant-profile": {

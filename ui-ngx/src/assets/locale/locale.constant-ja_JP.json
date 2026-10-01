@@ -217,7 +217,7 @@
     "domain-name": "ドメイン名",
     "domain-name-unique": "ドメイン名とプロトコルは一意である必要があります。",
     "domain-name-max-length": "ドメイン名は256未満である必要があります",
-    "error-verification-url": "ドメイン名に記号'/'および':'を含めることはできません。例: thingsboard.io",
+    "error-verification-url": "A domain name shouldn't contain symbols '/' and ':'. Example: example.com",
     "connection-settings": "接続設定",
     "oauth2": {
       "access-token-uri": "アクセストークンURI",
@@ -1871,8 +1871,8 @@
     "make-private-dashboard-title": "ダッシュボード'{{dashboardTitle}}'を非公開にしてもよろしいですか？",
     "make-private-dashboard-text": "確認後、ダッシュボードは非公開になり、他の人はアクセスできなくなります。",
     "make-private-dashboard": "ダッシュボードを非公開にする",
-    "socialshare-text": "'{{dashboardTitle}}' powered by ThingsBoard",
-    "socialshare-title": "'{{dashboardTitle}}' powered by ThingsBoard",
+    "socialshare-text": "'{{dashboardTitle}}'",
+    "socialshare-title": "'{{dashboardTitle}}'",
     "select-dashboard": "ダッシュボードを選択",
     "no-dashboards-matching": "'{{entity}}'に一致するダッシュボードが見つかりません。",
     "dashboard-required": "ダッシュボードは必須です。",
@@ -4471,9 +4471,9 @@
     "configuration-app": "設定アプリ",
     "configuration-step": {
       "prepare-environment-title": "開発環境の準備",
-      "prepare-environment-text": "Flutter ThingsBoardモバイルアプリケーションにはFlutter SDKが必要です。Flutter SDKのセットアップ手順に従ってください。",
+      "prepare-environment-text": "The Flutter mobile application requires the Flutter SDK. Follow instructions to set up Flutter SDK.",
       "get-source-code-title": "アプリソースコードの取得",
-      "get-source-code-text": "Flutter ThingsBoardモバイルアプリケーションのソースコードは、GitHubリポジトリからクローンして取得できます:",
+      "get-source-code-text": "You can get the Flutter mobile application source code by cloning the GitHub repository:",
       "configure-app-settings-title": "アプリ設定の構成",
       "configure-app-settings-text": "設定ファイルをダウンロードし、前の手順でクローンしたプロジェクトのルートディレクトリに配置してください。",
       "download-file": "ファイルをダウンロード",
@@ -6178,7 +6178,7 @@
     "tenant-required": "テナントは必須です",
     "search": "テナントを検索",
     "selected-tenants": "{ count, plural, =1 {テナント 1 件} other {テナント # 件} } を選択",
-    "isolated-tb-rule-engine": "分離された ThingsBoard ルールエンジン キューを使用",
+    "isolated-tb-rule-engine": "Use isolated Rule Engine queues",
     "isolated-tb-rule-engine-details": "各テナントに専用のルールエンジンキューが割り当てられます"
   },
   "tenant-profile": {
@@ -10017,7 +10017,7 @@
     },
     "functions": {
       "title": "機能",
-      "pe-feature-tooltip": "ThingsBoard\nProfessional Edition のみ",
+      "pe-feature-tooltip": "Only on the Professional Edition",
       "switch-to-pe": "PEに切り替え",
       "alarms": "アラーム",
       "dashboards": "ダッシュボード",

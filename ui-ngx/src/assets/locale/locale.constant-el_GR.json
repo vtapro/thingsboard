@@ -217,7 +217,7 @@
     "domain-name": "Όνομα τομέα",
     "domain-name-unique": "Το όνομα τομέα και το πρωτόκολλο πρέπει να είναι μοναδικά.",
     "domain-name-max-length": "Το όνομα τομέα πρέπει να έχει λιγότερους από 256 χαρακτήρες",
-    "error-verification-url": "Ένα όνομα τομέα δεν πρέπει να περιέχει τα σύμβολα '/' και ':'. Παράδειγμα: thingsboard.io",
+    "error-verification-url": "A domain name shouldn't contain symbols '/' and ':'. Example: example.com",
     "connection-settings": "Ρυθμίσεις σύνδεσης",
     "oauth2": {
       "access-token-uri": "URI διακριτικού πρόσβασης",
@@ -1871,8 +1871,8 @@
     "make-private-dashboard-title": "Είστε σίγουροι ότι θέλετε να κάνετε ιδιωτικό τον πίνακα ελέγχου '{{dashboardTitle}}';",
     "make-private-dashboard-text": "Μετά την επιβεβαίωση ο πίνακας ελέγχου θα γίνει ιδιωτικός και δεν θα είναι πλέον προσβάσιμος από άλλους.",
     "make-private-dashboard": "Ιδιωτικοποίηση πίνακα ελέγχου",
-    "socialshare-text": "'{{dashboardTitle}}' με την υποστήριξη του ThingsBoard",
-    "socialshare-title": "'{{dashboardTitle}}' με την υποστήριξη του ThingsBoard",
+    "socialshare-text": "'{{dashboardTitle}}'",
+    "socialshare-title": "'{{dashboardTitle}}'",
     "select-dashboard": "Επιλογή πίνακα ελέγχου",
     "no-dashboards-matching": "Δεν βρέθηκαν πίνακες ελέγχου που να ταιριάζουν με '{{entity}}'.",
     "dashboard-required": "Απαιτείται πίνακας ελέγχου.",
@@ -4471,9 +4471,9 @@
     "configuration-app": "Εφαρμογή ρυθμίσεων",
     "configuration-step": {
       "prepare-environment-title": "Προετοιμασία περιβάλλοντος ανάπτυξης",
-      "prepare-environment-text": "Η εφαρμογή Flutter ThingsBoard Mobile απαιτεί το Flutter SDK. Ακολουθήστε τις οδηγίες για την εγκατάσταση του Flutter SDK.",
+      "prepare-environment-text": "The Flutter mobile application requires the Flutter SDK. Follow instructions to set up Flutter SDK.",
       "get-source-code-title": "Λήψη πηγαίου κώδικα της εφαρμογής",
-      "get-source-code-text": "Μπορείτε να αποκτήσετε τον πηγαίο κώδικα της εφαρμογής Flutter ThingsBoard Mobile κάνοντάς τον clone από το αποθετήριο GitHub:",
+      "get-source-code-text": "You can get the Flutter mobile application source code by cloning the GitHub repository:",
       "configure-app-settings-title": "Ρύθμιση παραμέτρων εφαρμογής",
       "configure-app-settings-text": "Κατεβάστε το αρχείο ρυθμίσεων και τοποθετήστε το στον ριζικό φάκελο του έργου που κάνατε clone στο προηγούμενο βήμα.",
       "download-file": "Λήψη αρχείου",
@@ -6178,7 +6178,7 @@
     "tenant-required": "Απαιτείται ενοικιαστής",
     "search": "Αναζήτηση ενοικιαστών",
     "selected-tenants": "{ count, plural, =1 {1 ενοικιαστής} other {# ενοικιαστές} } επιλέχθηκαν",
-    "isolated-tb-rule-engine": "Χρήση απομονωμένων ουρών Rule Engine του ThingsBoard",
+    "isolated-tb-rule-engine": "Use isolated Rule Engine queues",
     "isolated-tb-rule-engine-details": "Κάθε ενοικιαστής θα έχει αφιερωμένες ουρές Rule Engine"
   },
   "tenant-profile": {
@@ -10017,7 +10017,7 @@
     },
     "functions": {
       "title": "Λειτουργίες",
-      "pe-feature-tooltip": "Μόνο στην ThingsBoard\nProfessional Edition",
+      "pe-feature-tooltip": "Only on the Professional Edition",
       "switch-to-pe": "Μετάβαση σε PE",
       "alarms": "Συναγερμοί",
       "dashboards": "Πίνακες ελέγχου",

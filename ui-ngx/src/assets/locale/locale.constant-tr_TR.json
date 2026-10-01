@@ -217,7 +217,7 @@
     "domain-name": "Alan adı",
     "domain-name-unique": "Alan adı ve protokol benzersiz olmalıdır.",
     "domain-name-max-length": "Alan adı 256 karakterden kısa olmalıdır",
-    "error-verification-url": "Alan adı '/' ve ':' karakterlerini içermemelidir. Örnek: thingsboard.io",
+    "error-verification-url": "A domain name shouldn't contain symbols '/' and ':'. Example: example.com",
     "connection-settings": "Bağlantı ayarları",
     "oauth2": {
       "access-token-uri": "Erişim belirteci URI'si",
@@ -1871,8 +1871,8 @@
     "make-private-dashboard-title": "'{{dashboardTitle}}' panosunu gizli yapmak istediğinize emin misiniz?",
     "make-private-dashboard-text": "Onaydan sonra pano gizli olacak ve başkaları tarafından erişilemeyecek.",
     "make-private-dashboard": "Panoyu gizli yap",
-    "socialshare-text": "'{{dashboardTitle}}' ThingsBoard tarafından desteklenmektedir",
-    "socialshare-title": "'{{dashboardTitle}}' ThingsBoard tarafından desteklenmektedir",
+    "socialshare-text": "'{{dashboardTitle}}'",
+    "socialshare-title": "'{{dashboardTitle}}'",
     "select-dashboard": "Pano seç",
     "no-dashboards-matching": "'{{entity}}' ile eşleşen pano bulunamadı.",
     "dashboard-required": "Pano gereklidir.",
@@ -4471,9 +4471,9 @@
     "configuration-app": "Yapılandırma uygulaması",
     "configuration-step": {
       "prepare-environment-title": "Geliştirme ortamını hazırla",
-      "prepare-environment-text": "Flutter ThingsBoard Mobil Uygulaması, Flutter SDK gerektirir. Flutter SDK'yı kurmak için talimatları izleyin.",
+      "prepare-environment-text": "The Flutter mobile application requires the Flutter SDK. Follow instructions to set up Flutter SDK.",
       "get-source-code-title": "Uygulama kaynak kodunu edinin",
-      "get-source-code-text": "Flutter ThingsBoard Mobil Uygulaması'nın kaynak kodunu GitHub deposundan klonlayarak edinebilirsiniz:",
+      "get-source-code-text": "You can get the Flutter mobile application source code by cloning the GitHub repository:",
       "configure-app-settings-title": "Uygulama ayarlarını yapılandır",
       "configure-app-settings-text": "Yapılandırma dosyasını indirip, bir önceki adımda klonladığınız projenin kök dizinine yerleştirin.",
       "download-file": "Dosyayı indir",
@@ -6178,7 +6178,7 @@
     "tenant-required": "Kiracı gereklidir",
     "search": "Kiracı ara",
     "selected-tenants": "{ count, plural, =1 {1 kiracı} other {# kiracı} } seçildi",
-    "isolated-tb-rule-engine": "Ayrı ThingsBoard Kural Motoru kuyrukları kullan",
+    "isolated-tb-rule-engine": "Use isolated Rule Engine queues",
     "isolated-tb-rule-engine-details": "Her kiracı için özel Kural Motoru kuyrukları oluşturulacaktır"
   },
   "tenant-profile": {
@@ -10017,7 +10017,7 @@
     },
     "functions": {
       "title": "Fonksiyonlar",
-      "pe-feature-tooltip": "Yalnızca ThingsBoard\nProfessional Edition",
+      "pe-feature-tooltip": "Only on the Professional Edition",
       "switch-to-pe": "PE sürümüne geç",
       "alarms": "Alarmlar",
       "dashboards": "Panolar",

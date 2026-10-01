@@ -165,7 +165,7 @@
         "domain-name": "網域名稱",
         "domain-name-unique": "網域名稱與通訊協定需是唯一值",
         "domain-name-max-length": "網域名稱需少於256字元",
-        "error-verification-url": "網域名稱不可包含符號 '/' 及 ':' 例如：thingsboard.io",
+        "error-verification-url": "A domain name shouldn't contain symbols '/' and ':'. Example: example.com",
         "oauth2": {
             "access-token-uri": "訪問token URI",
             "access-token-uri-required": "訪問token為必填",
@@ -809,8 +809,8 @@
         "make-private-dashboard-title": "您確定要將儀表板 '{{dashboardTitle}}' 設為私有嗎？",
         "make-private-dashboard-text": "確認後，儀表板將被設為私有，不能被其他人存取。",
         "make-private-dashboard": "儀表板設為私有",
-        "socialshare-text": "'{{dashboardTitle}}' 由Thingsboard提供支持",
-        "socialshare-title": "'{{dashboardTitle}}' 由Thingsboard提供支持",
+        "socialshare-text": "'{{dashboardTitle}}'",
+        "socialshare-title": "'{{dashboardTitle}}'",
         "select-dashboard": "選擇儀表板",
         "no-dashboards-matching": "找不到符合 '{{entity}}' 的儀表板。",
         "dashboard-required": "儀表板必填。",
@@ -2907,7 +2907,7 @@
         "tenant-required": "租戶必填",
         "search": "搜尋租戶",
         "selected-tenants": "{ count, plural, =1 {1 租戶} other {# 租戶} } 已選中",
-        "isolated-tb-rule-engine": "在隔離的ThingsBoard Rule規則引擎容器中處理",
+        "isolated-tb-rule-engine": "Use isolated Rule Engine queues",
         "isolated-tb-rule-engine-details": "每個獨立租戶需要單獨的微服務"
     },
     "tenant-profile": {

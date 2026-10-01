@@ -217,7 +217,7 @@
     "domain-name": "Nome de domínio",
     "domain-name-unique": "O nome de domínio e o protocolo precisam ser únicos.",
     "domain-name-max-length": "O nome de domínio deve ter menos de 256 caracteres",
-    "error-verification-url": "O nome de domínio não deve conter os símbolos '/' e ':'. Exemplo: thingsboard.io",
+    "error-verification-url": "A domain name shouldn't contain symbols '/' and ':'. Example: example.com",
     "connection-settings": "Configurações de conexão",
     "oauth2": {
       "access-token-uri": "Access token URI",
@@ -1871,8 +1871,8 @@
     "make-private-dashboard-title": "Tem certeza de que deseja tornar o dashboard '{{dashboardTitle}}' privado?",
     "make-private-dashboard-text": "Após a confirmação o dashboard será tornado privado e não estará mais acessível por outros.",
     "make-private-dashboard": "Tornar dashboard privado",
-    "socialshare-text": "'{{dashboardTitle}}' desenvolvido com ThingsBoard",
-    "socialshare-title": "'{{dashboardTitle}}' desenvolvido com ThingsBoard",
+    "socialshare-text": "'{{dashboardTitle}}'",
+    "socialshare-title": "'{{dashboardTitle}}'",
     "select-dashboard": "Selecionar dashboard",
     "no-dashboards-matching": "Nenhum dashboard correspondente a '{{entity}}' foi encontrado.",
     "dashboard-required": "O dashboard é obrigatório.",
@@ -4471,9 +4471,9 @@
     "configuration-app": "Aplicação de configuração",
     "configuration-step": {
       "prepare-environment-title": "Preparar ambiente de desenvolvimento",
-      "prepare-environment-text": "O Flutter ThingsBoard Mobile Application requer o Flutter SDK. Siga as instruções para configurar o Flutter SDK.",
+      "prepare-environment-text": "The Flutter mobile application requires the Flutter SDK. Follow instructions to set up Flutter SDK.",
       "get-source-code-title": "Obter código-fonte do aplicativo",
-      "get-source-code-text": "Você pode obter o código-fonte do Flutter ThingsBoard Mobile Application clonando-o do repositório GitHub:",
+      "get-source-code-text": "You can get the Flutter mobile application source code by cloning the GitHub repository:",
       "configure-app-settings-title": "Configurar as definições do aplicativo",
       "configure-app-settings-text": "Baixe o arquivo de configuração e coloque-o no diretório raiz do projeto clonado na etapa anterior.",
       "download-file": "Baixar arquivo",
@@ -6178,7 +6178,7 @@
     "tenant-required": "Tenant é obrigatório",
     "search": "Pesquisar tenants",
     "selected-tenants": "{ count, plural, =1 {1 tenant} other {# tenants} } selecionado(s)",
-    "isolated-tb-rule-engine": "Usar filas isoladas do ThingsBoard Motor de regras",
+    "isolated-tb-rule-engine": "Use isolated Rule Engine queues",
     "isolated-tb-rule-engine-details": "Cada tenant terá filas dedicadas do Motor de regras"
   },
   "tenant-profile": {
@@ -10017,7 +10017,7 @@
     },
     "functions": {
       "title": "Funções",
-      "pe-feature-tooltip": "Disponível apenas no ThingsBoard\nProfessional Edition",
+      "pe-feature-tooltip": "Only on the Professional Edition",
       "switch-to-pe": "Migrar para PE",
       "alarms": "Alarmes",
       "dashboards": "Dashboards",

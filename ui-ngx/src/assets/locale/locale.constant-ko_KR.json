@@ -217,7 +217,7 @@
         "domain-name": "도메인 이름",
         "domain-name-unique": "도메인 이름과 프로토콜은 중복되지 않아야 합니다.",
         "domain-name-max-length": "도메인 이름은 256자 미만이어야 합니다.",
-        "error-verification-url": "도메인 이름은 '/'이나 ':'와 같은 문자를 포함할 수 없습니다. 예: thingsboard.io",
+        "error-verification-url": "A domain name shouldn't contain symbols '/' and ':'. Example: example.com",
         "connection-settings": "연결 설정",
         "oauth2": {
             "access-token-uri": "액세스 토큰 URI",
@@ -1878,8 +1878,8 @@
         "make-private-dashboard-title": "대시보드 '{{dashboardTitle}}'를 비공개로 전환하시겠습니까?",
         "make-private-dashboard-text": "대시보드는 비공개로 전환되어 다른 이들이 접근할 수 없게 됩니다.",
         "make-private-dashboard": "대시보드 비공개 전환",
-        "socialshare-text": "'{{dashboardTitle}}' - ThingsBoard 제공",
-        "socialshare-title": "'{{dashboardTitle}}' - ThingsBoard 제공",
+        "socialshare-text": "'{{dashboardTitle}}'",
+        "socialshare-title": "'{{dashboardTitle}}'",
         "select-dashboard": "대시보드 선택",
         "no-dashboards-matching": "'{{entity}}'와 일치하는 대시보드가 없습니다.",
         "dashboard-required": "대시보드를 입력하세요.",
@@ -4487,9 +4487,9 @@
         "configuration-app": "구성 앱",
         "configuration-step": {
             "prepare-environment-title": "개발 환경 준비",
-            "prepare-environment-text": "Flutter ThingsBoard 모바일 애플리케이션에는 Flutter SDK가 필요합니다. 지침에 따라 Flutter SDK를 설정하세요.",
+            "prepare-environment-text": "The Flutter mobile application requires the Flutter SDK. Follow instructions to set up Flutter SDK.",
             "get-source-code-title": "앱 소스 코드 얻기",
-            "get-source-code-text": "GitHub 저장소에서 복제하여 Flutter ThingsBoard 모바일 애플리케이션 소스 코드를 얻을 수 있습니다:",
+            "get-source-code-text": "You can get the Flutter mobile application source code by cloning the GitHub repository:",
             "configure-app-settings-title": "앱 설정 구성",
             "configure-app-settings-text": "구성 파일을 다운로드하여 이전 단계에서 복제한 프로젝트의 루트 디렉토리에 배치하세요.",
             "download-file": "파일 다운로드",
@@ -6194,7 +6194,7 @@
         "tenant-required": "테넌트가 필요합니다.",
         "search": "테넌트 검색",
         "selected-tenants": "{ count, plural, =1 {1 개 테넌트} other {# 개 테넌트} } 선택됨",
-        "isolated-tb-rule-engine": "격리된 ThingsBoard 규칙 엔진 큐 사용",
+        "isolated-tb-rule-engine": "Use isolated Rule Engine queues",
         "isolated-tb-rule-engine-details": "각 테넌트는 전용 규칙 엔진 큐를 갖습니다"
     },
     "tenant-profile": {
@@ -10028,7 +10028,7 @@
         },
         "functions": {
             "title": "함수",
-            "pe-feature-tooltip": "ThingsBoard\nProfessional Edition에서만",
+            "pe-feature-tooltip": "Only on the Professional Edition",
             "switch-to-pe": "PE로 전환",
             "alarms": "알람",
             "dashboards": "대시보드",

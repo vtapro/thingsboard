@@ -319,7 +319,7 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
    * Footer attribution of the dashboard. The white labeling may replace the product name, or hide the footer
    * completely when the vendor promotion is disabled.
    */
-  poweredBy: {label: string; url?: string} = {label: 'ThingsBoard', url: 'https://thingsboard.io'};
+  poweredBy: {label: string; url?: string} = null;
 
   get toolbarOpened(): boolean {
     return !this.widgetEditMode && !this.hideToolbar &&
@@ -607,7 +607,9 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
     if (settings.enabled && settings.appTitle) {
       return {label: settings.appTitle};
     }
-    return {label: 'ThingsBoard', url: 'https://thingsboard.io'};
+    // no vendor promotion of the upstream project in the UI: the brand of the deployment is the white labeling
+    // (when it is not configured nothing is shown)
+    return null;
   }
 
   ngOnDestroy(): void {

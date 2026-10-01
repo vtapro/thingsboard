@@ -46,7 +46,7 @@ export class AppComponent {
               private rbacService: RbacService,
               @Inject(DOCUMENT) private document: Document) {
 
-    console.log(`ThingsBoard Version: ${env.tbVersion}`);
+    console.log(`Version: ${env.tbVersion}`);
 
     this.setupWhiteLabeling();
 
