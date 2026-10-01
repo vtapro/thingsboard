@@ -1006,6 +1006,8 @@ audit-log:
       "widget_type": "${AUDIT_LOG_MASK_WIDGET_TYPE:W}" # Widget type logging levels.
       "widgets_bundle": "${AUDIT_LOG_MASK_WIDGETS_BUNDLE:W}" # Widget bundles logging levels.
       "customer": "${AUDIT_LOG_MASK_CUSTOMER:W}" # Customer logging levels.
+      # The tenant entity keeps the permission changes (roles, user groups) of the tenant administrator
+      "tenant": "${AUDIT_LOG_MASK_TENANT:W}" # Tenant logging levels.
       "user": "${AUDIT_LOG_MASK_USER:W}" # User logging levels.
       "rule_chain": "${AUDIT_LOG_MASK_RULE_CHAIN:W}" # Rule chain logging levels.
       "alarm": "${AUDIT_LOG_MASK_ALARM:W}" # Alarm logging levels.

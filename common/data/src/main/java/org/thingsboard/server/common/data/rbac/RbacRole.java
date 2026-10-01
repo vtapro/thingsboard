@@ -43,4 +43,11 @@ public class RbacRole implements Serializable {
             "Use this instead of global permissions to keep the customer isolation of the platform.")
     private boolean ownCustomerOnly;
 
+    /**
+     * Role that ships with the platform (the two profiles of a customer user): it can not be renamed or deleted, and
+     * the platform creates it again when it is missing. Its permissions stay editable, so the tenant administrator
+     * may still tune what a profile grants.
+     */
+    private boolean system;
+
 }

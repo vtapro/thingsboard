@@ -41,6 +41,7 @@ import org.thingsboard.server.dao.sql.JpaExecutorService;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -185,6 +186,12 @@ public class AuditLogServiceImpl implements AuditLogService {
                         ObjectNode ruleChainMetaDataNode = (ObjectNode) JacksonUtil.valueToTree(ruleChainMetaData);
                         actionData.set("metadata", ruleChainMetaDataNode);
                     }
+                }
+                // a caller may describe the change with plain text (for example the roles or the groups that were
+                // granted to a user), so the audit log shows why the entity was updated
+                String info = extractTextInfo(additionalInfo);
+                if (!info.isEmpty()) {
+                    actionData.put("info", info);
                 }
                 break;
             case ADDED_COMMENT:
@@ -343,6 +350,20 @@ public class AuditLogServiceImpl implements AuditLogService {
 
     private <T> T extractParameter(Class<T> clazz, Object... additionalInfo) {
         return extractParameter(clazz, 0, additionalInfo);
+    }
+
+    /** Concatenates the plain text descriptions passed by the caller (e.g. "roles: Customer User"). */
+    private static String extractTextInfo(Object... additionalInfo) {
+        if (additionalInfo == null || additionalInfo.length == 0) {
+            return "";
+        }
+        List<String> parts = new ArrayList<>();
+        for (Object info : additionalInfo) {
+            if (info instanceof String text && !text.isEmpty()) {
+                parts.add(text);
+            }
+        }
+        return String.join("; ", parts);
     }
 
     private <T> T extractParameter(Class<T> clazz, int index, Object... additionalInfo) {

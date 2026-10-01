@@ -67,10 +67,17 @@ public class DefaultRoleService implements RoleService {
             settings.setRoles(new ArrayList<>());
         }
         for (RbacRole role : List.of(customerAdminRole(tenantId), customerUserRole(tenantId))) {
-            boolean exists = settings.getRoles().stream()
-                    .anyMatch(stored -> role.getId().equals(stored.getId()) || role.getName().equals(stored.getName()));
-            if (!exists) {
+            RbacRole stored = settings.getRoles().stream()
+                    .filter(candidate -> role.getId().equals(candidate.getId())
+                            || (!candidate.isSystem() && role.getName().equals(candidate.getName())))
+                    .findFirst().orElse(null);
+            if (stored == null) {
                 settings.getRoles().add(role);
+            } else {
+                // adopt the stored role as the system role of the profile: the tenant administrator may have tuned
+                // its permissions (they are kept), but its name and its existence are owned by the platform
+                stored.setSystem(true);
+                stored.setName(role.getName());
             }
         }
         return settings;
@@ -96,6 +103,7 @@ public class DefaultRoleService implements RoleService {
         role.setId(defaultRoleId(tenantId, CUSTOMER_ADMIN_ROLE_NAME));
         role.setName(CUSTOMER_ADMIN_ROLE_NAME);
         role.setPermissions(permissions);
+        role.setSystem(true);
         // the administrator manages its own customer and, when the tenant administrator declares them in the
         // Customer hierarchy tab, the sub-customers of that customer
         role.setOwnCustomerOnly(true);
@@ -116,12 +124,16 @@ public class DefaultRoleService implements RoleService {
         role.setId(defaultRoleId(tenantId, CUSTOMER_USER_ROLE_NAME));
         role.setName(CUSTOMER_USER_ROLE_NAME);
         role.setPermissions(permissions);
+        role.setSystem(true);
         return role;
     }
 
     @Override
     public RbacRoleSettings saveRoleSettings(TenantId tenantId, RbacRoleSettings settings) {
         synchronized (locks.lockFor(tenantId)) {
+            // the roles of the two profiles of a customer user always exist and keep their name: the platform owns
+            // them (their permissions stay editable)
+            settings = ensureDefaultRoles(tenantId, settings != null ? settings : new RbacRoleSettings());
             AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, ROLES_SETTINGS_KEY);
             if (adminSettings == null) {
                 adminSettings = new AdminSettings();

@@ -6,7 +6,10 @@ import io.swagger.v3.oas.annotations.Parameter;
 import org.springframework.web.bind.annotation.PathVariable;
 import lombok.RequiredArgsConstructor;
 import org.thingsboard.server.common.data.User;
+import org.thingsboard.server.common.data.Tenant;
+import org.thingsboard.server.common.data.audit.ActionType;
 import org.thingsboard.server.common.data.id.UserId;
+import org.thingsboard.server.common.data.id.TenantId;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,6 +29,7 @@ import org.thingsboard.server.service.security.permission.TbRbacAccessControlSer
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.security.permission.Operation;
 import org.thingsboard.server.service.security.permission.Resource;
+import org.thingsboard.server.service.entitiy.TbLogEntityActionService;
 
 import static org.thingsboard.server.controller.ControllerConstants.TENANT_AUTHORITY_PARAGRAPH;
 
@@ -44,6 +48,7 @@ public class RoleController extends BaseController {
 
     private final RoleService roleService;
     private final UserGroupService userGroupService;
+    private final TbLogEntityActionService logEntityActionService;
 
     @ApiOperation(value = "Get roles of the current tenant (getRoles)",
             notes = "Returns custom roles configured for the current tenant. " + TENANT_AUTHORITY_PARAGRAPH)
@@ -66,6 +71,15 @@ public class RoleController extends BaseController {
         RbacRoleSettings saved = roleService.saveRoleSettings(getCurrentUser().getTenantId(), settings);
         // the effective permissions of every user of the tenant change with the roles
         accessControlService.onPermissionsChanged();
+        // keep the permission changes in the audit log of the tenant (who changed the roles and when)
+        TenantId tenantId = getCurrentUser().getTenantId();
+        Tenant tenant = tenantService.findTenantById(tenantId);
+        if (tenant != null) {
+            String roles = saved.getRoles() == null ? "" : saved.getRoles().stream()
+                    .map(RbacRole::getName).collect(java.util.stream.Collectors.joining(", "));
+            logEntityActionService.logEntityAction(tenantId, tenantId, tenant, ActionType.UPDATED, getCurrentUser(),
+                    "roles: " + roles);
+        }
         return saved;
     }
 
@@ -122,7 +136,15 @@ public class RoleController extends BaseController {
         roleService.saveRoleSettings(getCurrentUser().getTenantId(), settings);
         // the effective permissions of the user change immediately
         accessControlService.onPermissionsChanged();
-        return userRoleAssignments(userId.toString());
+        UserRoleAssignments assignments = userRoleAssignments(userId.toString());
+        // who granted which role to the user: the audit log of the tenant has to keep the permission changes
+        String granted = assignments.getRoles().stream()
+                .filter(UserRoleAssignments.Role::isDirect)
+                .map(UserRoleAssignments.Role::getName)
+                .collect(java.util.stream.Collectors.joining(", "));
+        logEntityActionService.logEntityAction(getCurrentUser().getTenantId(), user.getId(), user, user.getCustomerId(),
+                ActionType.UPDATED, getCurrentUser(), "roles: " + granted);
+        return assignments;
     }
 
     /** Every role of the tenant with the way it applies to the user (direct assignment or user groups). */

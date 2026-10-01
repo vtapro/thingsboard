@@ -15,6 +15,7 @@ import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.User;
+import org.thingsboard.server.common.data.audit.ActionType;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.EntityIdFactory;
 import org.thingsboard.server.common.data.id.UserId;
@@ -26,6 +27,7 @@ import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.config.annotations.ApiOperation;
 import org.thingsboard.server.dao.settings.DefaultEntityGroupService;
 import org.thingsboard.server.dao.settings.EntityGroupService;
+import org.thingsboard.server.service.entitiy.TbLogEntityActionService;
 import org.thingsboard.server.dao.exception.IncorrectParameterException;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.security.permission.Operation;
@@ -43,6 +45,7 @@ import java.util.UUID;
 public class EntityGroupController extends BaseController {
 
     private final EntityGroupService entityGroupService;
+    private final TbLogEntityActionService logEntityActionService;
 
     @ApiOperation(value = "Get entity groups of the current tenant (getEntityGroups)",
             notes = "Returns entity groups (devices, assets, entity views) configured for the current tenant. " +
@@ -169,7 +172,20 @@ public class EntityGroupController extends BaseController {
         // the membership selects the roles of the user (and of the members of a user group), so the effective
         // permissions must be recomputed right away
         accessControlService.onPermissionsChanged();
-        return entityGroupMembers(id);
+        EntityGroupMembers members = entityGroupMembers(id);
+        if (EntityType.USER == id.getEntityType()) {
+            // changing the groups of a user changes its profile and its permissions: keep it in the audit log
+            User member = userService.findUserById(getCurrentUser().getTenantId(), new UserId(id.getId()));
+            if (member != null) {
+                String groups = members.getGroups().stream()
+                        .filter(EntityGroupMembers.Member::isMember)
+                        .map(EntityGroupMembers.Member::getName)
+                        .collect(java.util.stream.Collectors.joining(", "));
+                logEntityActionService.logEntityAction(getCurrentUser().getTenantId(), member.getId(), member,
+                        member.getCustomerId(), ActionType.UPDATED, getCurrentUser(), "groups: " + groups);
+            }
+        }
+        return members;
     }
 
     /**

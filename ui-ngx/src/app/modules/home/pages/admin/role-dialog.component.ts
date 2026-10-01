@@ -13,6 +13,8 @@ export interface RbacRoleModel {
   userIds: string[];
   ownCustomerOnly?: boolean;
   ownOnly?: { [resource: string]: boolean };
+  /** Role cua nen tang: khong doi duoc ten (quyen van sua duoc). */
+  system?: boolean;
 }
 
 export interface RoleDialogUser {
@@ -75,6 +77,11 @@ export class RoleDialogComponent {
     const role = data?.role;
     if (role) {
       this.nameControl.setValue(role.name);
+      if (role.system) {
+        // the name of a role of the platform (the two profiles of a customer user) is owned by the platform,
+        // its permissions stay editable
+        this.nameControl.disable({emitEvent: false});
+      }
       this.ownCustomerOnlyControl.setValue(!!role.ownCustomerOnly);
       this.ownOnlyDraft = {...(role.ownOnly || {})};
       this.userIds = [...(role.userIds || [])];

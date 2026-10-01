@@ -28,6 +28,8 @@ interface RbacRole {
   userIds: string[];
   ownCustomerOnly?: boolean;
   ownOnly?: { [resource: string]: boolean };
+  /** Role cua nen tang (2 profile customer user): khong the xoa/doi ten. */
+  system?: boolean;
 }
 
 interface PermissionChip {
@@ -256,6 +258,13 @@ export class RolesComponent extends PageComponent implements OnInit {
   }
 
   removeRole(role: RbacRole) {
+    if (role.system) {
+      this.store.dispatch(new ActionNotificationShow({
+        message: this.translate.instant('admin.roles-system-role'),
+        type: 'warn'
+      }));
+      return;
+    }
     this.dialogService.confirm(
       this.translate.instant('admin.roles-delete-title', {name: role.name}),
       this.translate.instant('admin.roles-delete-text'),

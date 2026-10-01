@@ -188,10 +188,32 @@ Trang **Roles** cho phép tạo role tuỳ ý (tên, từng resource/operation, 
 | Database | **không đổi schema**: role nằm trong `admin_settings` (key `roles`) dạng JSON, `userIds` là danh sách gán trực tiếp — API chỉ ghi lại document đó |
 | UI | mục **Roles** trong dialog: mỗi role một checkbox kèm tóm tắt quyền (`DEVICE read, write · DASHBOARD create, read`); role đến từ nhóm user hiện nhãn tên nhóm và chỉ đổi được bằng cách đổi nhóm |
 | Hiệu lực | `accessControlService.onPermissionsChanged()` được gọi sau khi lưu → quyền của user đổi **ngay**, không chờ cache |
+| Audit | mỗi lần đổi quyền có bản ghi trong **Security → Audit logs**: `USER … roles: <danh sách>` (gán trực tiếp), `USER … groups: <nhóm>` (đổi owner/nhóm trong dialog), `TENANT … roles: <danh sách role>` (sửa ở trang Roles) |
 
 Quyền hiệu lực của user = **hợp** của: role gán trực tiếp (ticked trong dialog) + role của các nhóm user
 (`Customer Administrators` / `Customer Users` / nhóm thường). Dialog cảnh báo khi user là `Customer Users` mà còn
 role khác cấp thêm quyền, và có nút **Remove the extra roles** để bỏ gán trực tiếp các role ngoài profile.
+
+### Role hệ thống (2 profile)
+
+Hai role `Customer Administrator` / `Customer User` được trả về với cờ `"system": true`:
+
+- **Không xoá và không đổi tên được**: xoá thì lần đọc sau role được tạo lại, đổi tên thì tên được trả về như cũ
+  (backend gọi `ensureDefaultRoles` cả khi ghi). Trang Roles hiện chip `System` và khoá nút xoá; dialog role khoá ô
+  tên. **Quyền vẫn sửa được** để tenant admin tinh chỉnh profile.
+- Role hệ thống được nhận diện theo `id` (ổn định) hoặc theo tên khi tenant đã có bản ghi cũ — khi đó bản ghi cũ
+  được "nhận" làm role hệ thống và giữ nguyên quyền đã tinh chỉnh.
+
+### Audit log cho thay đổi quyền
+
+| Sự kiện | Bản ghi |
+|---|---|
+| Gán/bỏ role trực tiếp cho user | `USER <email> — UPDATED — info: roles: <role1, role2>` |
+| Đổi owner/nhóm của user (dialog) | `USER <email> — UPDATED — info: groups: <nhóm...>` |
+| Sửa danh sách role của tenant (trang Roles) | `TENANT — UPDATED — info: roles: <role...>` |
+
+Để có dòng `TENANT`, `audit-log.logging-level.mask` trong `thingsboard.yml` được bổ sung `tenant: W`; phần
+`actionData` của `UPDATED` thêm khoá `info` (text do caller truyền) để bản ghi nói rõ **vì sao** entity bị sửa.
 
 ### Ai tạo tài khoản nào (2026-10-01)
 

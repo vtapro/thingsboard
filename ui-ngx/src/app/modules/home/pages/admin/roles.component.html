@@ -42,6 +42,11 @@
                       <th mat-header-cell *matHeaderCellDef translate>admin.roles-name</th>
                       <td mat-cell *matCellDef="let role">
                         <div class="tb-roles-cell-strong">{{ role.name }}</div>
+                        @if (role.system) {
+                          <span class="tb-roles-system-chip" [matTooltip]="'admin.roles-system-role-hint' | translate">
+                            {{ 'admin.roles-system' | translate }}
+                          </span>
+                        }
                       </td>
                     </ng-container>
                     <ng-container matColumnDef="permissions">
@@ -69,7 +74,9 @@
                           <mat-icon>edit_outlined</mat-icon>
                         </button>
                         <button mat-icon-button type="button" (click)="removeRole(role)"
-                                [matTooltip]="'admin.roles-delete-title' | translate: {name: role.name}">
+                                [disabled]="role.system"
+                                [matTooltip]="(role.system ? 'admin.roles-system-role-hint' : 'admin.roles-delete-title')
+                                              | translate: {name: role.name}">
                           <mat-icon>delete_outline</mat-icon>
                         </button>
                       </td>
