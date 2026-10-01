@@ -99,3 +99,31 @@
 .tb-manage-owner-info-line {
   margin-top: 6px;
 }
+
+.tb-manage-owner-role-extra {
+  font-weight: 600;
+}
+
+.tb-manage-owner-role-tag {
+  margin-left: 4px;
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 11px;
+  background: #fde7e9;
+  color: #a2201f;
+  white-space: nowrap;
+}
+
+.tb-manage-owner-warning {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  background: #fdf3e6;
+  color: #7a4b12;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.tb-manage-owner-warning-action {
+  margin-top: 8px;
+}

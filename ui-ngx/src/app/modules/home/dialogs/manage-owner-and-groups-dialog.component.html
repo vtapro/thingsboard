@@ -66,12 +66,35 @@
       <span class="tb-manage-owner-roles-label">{{ 'owner-and-groups.effective-roles' | translate }}</span>
       @if (!rolesLoaded) {
         <span class="tb-manage-owner-roles-value">{{ 'common.loading' | translate }}</span>
-      } @else if (effectiveRoleNames.length) {
-        <span class="tb-manage-owner-roles-value">{{ effectiveRoleNames.join(', ') }}</span>
+      } @else if (effectiveRoles.length) {
+        <span class="tb-manage-owner-roles-value">
+          @for (role of effectiveRoles; track role.name; let last = $last) {
+            <span [class.tb-manage-owner-role-extra]="!role.profile">{{ role.name }}</span>@if (!role.profile) {
+              <span class="tb-manage-owner-role-tag">{{ 'owner-and-groups.extra-role' | translate }}</span>
+            }@if (!last) {
+              <span>, </span>
+            }
+          }
+        </span>
       } @else {
         <span class="tb-manage-owner-roles-value">{{ 'owner-and-groups.no-roles' | translate }}</span>
       }
     </div>
+    @if (extraRoles.length) {
+      <div class="tb-manage-owner-warning">
+        {{ 'owner-and-groups.extra-roles-warning' | translate:{roles: extraRoleNames} }}
+        @if (isPlainCustomerProfile) {
+          <div class="tb-manage-owner-info-line">{{ 'owner-and-groups.extra-roles-plain-hint' | translate }}</div>
+        }
+        <div class="tb-manage-owner-warning-action">
+          <button mat-stroked-button color="primary" type="button"
+                  [disabled]="saving"
+                  (click)="removeExtraRoles()">
+            {{ 'owner-and-groups.remove-extra-roles' | translate }}
+          </button>
+        </div>
+      </div>
+    }
     @if (onlySystemGroups || data.ownerEditable === false) {
       <div class="tb-manage-owner-info">
         {{ 'owner-and-groups.system-hint' | translate }}

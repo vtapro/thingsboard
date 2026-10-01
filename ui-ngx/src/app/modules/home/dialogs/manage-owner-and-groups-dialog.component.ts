@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Component, Inject, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { TranslateService } from '@ngx-translate/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { EntityGroupMember, EntityGroupService } from '@core/http/entity-group.service';
 import { defaultHttpOptionsFromConfig } from '@core/http/http-utils';
+import { DialogService } from '@core/services/dialog.service';
 import { UserService } from '@core/http/user.service';
 import { EntityType } from '@shared/models/entity-type.models';
 import { User } from '@shared/models/user.model';
@@ -32,6 +34,18 @@ export interface ManageOwnerAndGroupsDialogData {
   user?: User;
 }
 
+const CUSTOMER_PROFILE_ROLE_NAMES = ['Customer Administrator', 'Customer User'];
+
+interface EffectiveRole {
+  name: string;
+  /** One of the two profiles of a customer user. */
+  profile: boolean;
+  /** Assigned to the user itself (the other roles come from a user group). */
+  direct: boolean;
+  /** Names of the user groups that carry the role. */
+  groups: string[];
+}
+
 @Component({
   selector: 'tb-manage-owner-and-groups-dialog',
   templateUrl: './manage-owner-and-groups-dialog.component.html',
@@ -48,10 +62,10 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
   loading = true;
   saving = false;
   /**
-   * Names of the custom roles that grant the permissions of the user (assigned to the user directly or through one
-   * of its user groups). An empty list means the platform permissions of its authority apply.
+   * Custom roles that grant the permissions of the user (assigned to the user directly or through one of its user
+   * groups). An empty list means the platform permissions of its authority apply.
    */
-  effectiveRoleNames: string[] = [];
+  effectiveRoles: EffectiveRole[] = [];
   rolesLoaded = false;
 
   constructor(protected store: Store<AppState>,
@@ -60,6 +74,8 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
               public dialogRef: MatDialogRef<ManageOwnerAndGroupsDialogComponent, boolean>,
               private fb: UntypedFormBuilder,
               private http: HttpClient,
+              private dialogService: DialogService,
+              private translate: TranslateService,
               private entityGroupService: EntityGroupService,
               private userService: UserService) {
     super(store, router, dialogRef);
@@ -94,21 +110,35 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
       '/api/tenant/role', options).subscribe({
       next: (settings) => {
         const roles = settings?.roles || [];
-        const roleIds = new Set<string>();
-        roles.forEach(role => {
-          if (role.userIds && role.userIds.includes(userId)) {
-            roleIds.add(role.id);
-          }
-        });
-        this.http.get<{ groups: Array<{ userIds?: string[]; roleIds?: string[] }> }>(
+        this.http.get<{ groups: Array<{ name?: string; userIds?: string[]; roleIds?: string[] }> }>(
           '/api/tenant/userGroup', options).subscribe({
           next: (userGroups) => {
-            (userGroups?.groups || []).forEach(group => {
-              if (group.userIds && group.userIds.includes(userId)) {
-                (group.roleIds || []).forEach(roleId => roleIds.add(roleId));
+            const roleSources = new Map<string, { names: string[]; direct: boolean }>();
+            roles.forEach(role => {
+              if (role.userIds && role.userIds.includes(userId)) {
+                roleSources.set(role.id, {names: [], direct: true});
               }
             });
-            this.effectiveRoleNames = roles.filter(role => roleIds.has(role.id)).map(role => role.name);
+            (userGroups?.groups || []).forEach(group => {
+              if (group.userIds && group.userIds.includes(userId)) {
+                (group.roleIds || []).forEach(roleId => {
+                  const source = roleSources.get(roleId) || {names: [], direct: false};
+                  if (group.name && !source.names.includes(group.name)) {
+                    source.names.push(group.name);
+                  }
+                  roleSources.set(roleId, source);
+                });
+              }
+            });
+            this.effectiveRoles = roles.filter(role => roleSources.has(role.id)).map(role => {
+              const source = roleSources.get(role.id);
+              return {
+                name: role.name,
+                profile: CUSTOMER_PROFILE_ROLE_NAMES.includes(role.name),
+                direct: source.direct,
+                groups: source.names
+              };
+            });
             this.rolesLoaded = true;
           },
           error: () => {
@@ -140,6 +170,66 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
 
   get isTenantAdmin(): boolean {
     return this.data.user?.authority === Authority.TENANT_ADMIN;
+  }
+
+  /** Roles that add permissions on top of the profile of the customer user (they are not the profile itself). */
+  get extraRoles(): EffectiveRole[] {
+    return this.effectiveRoles.filter(role => !role.profile);
+  }
+
+  /** True when the user is a plain customer user, so any extra role adds permissions to a read-only profile. */
+  get isPlainCustomerProfile(): boolean {
+    return this.groups.some(group => group.member && group.name === 'Customer Users');
+  }
+
+  get extraRoleNames(): string {
+    return this.extraRoles.map(role => role.name).join(', ');
+  }
+
+  /**
+   * Drops the direct assignment of the user to the roles that are not one of the two customer user profiles, so the
+   * permissions of the user are exactly the ones of its groups (the profile). The roles itself and the assignments of
+   * the other users are not touched.
+   */
+  removeExtraRoles(): void {
+    if (!this.extraRoles.length || this.saving) {
+      return;
+    }
+    this.dialogService.confirm(
+      this.translate.instant('owner-and-groups.remove-extra-roles-title'),
+      this.translate.instant('owner-and-groups.remove-extra-roles-text', {roles: this.extraRoleNames}),
+      this.translate.instant('action.cancel'),
+      this.translate.instant('owner-and-groups.remove-extra-roles'),
+      true
+    ).subscribe((confirmed) => {
+      if (!confirmed) {
+        return;
+      }
+      this.saving = true;
+      const options = defaultHttpOptionsFromConfig({});
+      this.http.get<{ roles: Array<{ id: string; name: string; userIds?: string[] }> }>(
+        '/api/tenant/role', options).subscribe({
+        next: (settings) => {
+          (settings?.roles || []).forEach(role => {
+            if (!CUSTOMER_PROFILE_ROLE_NAMES.includes(role.name) && role.userIds) {
+              role.userIds = role.userIds.filter(id => id !== this.data.entityId);
+            }
+          });
+          this.http.post('/api/tenant/role', {roles: settings?.roles || []}, options).subscribe({
+            next: () => {
+              this.saving = false;
+              this.loadEffectiveRoles();
+            },
+            error: () => {
+              this.saving = false;
+            }
+          });
+        },
+        error: () => {
+          this.saving = false;
+        }
+      });
+    });
   }
 
   isMember(group: EntityGroupMember): boolean {
