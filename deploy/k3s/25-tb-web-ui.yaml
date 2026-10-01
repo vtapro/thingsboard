@@ -48,7 +48,7 @@ spec:
         - name: tb-web-ui
           # Release v4.4.0.5 = v4.4.0.4 + bao ve tai khoan TENANT_ADMIN (khong the disable/login-as),
           # nhom thuc the cho Customers/Users (bam duoc vao nhom All) va cac fix RBAC/customer hierarchy.
-          image: ghcr.io/vtapro/tb-web-ui:v4.4.0.12
+          image: ghcr.io/vtapro/tb-web-ui:v4.4.0.13
           imagePullPolicy: Always
           env:
             - name: NODE_ENV
