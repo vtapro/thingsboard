@@ -21,35 +21,34 @@ production của ThingsBoard. Khác biệt với môi trường dev (xem [local-
 > nằm ở [`deploy/k3s/SCALING.md`](../deploy/k3s/SCALING.md). Mục 3.3 và §10 dưới đây mô tả cụm 3 node cũ;
 > khi nâng cấp hãy đọc SCALING.md trước.
 
-> **Cập nhật (2026-10-01): release `v4.4.0.11`** — gom toàn bộ phần RBAC/quyền làm trên local:
+> **Cập nhật (2026-10-01): release `v4.4.0.12`** — tiếp phần quyền:
 >
-> **(a) Gán role tuỳ biến trực tiếp cho user:** API `GET/POST /api/tenant/user/{userId}/roles` (chỉ TENANT_ADMIN +
-> `ADMIN_SETTINGS`); dialog **Manage owner and groups** có mục **Roles** liệt kê mọi role của tenant kèm tóm tắt quyền,
-> tick = gán trực tiếp; quyền hiệu lực = hợp các role và đổi **ngay**.
+> **(a) Khách tự nhận thiết bị đã mua (claiming):** nút **Claim device** trong menu Add của trang Devices (hiện theo
+> quyền `CLAIM_DEVICES`), dialog nhập *tên thiết bị* + *secret*; thiết bị nhà cung cấp đăng ký sẵn được gán về đúng
+> customer của khách. Profile `Customer User` được cấp `CLAIM_DEVICES` (+ `READ_ATTRIBUTES`/`READ_TELEMETRY` để
+> dashboard vẫn chạy) nhưng **không** được tạo thiết bị mới.
 >
-> **(b) Role hệ thống:** `Customer Administrator` / `Customer User` trả `"system": true`, không xoá/đổi tên được
-> (UI khoá, backend tự khôi phục), quyền vẫn sửa được.
+> **(b) Nâng cấp profile một lần:** role hệ thống có `defaultVersion`; tenant cũ tự merge quyền mặc định mới **một
+> lần** rồi giữ nguyên mọi tinh chỉnh sau đó của admin (tránh việc “sửa xong bị ghi đè”).
 >
-> **(c) Audit trail cho thay đổi quyền:** `USER … roles: …`, `USER … groups: …`, `TENANT … roles: …` trong
-> Security → Audit logs (thêm `info` vào `actionData` của UPDATED + mask `tenant: W`).
+> **(c) Chặn trùng tên role:** hai role của tenant không thể cùng tên (`400` với thông báo rõ) — trước đây có thể
+> tạo 2 role cùng tên `Customer User` gây nhầm lẫn.
 >
-> **(d) Sửa lỗi UI/quyền:** nút Delete chỉ bật khi role có `DELETE` (khớp backend), customer user không xoá được
-> customer của chính mình, bỏ 2 nhóm `Tenant Administrators`/`Tenant Users` (PE không có), bỏ chữ “ThingsBoard”
-> khỏi UI (white-label), dialog giải thích rõ profile + cảnh báo role phụ.
+> **(d) Cập nhật settings nguyên tử:** sửa role/nhóm (kể cả 2 admin cùng lúc) không còn ghi đè lẫn nhau; dialog báo
+> rõ bước nào lỗi và nạp lại trạng thái thật.
 >
 > Schema không đổi so với `v4.4.0.5` nên **bỏ qua job `tb-install`**.
 >
-> Đã roll cụm production (2026-10-01): `tb-core`, `tb-rule-engine` (`ghcr.io/vtapro/tb-node:v4.4.0.11`) và
-> `tb-web-ui` (`ghcr.io/vtapro/tb-web-ui:v4.4.0.11`) — pod Running 1/1; `https://app.greeniq.vn` = 200. Transport và
-> `tb-js-executor` giữ `v4.4.0.7` (không đổi code). Chiến lược rollingUpdate tạm `maxSurge=0/maxUnavailable=1` khi
-> roll rồi trả lại `25%/25%`.
+> Đã roll cụm production (2026-10-01): `tb-core`, `tb-rule-engine` (`tb-node:v4.4.0.12`) và `tb-web-ui`
+> (`tb-web-ui:v4.4.0.12`) — pod Running 1/1; `https://app.greeniq.vn` = 200. Transport / `tb-js-executor` giữ
+> `v4.4.0.7`.
 >
 > **Sự cố GHCR đã khắc phục (2026-10-01):** các node k3s **không có route IPv6 ra internet**, nhưng containerd
 > lại ưu tiên bản ghi AAAA của `ghcr.io` / `pkg-containers.githubusercontent.com` → pull lỗi
 > `read: connection reset by peer` (rollout treo ở ImagePullBackOff). Đã ghim IPv4 cho 2 host đó trong
 > `/etc/hosts` của **cả 4 node** bằng DaemonSet `tb-ghcr-ipv4` (`deploy/k3s/99-ghcr-ipv4-hosts.yaml`), idempotent
 > và tự chạy lại sau khi node reboot. Kiểm chứng: DaemonSet `imagePullPolicy: Always` pull
-> `ghcr.io/vtapro/tb-web-ui:v4.4.0.11` thành công trên 100% node.
+> `ghcr.io/vtapro/tb-web-ui:v4.4.0.12` thành công trên 100% node.
 
 > **HPA cho giai đoạn ít tải (2026-10-01):** ghim **1 replica / service** — `minReplicas = maxReplicas = 1` cho cả
 > 6 HPA trong `deploy/k3s/40-hpa.yaml`, và trên cụm đã patch tương ứng + `kubectl scale deploy --replicas=1` nên
@@ -110,19 +109,19 @@ cluster. Nếu muốn id ổn định qua các lần restart, dùng `StatefulSet
 ## 2. Build image lên GHCR
 
 Mỗi ThingsBoard service có **một image riêng**, đặt tên theo service, version sản phẩm hiện tại
-**`v4.4.0.11`** (tag Git dùng để phát hành; `IMAGE_VERSION` trong workflow vẫn là `v4.4.0.0` — release
-`v4.4.0.11` phát hành bằng git tag, xem §2.2):
+**`v4.4.0.12`** (tag Git dùng để phát hành; `IMAGE_VERSION` trong workflow vẫn là `v4.4.0.0` — release
+`v4.4.0.12` phát hành bằng git tag, xem §2.2):
 
 | Service | Image |
 |---|---|
-| tb-node (monolith / tb-core / tb-rule-engine, kiêm job installer) | `ghcr.io/vtapro/tb-node:v4.4.0.11` |
-| tb-mqtt-transport | `ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.11` |
-| tb-http-transport | `ghcr.io/vtapro/tb-http-transport:v4.4.0.11` |
-| tb-coap-transport | `ghcr.io/vtapro/tb-coap-transport:v4.4.0.11` |
-| tb-lwm2m-transport | `ghcr.io/vtapro/tb-lwm2m-transport:v4.4.0.11` |
-| tb-snmp-transport | `ghcr.io/vtapro/tb-snmp-transport:v4.4.0.11` |
-| tb-edqs | `ghcr.io/vtapro/tb-edqs:v4.4.0.11` |
-| tb-vc-executor | `ghcr.io/vtapro/tb-vc-executor:v4.4.0.11` |
+| tb-node (monolith / tb-core / tb-rule-engine, kiêm job installer) | `ghcr.io/vtapro/tb-node:v4.4.0.12` |
+| tb-mqtt-transport | `ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.12` |
+| tb-http-transport | `ghcr.io/vtapro/tb-http-transport:v4.4.0.12` |
+| tb-coap-transport | `ghcr.io/vtapro/tb-coap-transport:v4.4.0.12` |
+| tb-lwm2m-transport | `ghcr.io/vtapro/tb-lwm2m-transport:v4.4.0.12` |
+| tb-snmp-transport | `ghcr.io/vtapro/tb-snmp-transport:v4.4.0.12` |
+| tb-edqs | `ghcr.io/vtapro/tb-edqs:v4.4.0.12` |
+| tb-vc-executor | `ghcr.io/vtapro/tb-vc-executor:v4.4.0.12` |
 
 Lưu ý: `greeniq-backend` / `greeniq-frontend` trên GHCR đã là của ứng dụng khác
 (`greeniq-backend:v2.8.2.69`), nên nền tảng ThingsBoard dùng nhóm `tb-*` để không đụng tên.
@@ -147,7 +146,7 @@ nên mỗi pod chỉ mang đúng những gì nó chạy.
 > Trong lúc chờ, vẫn build image bằng tay: `docker build -f docker/tb-custom/Dockerfile -t ... .`
 > và `docker push` lên GHCR.
 
-Mỗi image được gắn 4 tag giống nhau: `:v4.4.0.11` (tag để deploy), `:<branch>`, `:sha-<short>`
+Mỗi image được gắn 4 tag giống nhau: `:v4.4.0.12` (tag để deploy), `:<branch>`, `:sha-<short>`
 (truy vết commit) và `:latest` (chỉ trên default branch).
 
 ### 2.1. Build/push khi máy có Docker
@@ -161,18 +160,18 @@ mvn -B -T 1C clean install -DskipTests \
 mkdir -p /tmp/jars && cp application/target/thingsboard-4.4.0-SNAPSHOT-boot.jar /tmp/jars/tb-node.jar
 docker build -f docker/msa/Dockerfile.tb-node \
   --build-context jars=/tmp/jars --build-arg SERVICE_JAR=tb-node.jar \
-  -t ghcr.io/vtapro/tb-node:v4.4.0.11 .
+  -t ghcr.io/vtapro/tb-node:v4.4.0.12 .
 
 # mqtt transport (lặp lại cho http/coap/lwm2m/snmp/edqs/vc-executor, đổi jar tương ứng)
 cp transport/mqtt/target/tb-mqtt-transport-4.4.0-SNAPSHOT-boot.jar /tmp/jars/tb-mqtt-transport.jar
 docker build -f docker/msa/Dockerfile.service \
   --build-context jars=/tmp/jars --build-arg SERVICE_JAR=tb-mqtt-transport.jar \
-  -t ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.11 .
+  -t ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.12 .
 
 # đăng nhập GHCR (PAT cần scope write:packages) rồi push
 echo "$CR_PAT" | docker login ghcr.io -u vtapro --password-stdin
-docker push ghcr.io/vtapro/tb-node:v4.4.0.11
-docker push ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.11
+docker push ghcr.io/vtapro/tb-node:v4.4.0.12
+docker push ghcr.io/vtapro/tb-mqtt-transport:v4.4.0.12
 ```
 
 ### 2.2. Không có Docker ở máy dev — dùng GitHub Actions
@@ -208,7 +207,7 @@ git push origin RBAC-full-groups-tabs
 gh run watch
 
 # 4. kiểm tra image đã lên GHCR (8 package tb-*)
-docker manifest inspect ghcr.io/vtapro/tb-node:v4.4.0.11    # nếu có docker
+docker manifest inspect ghcr.io/vtapro/tb-node:v4.4.0.12    # nếu có docker
 # hoặc xem trực tiếp: https://github.com/vtapro?tab=packages
 ```
 
@@ -563,8 +562,8 @@ kubectl apply -f deploy/k3s/04-kafka.yaml
 kubectl -n thingsboard rollout status statefulset/tb-zookeeper --timeout=5m
 kubectl -n thingsboard rollout status statefulset/tb-kafka --timeout=5m
 
-# 3. image đã mặc định là ghcr.io/vtapro/tb-*:v4.4.0.11 trong manifest;
-#    chỉ đổi tag khi roll bản mới, ví dụ: sed -i '' 's#:v4.4.0.11#:v4.4.0.11#' deploy/k3s/*.yaml
+# 3. image đã mặc định là ghcr.io/vtapro/tb-*:v4.4.0.12 trong manifest;
+#    chỉ đổi tag khi roll bản mới, ví dụ: sed -i '' 's#:v4.4.0.12#:v4.4.0.12#' deploy/k3s/*.yaml
 
 # 4. cài/cập nhật schema — 1 lần cho mỗi release, TRƯỚC khi rolling service
 kubectl apply -f deploy/k3s/10-install-job.yaml

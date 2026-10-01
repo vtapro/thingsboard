@@ -1,0 +1,39 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Thingsboard Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<form [formGroup]="claimFormGroup" (ngSubmit)="claim()">
+  <mat-toolbar color="primary" class="tb-dialog-header">
+    <h2>{{ 'device.claim-device' | translate }}</h2>
+    <span class="flex-1"></span>
+    <button mat-icon-button type="button" (click)="cancel()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </mat-toolbar>
+  <mat-dialog-content class="tb-device-claim-content">
+    <div class="tb-device-claim-hint">{{ 'device.claim-hint' | translate }}</div>
+    <mat-form-field class="mat-block" appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'device.device-name' | translate }}</mat-label>
+      <input matInput formControlName="deviceName" required>
+      @if (claimFormGroup.get('deviceName').hasError('required')) {
+        <mat-error>{{ 'device.device-name-required' | translate }}</mat-error>
+      }
+    </mat-form-field>
+    <mat-form-field class="mat-block" appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'device.claim-secret' | translate }}</mat-label>
+      <input matInput formControlName="secretKey">
+    </mat-form-field>
+    @if (errorMessage) {
+      <div class="tb-device-claim-error">{{ errorMessage | translate }}</div>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">{{ 'action.cancel' | translate }}</button>
+    <button mat-raised-button color="primary" type="submit"
+            [disabled]="claimFormGroup.invalid || claimFormGroup.disabled">
+      {{ 'device.claim-device' | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

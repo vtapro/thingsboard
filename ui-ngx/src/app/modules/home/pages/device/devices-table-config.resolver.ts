@@ -73,6 +73,7 @@ import {
   DeviceCheckConnectivityDialogComponent,
   DeviceCheckConnectivityDialogData
 } from '@home/pages/device/device-check-connectivity-dialog.component';
+import { DeviceClaimDialogComponent } from '@home/pages/device/device-claim-dialog.component';
 import { EntityId } from '@shared/models/id/entity-id';
 import { ItemType } from '@shared/models/iot-hub/iot-hub-item.models';
 import { IotHubActionsService } from '@home/components/iot-hub/iot-hub-actions.service';
@@ -444,6 +445,14 @@ export class DevicesTableConfigResolver  {
           icon: 'insert_drive_file',
           isEnabled: () => hasExplicitRbacPermission('DEVICE', 'CREATE'),
           onAction: ($event) => this.deviceWizard($event)
+        },
+        {
+          // the flow for an end user that buys a device: the provider pre-registered it, the user enters the name and
+          // the secret of the device and it becomes a device of its customer (no access token involved)
+          name: this.translate.instant('device.claim-device'),
+          icon: 'link',
+          isEnabled: () => hasExplicitRbacPermission('DEVICE', 'CLAIM_DEVICES'),
+          onAction: ($event) => this.claimDevice($event)
         }
       );
     }
@@ -479,6 +488,21 @@ export class DevicesTableConfigResolver  {
   importDevices($event: Event) {
     this.homeDialogs.importEntities(EntityType.DEVICE).subscribe((res) => {
       if (res) {
+        this.broadcast.broadcast('deviceSaved');
+        this.config.updateData();
+      }
+    });
+  }
+
+  claimDevice($event: Event) {
+    if ($event) {
+      $event.stopPropagation();
+    }
+    this.dialog.open<DeviceClaimDialogComponent, null, boolean>(DeviceClaimDialogComponent, {
+      disableClose: true,
+      panelClass: ['tb-dialog', 'tb-fullscreen-dialog']
+    }).afterClosed().subscribe((claimed) => {
+      if (claimed) {
         this.broadcast.broadcast('deviceSaved');
         this.config.updateData();
       }

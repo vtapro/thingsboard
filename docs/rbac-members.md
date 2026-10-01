@@ -194,6 +194,23 @@ Quyền hiệu lực của user = **hợp** của: role gán trực tiếp (tick
 (`Customer Administrators` / `Customer Users` / nhóm thường). Dialog cảnh báo khi user là `Customer Users` mà còn
 role khác cấp thêm quyền, và có nút **Remove the extra roles** để bỏ gán trực tiếp các role ngoài profile.
 
+### Khách tự thêm thiết bị mình mua (claiming)
+
+Luồng chuẩn cho "khách mua thiết bị về cắm" (không cần lộ access token):
+
+1. **Nhà cung cấp (tenant)** đăng ký thiết bị trước (trang Devices) — thiết bị **chưa gán customer**.
+2. Thiết bị gửi *claim request* kèm **secret** (in trên tem/QR) — hoặc nhà cung cấp ghi server attribute
+   `claimingData` = `{"secretKey": "...", "expirationTime": <ms>}`.
+3. **Khách** (profile `Customer User`) vào **Devices → Add device → Claim device**, nhập *tên thiết bị* + *secret* →
+   thiết bị được gán vào **customer của khách** và hiện ngay trong danh sách của họ.
+
+| Thành phần | Nội dung |
+|---|---|
+| API | `POST /api/customer/device/{deviceName}/claim` `{"secretKey": "..."}` (CUSTOMER_USER + quyền `CLAIM_DEVICES`), trả `SUCCESS` / `FAILURE` / `CLAIMED` |
+| UI | nút **Claim device** trong menu Add của trang Devices (chỉ hiện khi role có `CLAIM_DEVICES`) → dialog nhập tên + secret, báo lỗi rõ khi sai |
+| Quyền | `Customer User` có `CLAIM_DEVICES` mặc định; role tự tạo phải tick `Claim devices` ở resource DEVICE. Nếu role là "chi tiết" thì cần tick kèm `READ_ATTRIBUTES`/`READ_TELEMETRY` để dashboard vẫn hiển thị |
+| Nâng cấp profile | role hệ thống có `defaultVersion`; tenant cũ được **merge** quyền mặc định mới **một lần**, sau đó mọi tinh chỉnh của admin được giữ nguyên |
+
 ### Role hệ thống (2 profile)
 
 Hai role `Customer Administrator` / `Customer User` được trả về với cờ `"system": true`:
@@ -237,7 +254,7 @@ Mỗi tenant được cấp sẵn **2 role** và **2 nhóm USER** cùng tên, n�
 | Profile | Nhóm (chọn trong dialog) | Role mặc định | Quyền |
 |---|---|---|---|
 | **Customer Administrator** | `Customer Administrators` | `Customer Administrator` | DEVICE/ASSET/ENTITY_VIEW/DASHBOARD: CREATE-READ-WRITE-DELETE; USER: CREATE-READ-WRITE-DELETE (user của customer mình); CUSTOMER: CREATE-READ-WRITE (sub-customer); ALARM: READ-WRITE; cờ `ownCustomerOnly` → quản lý được cả customer con |
-| **Customer User** | `Customer Users` | `Customer User` | chỉ DEVICE/ASSET/ENTITY_VIEW/DASHBOARD/CUSTOMER: READ, ALARM: READ-WRITE (chỉ xem dữ liệu của customer mình) |
+| **Customer User** | `Customer Users` | `Customer User` | chỉ xem: DEVICE/ASSET/ENTITY_VIEW: READ + READ_ATTRIBUTES + READ_TELEMETRY, DASHBOARD/CUSTOMER: READ, ALARM: READ-WRITE. **Được `CLAIM_DEVICES`** để tự nhận thiết bị nhà cung cấp đã đăng ký sẵn (không tự tạo thiết bị mới) |
 
 - Customer user mới **mặc định thuộc `Customer Users`** (chỉ xem). Tenant admin vào **Manage owner and groups**,
   chuyển user sang `Customer Administrators` là user có quyền tạo/sửa như PE; chuyển ngược lại là thu hồi ngay.

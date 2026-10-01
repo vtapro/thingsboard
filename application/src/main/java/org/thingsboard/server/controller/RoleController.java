@@ -67,6 +67,7 @@ public class RoleController extends BaseController {
             @Parameter(description = "A JSON value representing the roles.")
             @RequestBody RbacRoleSettings settings) throws ThingsboardException {
         accessControlService.checkPermission(getCurrentUser(), Resource.ADMIN_SETTINGS, Operation.WRITE);
+        validateUniqueRoleNames(settings);
         validateScopedPermissions(settings);
         RbacRoleSettings saved = roleService.saveRoleSettings(getCurrentUser().getTenantId(), settings);
         // the effective permissions of every user of the tenant change with the roles
@@ -174,6 +175,27 @@ public class RoleController extends BaseController {
                     isDirect || !groups.isEmpty(), groups));
         }
         return new UserRoleAssignments(userId, roles);
+    }
+
+    /**
+     * The name of a role identifies it for the administrator (and the two profiles of a customer user are matched by
+     * name when they are read), so two roles of a tenant may not share a name.
+     */
+    private void validateUniqueRoleNames(RbacRoleSettings settings) {
+        if (settings == null || settings.getRoles() == null) {
+            return;
+        }
+        Set<String> names = new HashSet<>();
+        for (RbacRole role : settings.getRoles()) {
+            if (role.getName() == null || role.getName().isBlank()) {
+                throw new IncorrectParameterException("The name of a role is required");
+            }
+            String name = role.getName().trim();
+            if (!names.add(name.toLowerCase(java.util.Locale.ENGLISH))) {
+                throw new IncorrectParameterException("There is already a role named '" + name
+                        + "'. Choose another name.");
+            }
+        }
     }
 
     private void validateScopedPermissions(RbacRoleSettings settings) {

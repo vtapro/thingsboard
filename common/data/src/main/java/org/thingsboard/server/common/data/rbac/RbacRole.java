@@ -50,4 +50,11 @@ public class RbacRole implements Serializable {
      */
     private boolean system;
 
+    /**
+     * Version of the platform defaults that were merged into this role. When the platform ships new permissions for
+     * a profile (e.g. the plain customer user may claim its devices) they are merged into the stored role once; after
+     * that the tenant administrator may add or remove permissions and the changes are kept.
+     */
+    private int defaultVersion;
+
 }

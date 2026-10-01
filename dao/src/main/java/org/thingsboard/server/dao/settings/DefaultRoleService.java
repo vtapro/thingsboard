@@ -39,6 +39,14 @@ public class DefaultRoleService implements RoleService {
      */
     public static final String CUSTOMER_ADMIN_ROLE_NAME = "Customer Administrator";
     public static final String CUSTOMER_USER_ROLE_NAME = "Customer User";
+    /**
+     * Version of the pre-configured permissions of the two profiles. It is stored on the role, so a tenant that was
+     * created with an older version gets the new default permissions merged in once (see ensureDefaultRoles), while
+     * the later changes of the tenant administrator are kept.
+     *
+     * <p>1: the initial profiles; 2: the plain customer user may claim the devices of the provider (CLAIM_DEVICES).</p>
+     */
+    private static final int PROFILE_DEFAULT_VERSION = 2;
 
     private final AdminSettingsService adminSettingsService;
     private final UserGroupService userGroupService;
@@ -96,9 +104,35 @@ public class DefaultRoleService implements RoleService {
                 // its permissions (they are kept), but its name and its existence are owned by the platform
                 stored.setSystem(true);
                 stored.setName(role.getName());
+                if (stored.getDefaultVersion() < PROFILE_DEFAULT_VERSION) {
+                    // merge the new platform defaults once, then remember that the role is up to date
+                    mergeDefaultPermissions(role, stored);
+                    stored.setDefaultVersion(PROFILE_DEFAULT_VERSION);
+                }
             }
         }
         return settings;
+    }
+
+    /**
+     * Adds the operations of the platform defaults that the stored role does not have yet (the administrator may have
+     * removed some of them later, the version prevents us from adding them again).
+     */
+    private static void mergeDefaultPermissions(RbacRole source, RbacRole target) {
+        if (source.getPermissions() == null) {
+            return;
+        }
+        if (target.getPermissions() == null) {
+            target.setPermissions(new LinkedHashMap<>());
+        }
+        source.getPermissions().forEach((resource, operations) -> {
+            List<String> merged = target.getPermissions().computeIfAbsent(resource, r -> new ArrayList<>());
+            for (String operation : operations) {
+                if (!merged.contains(operation)) {
+                    merged.add(operation);
+                }
+            }
+        });
     }
 
     /** Stable id of a default role, so the default user groups may reference it before it is persisted. */
@@ -122,6 +156,7 @@ public class DefaultRoleService implements RoleService {
         role.setName(CUSTOMER_ADMIN_ROLE_NAME);
         role.setPermissions(permissions);
         role.setSystem(true);
+        role.setDefaultVersion(PROFILE_DEFAULT_VERSION);
         // the administrator manages its own customer and, when the tenant administrator declares them in the
         // Customer hierarchy tab, the sub-customers of that customer
         role.setOwnCustomerOnly(true);
@@ -129,9 +164,13 @@ public class DefaultRoleService implements RoleService {
     }
 
     private RbacRole customerUserRole(TenantId tenantId) {
-        List<String> read = List.of("READ");
+        // The plain user only reads the telemetry of its customer, but it may claim the devices that the provider
+        // pre-registered for it (the device sends a claim request with a secret, the user enters it in the UI). A
+        // role that lists an operation outside the four basic ones is a "detailed" role, so every auxiliary operation
+        // the dashboards of the user need is listed explicitly.
+        List<String> read = List.of("READ", "READ_ATTRIBUTES", "READ_TELEMETRY");
         Map<String, List<String>> permissions = new LinkedHashMap<>();
-        permissions.put("DEVICE", read);
+        permissions.put("DEVICE", List.of("READ", "READ_ATTRIBUTES", "READ_TELEMETRY", "CLAIM_DEVICES"));
         permissions.put("ASSET", read);
         permissions.put("ENTITY_VIEW", read);
         permissions.put("DASHBOARD", read);
@@ -143,16 +182,33 @@ public class DefaultRoleService implements RoleService {
         role.setName(CUSTOMER_USER_ROLE_NAME);
         role.setPermissions(permissions);
         role.setSystem(true);
+        role.setDefaultVersion(PROFILE_DEFAULT_VERSION);
         return role;
     }
 
     @Override
     public RbacRoleSettings saveRoleSettings(TenantId tenantId, RbacRoleSettings settings) {
         synchronized (locks.lockFor(tenantId)) {
+            RbacRoleSettings incoming = settings != null ? settings : new RbacRoleSettings();
+            // the client (WEB UI) does not send the platform metadata of a role back: carry it over, otherwise the
+            // platform would merge the default permissions again (and undo the tuning of the administrator)
+            RbacRoleSettings stored = readRoleSettings(tenantId);
+            if (incoming.getRoles() != null && stored.getRoles() != null) {
+                for (RbacRole role : incoming.getRoles()) {
+                    for (RbacRole existing : stored.getRoles()) {
+                        if (role.getId() != null && role.getId().equals(existing.getId())) {
+                            role.setSystem(existing.isSystem());
+                            if (role.getDefaultVersion() < existing.getDefaultVersion()) {
+                                role.setDefaultVersion(existing.getDefaultVersion());
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
             // the roles of the two profiles of a customer user always exist and keep their name: the platform owns
             // them (their permissions stay editable)
-            settings = ensureDefaultRoles(tenantId, settings != null ? settings : new RbacRoleSettings());
-            return writeRoleSettings(tenantId, settings);
+            return writeRoleSettings(tenantId, ensureDefaultRoles(tenantId, incoming));
         }
     }
 
