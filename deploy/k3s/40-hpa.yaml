@@ -5,6 +5,11 @@
 
 # HorizontalPodAutoscaler cho các service co giãn ngang được.
 #
+# >>> GIAI ĐOẠN ÍT TẢI (2026-10-01): mọi service đang được ghim `minReplicas=maxReplicas=1` (1 pod/service) để
+#     tiết kiệm CPU/RAM khi ít người dùng và ít telemetry. Muốn bật lại co giãn: đặt `maxReplicas` theo bảng
+#     dưới đây (16 cho core/rule-engine/js-executor/mqtt, 8 cho web-ui/http) rồi `kubectl apply -f 40-hpa.yaml`
+#     (hoặc `kubectl -n thingsboard patch hpa <name> --type=merge -p '{"spec":{"maxReplicas":N}}'`).
+#
 # Nguyên tắc: muốn "thêm node + thêm pod = tăng chịu tải" thì max replicas phải <= số partition
 # của queue mà pod đó tiêu thụ, nếu không pod thừa sẽ ngồi không:
 #   * tb-rule-engine  <= TB_QUEUE_RULE_ENGINE_PARTITIONS (32)  -> max 16 (dư địa gấp đôi khi cần)
@@ -33,7 +38,7 @@ spec:
     kind: Deployment
     name: tb-core
   minReplicas: 1
-  maxReplicas: 16
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
@@ -62,7 +67,7 @@ spec:
   minReplicas: 1
   # Trần = TB_QUEUE_RULE_ENGINE_PARTITIONS / 2. Read the partition count from the Tenant profile queue
   # (Main/HighPriority/SequentialByOriginator) before raising this value.
-  maxReplicas: 16
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
@@ -89,7 +94,7 @@ spec:
     kind: Deployment
     name: tb-web-ui
   minReplicas: 1
-  maxReplicas: 8
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
@@ -111,7 +116,7 @@ spec:
     name: tb-js-executor
   minReplicas: 1
   # Trần = partitions của topic tb_js_executor (TB_QUEUE_KAFKA_JE_TOPIC_PROPERTIES, mặc định 30).
-  maxReplicas: 16
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
@@ -140,7 +145,7 @@ spec:
   # 2 replica thường trực: lúc bắt đầu bão kết nối transport cần sẵn sàng, không chờ HPA.
   minReplicas: 1
   # MQTT transport là producer (không bị giới hạn bởi partition); trần thật là số connection + CPU/RAM của node.
-  maxReplicas: 16
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
@@ -167,7 +172,7 @@ spec:
     kind: Deployment
     name: tb-http-transport
   minReplicas: 1
-  maxReplicas: 8
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
