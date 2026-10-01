@@ -12,10 +12,14 @@ import org.thingsboard.server.common.data.rbac.RbacRoleSettings;
 import org.thingsboard.server.common.data.rbac.RbacUserGroup;
 
 import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +29,16 @@ public class DefaultRoleService implements RoleService {
 
     private static final String EFFECTIVE_ROLE_ID = "effective";
 
+    /**
+     * The two profiles of the customer users of PE, pre-configured for the tenant: a "Customer Administrator" may
+     * manage the devices, assets, entity views, dashboards, users and sub-customers of its own customer, a plain
+     * "Customer User" only reads them. The two default user groups of the same name carry the role
+     * (see DefaultUserGroupService), so the tenant administrator switches the profile of a user by moving it to the
+     * matching group in the "Manage owner and groups" dialog.
+     */
+    public static final String CUSTOMER_ADMIN_ROLE_NAME = "Customer Administrator";
+    public static final String CUSTOMER_USER_ROLE_NAME = "Customer User";
+
     private final AdminSettingsService adminSettingsService;
     private final UserGroupService userGroupService;
     private final TenantSettingsLocks locks = new TenantSettingsLocks();
@@ -33,13 +47,76 @@ public class DefaultRoleService implements RoleService {
     public RbacRoleSettings getRoleSettings(TenantId tenantId) {
         AdminSettings adminSettings = adminSettingsService.findAdminSettingsByTenantIdAndKey(tenantId, ROLES_SETTINGS_KEY);
         if (adminSettings == null || adminSettings.getJsonValue() == null) {
-            return new RbacRoleSettings();
+            return ensureDefaultRoles(tenantId, new RbacRoleSettings());
         }
         try {
-            return JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.convertValue(adminSettings.getJsonValue(), RbacRoleSettings.class);
+            return ensureDefaultRoles(tenantId, JacksonUtil.IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER
+                    .convertValue(adminSettings.getJsonValue(), RbacRoleSettings.class));
         } catch (Exception e) {
             throw new RuntimeException("Failed to load roles settings!", e);
         }
+    }
+
+    /**
+     * The two profiles of the customer users are always available: they are completed in memory only (like the
+     * default entity groups) and their id is derived from the tenant and the name, so the default user groups that
+     * reference them keep working and the tenant administrator sees exactly what a customer user may do.
+     */
+    private RbacRoleSettings ensureDefaultRoles(TenantId tenantId, RbacRoleSettings settings) {
+        if (settings.getRoles() == null) {
+            settings.setRoles(new ArrayList<>());
+        }
+        for (RbacRole role : List.of(customerAdminRole(tenantId), customerUserRole(tenantId))) {
+            boolean exists = settings.getRoles().stream()
+                    .anyMatch(stored -> role.getId().equals(stored.getId()) || role.getName().equals(stored.getName()));
+            if (!exists) {
+                settings.getRoles().add(role);
+            }
+        }
+        return settings;
+    }
+
+    /** Stable id of a default role, so the default user groups may reference it before it is persisted. */
+    public static String defaultRoleId(TenantId tenantId, String name) {
+        return UUID.nameUUIDFromBytes(("defaultRole:" + tenantId.getId() + ":" + name)
+                .getBytes(StandardCharsets.UTF_8)).toString();
+    }
+
+    private RbacRole customerAdminRole(TenantId tenantId) {
+        List<String> manage = List.of("CREATE", "READ", "WRITE", "DELETE");
+        Map<String, List<String>> permissions = new LinkedHashMap<>();
+        permissions.put("DEVICE", manage);
+        permissions.put("ASSET", manage);
+        permissions.put("ENTITY_VIEW", manage);
+        permissions.put("DASHBOARD", manage);
+        permissions.put("USER", manage);
+        permissions.put("CUSTOMER", List.of("CREATE", "READ", "WRITE"));
+        permissions.put("ALARM", List.of("READ", "WRITE"));
+        RbacRole role = new RbacRole();
+        role.setId(defaultRoleId(tenantId, CUSTOMER_ADMIN_ROLE_NAME));
+        role.setName(CUSTOMER_ADMIN_ROLE_NAME);
+        role.setPermissions(permissions);
+        // the administrator manages its own customer and, when the tenant administrator declares them in the
+        // Customer hierarchy tab, the sub-customers of that customer
+        role.setOwnCustomerOnly(true);
+        return role;
+    }
+
+    private RbacRole customerUserRole(TenantId tenantId) {
+        List<String> read = List.of("READ");
+        Map<String, List<String>> permissions = new LinkedHashMap<>();
+        permissions.put("DEVICE", read);
+        permissions.put("ASSET", read);
+        permissions.put("ENTITY_VIEW", read);
+        permissions.put("DASHBOARD", read);
+        permissions.put("CUSTOMER", read);
+        // acknowledging an alarm is part of the day to day work of a user that may only read the telemetry
+        permissions.put("ALARM", List.of("READ", "WRITE"));
+        RbacRole role = new RbacRole();
+        role.setId(defaultRoleId(tenantId, CUSTOMER_USER_ROLE_NAME));
+        role.setName(CUSTOMER_USER_ROLE_NAME);
+        role.setPermissions(permissions);
+        return role;
     }
 
     @Override

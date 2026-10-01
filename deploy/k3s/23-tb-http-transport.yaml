@@ -44,7 +44,7 @@ spec:
               app.kubernetes.io/name: tb-http-transport
       containers:
         - name: tb-http-transport
-          image: ghcr.io/vtapro/tb-http-transport:v4.4.0.9
+          image: ghcr.io/vtapro/tb-http-transport:v4.4.0.10
           imagePullPolicy: Always
           envFrom:
             - configMapRef:

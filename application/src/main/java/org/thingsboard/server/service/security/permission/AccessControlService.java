@@ -59,4 +59,12 @@ public interface AccessControlService {
     default void onEntityCreated(SecurityUser user) {
     }
 
+    /**
+     * Called after the permission settings of a tenant changed (roles, entity groups, user groups, shares), so an
+     * implementation that caches them drops the stale entries and the change takes effect immediately instead of
+     * after the cache expires.
+     */
+    default void onPermissionsChanged() {
+    }
+
 }

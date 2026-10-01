@@ -33,6 +33,16 @@ public class DefaultEntityGroupService implements EntityGroupService {
     public static final String TENANT_USERS_GROUP_NAME = "Tenant Users";
     public static final List<String> DEFAULT_USER_GROUP_NAMES =
             List.of(TENANT_ADMINS_GROUP_NAME, TENANT_USERS_GROUP_NAME);
+    /**
+     * The two profiles of a customer user of PE: an administrator of the customer may create and manage the devices,
+     * assets, entity views and dashboards of the customer (and manage its users and sub-customers), a plain user only
+     * reads them. The membership of these two groups is maintained by the tenant administrator in the
+     * "Manage owner and groups" dialog (their roles are pre-configured, see DefaultRoleService).
+     */
+    public static final String CUSTOMER_ADMINS_GROUP_NAME = "Customer Administrators";
+    public static final String CUSTOMER_USERS_GROUP_NAME = "Customer Users";
+    public static final List<String> CUSTOMER_PROFILE_GROUP_NAMES =
+            List.of(CUSTOMER_ADMINS_GROUP_NAME, CUSTOMER_USERS_GROUP_NAME);
 
     /**
      * True when the membership of the group is derived from the platform instead of being maintained by the tenant
@@ -42,6 +52,15 @@ public class DefaultEntityGroupService implements EntityGroupService {
     public static boolean isAuthorityManagedUserGroup(RbacEntityGroup group) {
         return group != null && "USER".equals(group.getEntityType())
                 && DEFAULT_USER_GROUP_NAMES.contains(group.getName());
+    }
+
+    /**
+     * True when the group selects the profile of a customer user (administrator or plain user). The tenant
+     * administrator changes it in the "Manage owner and groups" dialog.
+     */
+    public static boolean isCustomerProfileGroup(RbacEntityGroup group) {
+        return group != null && "USER".equals(group.getEntityType())
+                && CUSTOMER_PROFILE_GROUP_NAMES.contains(group.getName());
     }
 
     /**
@@ -99,18 +118,35 @@ public class DefaultEntityGroupService implements EntityGroupService {
             boolean exists = settings.getGroups().stream()
                     .anyMatch(group -> "USER".equals(group.getEntityType()) && name.equals(group.getName()));
             if (!exists) {
-                RbacEntityGroup group = new RbacEntityGroup();
-                group.setId(defaultUserGroupId(tenantId, name));
-                group.setName(name);
-                group.setEntityType("USER");
-                group.setDescription(TENANT_ADMINS_GROUP_NAME.equals(name)
+                settings.getGroups().add(defaultUserGroup(tenantId, name, TENANT_ADMINS_GROUP_NAME.equals(name)
                         ? "Tenant administrators of the tenant (kept in sync by the platform)"
-                        : "Users of the tenant (kept in sync by the platform)");
-                group.setCreatedTime(System.currentTimeMillis());
-                settings.getGroups().add(group);
+                        : "Users of the tenant (kept in sync by the platform)"));
+            }
+        }
+        // the two profiles of the customer users of PE
+        for (String name : CUSTOMER_PROFILE_GROUP_NAMES) {
+            boolean exists = settings.getGroups().stream()
+                    .anyMatch(group -> "USER".equals(group.getEntityType()) && name.equals(group.getName()));
+            if (!exists) {
+                settings.getGroups().add(defaultUserGroup(tenantId, name,
+                        CUSTOMER_ADMINS_GROUP_NAME.equals(name)
+                                ? "Customer users that manage the devices, assets, entity views and users of their "
+                                        + "customer (permissions of the role 'Customer Administrator')"
+                                : "Customer users that may only read the data of their customer "
+                                        + "(permissions of the role 'Customer User')"));
             }
         }
         return settings;
+    }
+
+    private RbacEntityGroup defaultUserGroup(TenantId tenantId, String name, String description) {
+        RbacEntityGroup group = new RbacEntityGroup();
+        group.setId(defaultUserGroupId(tenantId, name));
+        group.setName(name);
+        group.setEntityType("USER");
+        group.setDescription(description);
+        group.setCreatedTime(System.currentTimeMillis());
+        return group;
     }
 
     /** Stable id of a default user group, so every read returns the same id (see {@link #allGroupId}). */
@@ -179,7 +215,40 @@ public class DefaultEntityGroupService implements EntityGroupService {
                 changed = true;
             }
         }
+        if (Authority.CUSTOMER_USER.equals(authority)) {
+            // A new customer user is a plain user; the tenant administrator promotes it to the administrator of its
+            // customer by moving it to the "Customer Administrators" group in the dialog.
+            changed |= ensureCustomerProfile(settings, entity);
+        }
         return changed;
+    }
+
+    /**
+     * A customer user always has one of the two profiles: when it belongs to neither "Customer Administrators" nor
+     * "Customer Users" it is a plain user. Returns true when the membership changed.
+     */
+    private boolean ensureCustomerProfile(RbacEntityGroupSettings settings, String entity) {
+        boolean memberOfAnyProfile = false;
+        RbacEntityGroup customersUsers = null;
+        for (RbacEntityGroup group : settings.getGroups()) {
+            if (!"USER".equals(group.getEntityType()) || !CUSTOMER_PROFILE_GROUP_NAMES.contains(group.getName())) {
+                continue;
+            }
+            if (group.getEntityIds() != null && group.getEntityIds().contains(entity)) {
+                memberOfAnyProfile = true;
+            }
+            if (CUSTOMER_USERS_GROUP_NAME.equals(group.getName())) {
+                customersUsers = group;
+            }
+        }
+        if (memberOfAnyProfile || customersUsers == null) {
+            return false;
+        }
+        if (customersUsers.getEntityIds() == null) {
+            customersUsers.setEntityIds(new ArrayList<>());
+        }
+        customersUsers.getEntityIds().add(entity);
+        return true;
     }
 
     /** Stable id of the "All" group of an entity type, so the id survives the reads that do not persist it. */

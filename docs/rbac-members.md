@@ -192,6 +192,25 @@ Trang **Users** của tenant admin vì thế tạo thẳng customer user (dialog
 
 ### Quyền theo role của customer user
 
+#### Hai profile của customer user (chuẩn PE) — 2026-10-01
+
+Mỗi tenant được cấp sẵn **2 role** và **2 nhóm USER** cùng tên, nên không phải cấu hình tay:
+
+| Profile | Nhóm (chọn trong dialog) | Role mặc định | Quyền |
+|---|---|---|---|
+| **Customer Administrator** | `Customer Administrators` | `Customer Administrator` | DEVICE/ASSET/ENTITY_VIEW/DASHBOARD: CREATE-READ-WRITE-DELETE; USER: CREATE-READ-WRITE-DELETE (user của customer mình); CUSTOMER: CREATE-READ-WRITE (sub-customer); ALARM: READ-WRITE; cờ `ownCustomerOnly` → quản lý được cả customer con |
+| **Customer User** | `Customer Users` | `Customer User` | chỉ DEVICE/ASSET/ENTITY_VIEW/DASHBOARD/CUSTOMER: READ, ALARM: READ-WRITE (chỉ xem dữ liệu của customer mình) |
+
+- Customer user mới **mặc định thuộc `Customer Users`** (chỉ xem). Tenant admin vào **Manage owner and groups**,
+  chuyển user sang `Customer Administrators` là user có quyền tạo/sửa như PE; chuyển ngược lại là thu hồi ngay.
+- Hai nhóm này **sửa được** trong dialog (khác 3 nhóm hệ thống `All`/`Tenant Administrators`/`Tenant Users`).
+- Nhóm user cùng tên (dùng để gán role) được sinh tự động và **lấy thành viên từ nhóm entity** — dialog là nơi
+  duy nhất quản lý thành viên; role của profile được gán sẵn cho nhóm đó.
+- Muốn tinh chỉnh profile: sửa role `Customer Administrator` / `Customer User` ở trang **Roles** (role là mặc định
+  nhưng vẫn sửa được); muốn cấp thêm quyền cho một nhóm người: tạo role mới và gán cho nhóm thường.
+- Khi đổi role/nhóm, backend **xoá cache quyền** (`AccessControlService.onPermissionsChanged`) nên hiệu lực ngay,
+  không phải chờ 10 giây.
+
 | Resource | Role cấp | Hành vi |
 |---|---|---|
 | `DEVICE`, `ASSET`, `ENTITY_VIEW` | `CREATE` | tạo được; backend gán `customerId` của người tạo + `rbacOwnerId` trước khi kiểm quyền |
@@ -224,6 +243,17 @@ Script tạo customer + role `DEVICE:[CREATE,READ,WRITE,DELETE]` (`ownOnly.DEVIC
 và không đổi được qua API membership; nhóm thường vẫn lưu membership bình thường. Bổ sung `DASHBOARD:CREATE`
 (tạo dashboard → tự gán cho customer của người tạo → sửa lại được) và quy tắc tài khoản quản trị: tenant admin tạo
 `TENANT_ADMIN` → **403**, `SYS_ADMIN` tạo → **200**.
+
+Hai profile customer user có script riêng:
+
+```bash
+/tmp/emu-venv/bin/python scripts/test-customer-profiles-local.py   # 21/21 PASS
+```
+
+Script kiểm tra: tenant có sẵn role `Customer Administrator` / `Customer User` và 2 nhóm cùng tên (có `roleIds`);
+user mới vào `Customer Users` → `GET /api/user/roles` = `[Customer User]`, tạo device **403**; chuyển sang
+`Customer Administrators` → `[Customer Administrator]`, tạo được device + asset + entity view + dashboard (**200**)
+và thêm được user của customer mình; chuyển lại `Customer Users` → tạo device **403** ngay lập tức.
 
 ### Phía WEB UI (3 guard bổ sung)
 

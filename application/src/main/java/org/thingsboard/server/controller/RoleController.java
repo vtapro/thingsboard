@@ -49,7 +49,10 @@ public class RoleController extends BaseController {
             @RequestBody RbacRoleSettings settings) throws ThingsboardException {
         accessControlService.checkPermission(getCurrentUser(), Resource.ADMIN_SETTINGS, Operation.WRITE);
         validateScopedPermissions(settings);
-        return roleService.saveRoleSettings(getCurrentUser().getTenantId(), settings);
+        RbacRoleSettings saved = roleService.saveRoleSettings(getCurrentUser().getTenantId(), settings);
+        // the effective permissions of every user of the tenant change with the roles
+        accessControlService.onPermissionsChanged();
+        return saved;
     }
 
     /**

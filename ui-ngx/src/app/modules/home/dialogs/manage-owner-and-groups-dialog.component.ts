@@ -132,6 +132,12 @@ export class ManageOwnerAndGroupsDialogComponent extends DialogComponent<ManageO
     return this.groups.length > 0 && this.groups.every(group => group.system);
   }
 
+  /** True when the two profiles of a customer user (Customer Administrators / Customer Users) are available. */
+  get hasCustomerProfileGroups(): boolean {
+    return this.data.entityType === EntityType.USER && this.groups.some(group =>
+      group.name === 'Customer Administrators' || group.name === 'Customer Users');
+  }
+
   get isTenantAdmin(): boolean {
     return this.data.user?.authority === Authority.TENANT_ADMIN;
   }

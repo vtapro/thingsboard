@@ -63,7 +63,9 @@ public class EntityGroupController extends BaseController {
             @RequestBody RbacEntityGroupSettings settings) throws ThingsboardException {
         accessControlService.checkPermission(getCurrentUser(), Resource.ADMIN_SETTINGS, Operation.WRITE);
         validateSettings(getCurrentUser().getTenantId(), settings);
-        return entityGroupService.saveEntityGroupSettings(getCurrentUser().getTenantId(), settings);
+        RbacEntityGroupSettings saved = entityGroupService.saveEntityGroupSettings(getCurrentUser().getTenantId(), settings);
+        accessControlService.onPermissionsChanged();
+        return saved;
     }
 
     @ApiOperation(value = "Create Or Update a single entity group (saveEntityGroup)",
@@ -86,7 +88,9 @@ public class EntityGroupController extends BaseController {
             throw new IncorrectParameterException("The All group of an entity type contains every entity of the tenant "
                     + "and can not be modified");
         }
-        return entityGroupService.saveEntityGroup(getCurrentUser().getTenantId(), entityGroup);
+        RbacEntityGroupSettings saved = entityGroupService.saveEntityGroup(getCurrentUser().getTenantId(), entityGroup);
+        accessControlService.onPermissionsChanged();
+        return saved;
     }
 
     @ApiOperation(value = "Delete a single entity group (deleteEntityGroup)",
@@ -105,7 +109,9 @@ public class EntityGroupController extends BaseController {
             throw new IncorrectParameterException("The All group of an entity type contains every entity of the tenant "
                     + "and can not be deleted");
         }
-        return entityGroupService.deleteEntityGroup(getCurrentUser().getTenantId(), groupId);
+        RbacEntityGroupSettings saved = entityGroupService.deleteEntityGroup(getCurrentUser().getTenantId(), groupId);
+        accessControlService.onPermissionsChanged();
+        return saved;
     }
 
     @ApiOperation(value = "Get the entity groups of one entity (getEntityGroupMembers)",
@@ -164,6 +170,9 @@ public class EntityGroupController extends BaseController {
             }
         }
         entityGroupService.saveEntityGroupSettings(getCurrentUser().getTenantId(), settings);
+        // the membership selects the roles of the user (and of the members of a user group), so the effective
+        // permissions must be recomputed right away
+        accessControlService.onPermissionsChanged();
         return entityGroupMembers(id);
     }
 

@@ -29,6 +29,7 @@
         "no-owner-hint": "Owner: a tenant administrator account belongs to the tenant, not to a customer, so it has no owner to change.",
         "system-hint": "The groups are kept by the platform and can not be edited here. Permissions are not set per user: go to Security → Roles, create/edit a role and assign it to this user. To grant the same role to several users at once, create a regular group in the GROUPS tab of the Users page, add the users to it and assign the role to that group.",
         "tenant-admin-hint": "A tenant administrator starts with the full permissions of the tenant; assigning a role only narrows what it may do.",
+        "customer-profile-hint": "Customer user profiles (like ThingsBoard PE): a user in 'Customer Administrators' is the administrator of its customer — it may create and manage devices, assets, entity views and dashboards, and manage the users of that customer (role 'Customer Administrator'); a user in 'Customer Users' may only read the data of its customer (role 'Customer User'). Move the user to the other group to switch the profile; the permissions of the user change immediately.",
         "no-groups": "There is no entity group of this type yet. Create one in the Groups tab of the entity page.",
         "saved": "Owner and groups updated",
         "save-failed": "Failed to update the owner"

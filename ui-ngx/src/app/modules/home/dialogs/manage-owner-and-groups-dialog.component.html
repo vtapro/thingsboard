@@ -80,6 +80,11 @@
         }
       </div>
     }
+    @if (hasCustomerProfileGroups) {
+      <div class="tb-manage-owner-info">
+        {{ 'owner-and-groups.customer-profile-hint' | translate }}
+      </div>
+    }
   </mat-dialog-content>
   <mat-dialog-actions align="end">
     <button mat-button type="button" (click)="cancel()">{{ 'action.cancel' | translate }}</button>

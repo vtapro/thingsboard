@@ -43,7 +43,9 @@ public class UserGroupController extends BaseController {
             @Parameter(description = "A JSON value representing the user groups.")
             @RequestBody RbacUserGroupSettings settings) throws ThingsboardException {
         accessControlService.checkPermission(getCurrentUser(), Resource.ADMIN_SETTINGS, Operation.WRITE);
-        return userGroupService.saveUserGroupSettings(getCurrentUser().getTenantId(), settings);
+        RbacUserGroupSettings saved = userGroupService.saveUserGroupSettings(getCurrentUser().getTenantId(), settings);
+        accessControlService.onPermissionsChanged();
+        return saved;
     }
 
 }

@@ -460,6 +460,15 @@ public class TbRbacAccessControlService implements AccessControlService {
         }
     }
 
+    @Override
+    public void onPermissionsChanged() {
+        // roles, entity groups, user groups and shares are all part of the permission settings of a tenant
+        effectiveRoleCache.clear();
+        entityGroupCache.clear();
+        userGroupCache.clear();
+        shareCache.clear();
+    }
+
     private record OwnerIndex(long createdTs, Map<UUID, String> owners) {
     }
 

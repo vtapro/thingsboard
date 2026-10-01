@@ -67,7 +67,9 @@ public class ShareController extends BaseController {
             throws ThingsboardException {
         accessControlService.checkPermission(getCurrentUser(), Resource.ADMIN_SETTINGS, Operation.WRITE);
         validate(settings);
-        return shareService.saveShareSettings(getCurrentUser().getTenantId(), settings);
+        RbacShareSettings saved = shareService.saveShareSettings(getCurrentUser().getTenantId(), settings);
+        accessControlService.onPermissionsChanged();
+        return saved;
     }
 
     /**
